@@ -71,9 +71,12 @@ class Board:
         with open(filename, "w") as json_file:
             json.dump(data, json_file)
 
-    def convert_screen_to_xy(self, x, y):
-        x = (x - self.center.x)/self.scale
-        y = (self.center.y - y)/self.scale
+    # convert screen points (key.x, key.y) to x, y
+    def convert_screen_to_xy(self, keyx, keyy):
+        canvas_x = self.board.canvasx(keyx)
+        canvas_y = self.board.canvasy(keyy)
+        x = (canvas_x - self.center.x)/self.scale
+        y = (self.center.y - canvas_y)/self.scale
         return x, y
 
     def convert_xy_to_screen(self, x, y):
