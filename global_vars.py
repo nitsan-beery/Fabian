@@ -6,6 +6,7 @@ WINDWO_SIZE = str(WINDOW_WIDTH)+'x'+str(WINDOW_HEIGHT)
 BOARD_HEIGHT = 10000
 BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
+select_mode = 'edge'
 board_bg_color = '#D1EDFF'
 default_color = '#0099FF'
 marked_entity_color = 'orange'

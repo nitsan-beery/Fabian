@@ -29,6 +29,7 @@ class FabianBoard(Board):
         self.scale = scale
         self.window_main.title("Fabian")
         self.button_load.config(command=lambda: self.load_dxf())
+        self.button_save.config(command=lambda: self.save_dxf())
         self.button_zoom_in = tk.Button(self.frame_2, text='Zoom In', command=lambda: self.zoom(4/3))
         self.button_zoom_out = tk.Button(self.frame_2, text='Zoom Out', command=lambda: self.zoom(3/4))
         self.button_zoom_in.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
@@ -37,6 +38,7 @@ class FabianBoard(Board):
 
         self.dxfDoc = None
         self.entity_list = []
+        self.select_mode = gv.select_mode
         self.selected_entity = 0
         self.selected_entity_mark = None
         self.new_line_edge = [None, None]
@@ -54,14 +56,16 @@ class FabianBoard(Board):
         if self.selected_entity_mark is None:
             return
         x, y = self.convert_screen_to_xy(key.x, key.y)
-        p = Point(x, y)
         e = self.entity_list[self.selected_entity]
-        d_left = gv.get_distance_between_points(Point(x, y), e.left_bottom)
-        d_right = gv.get_distance_between_points(Point(x, y), e.right_up)
-        if d_left < d_right:
-            p = e.left_bottom
+        if self.select_mode == 'edge':
+            d_left = gv.get_distance_between_points(Point(x, y), e.left_bottom)
+            d_right = gv.get_distance_between_points(Point(x, y), e.right_up)
+            if d_left < d_right:
+                p = e.left_bottom
+            else:
+                p = e.right_up
         else:
-            p = e.right_up
+            d, p = self.get_distance_from_entity_and_nearest_point(Point(x, y), self.selected_entity)
         # first point
         if self.new_line_edge[0] is None:
             self.new_line_edge[0] = p
@@ -138,7 +142,7 @@ class FabianBoard(Board):
         if self.new_line_edge[0] is not None:
             self.board.delete(self.temp_line_mark)
             self.temp_line_mark = self.create_line(self.new_line_edge[0], p, gv.temp_line_color)
-        selected_d = self.get_distance_from_entity_and_nearest_point(p, self.selected_entity)
+        selected_d, nearest_point = self.get_distance_from_entity_and_nearest_point(p, self.selected_entity)
         i, d = self.find_nearest_entity(p)
         if selected_d*self.scale > 5:
             self.remove_selected_entity_mark()
@@ -147,13 +151,33 @@ class FabianBoard(Board):
             self.mark_entity(self.selected_entity)
             self.selected_entity = i
 
+    def save_dxf(self):
+        doc = ezdxf.new('R2010')
+        msp = doc.modelspace()
+        for e in self.entity_list:
+            if e.shape == 'LINE':
+                msp.add_line((e.start.x, e.start.y), (e.end.x, e.end.y))
+            elif e.shape == 'ARC':
+                msp.add_arc((e.center.x, e.center.y), e.radius, e.arc_start_angle, e.arc_end_angle)
+            elif e.shape == 'CIRCLE':
+                msp.add_circle((e.center.x, e.center.y), e.radius)
+        default_file_name = f'Fabian'
+        filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./DXF files/", title="Select file",
+                                                initialfile=default_file_name, defaultextension=".dxf",
+                                                filetypes=(("dxf files", "*.dxf"), ("all files", "*.*")))
+        if filename == '':
+            return
+        doc.saveas(filename)
+
     def load_dxf(self):
         filename = filedialog.askopenfilename(parent=self.window_main, initialdir="./DXF files/",
                                               title="Select file",
                                               filetypes=(("DXF files", "*.dxf"), ("all files", "*.*")))
         if filename == '':
             return
-        self.dxfDoc = ezdxf.readfile(filename)
+        doc = ezdxf.readfile(filename)
+        self.convert_doc_to_entity_list(doc)
+        self.show_all_entities()
 
     def mark_selected_entity(self):
         if self.selected_entity_mark is None:
@@ -248,8 +272,8 @@ class FabianBoard(Board):
             p1, p2 = self.get_sorted_points(p1, p2, sort_by_x=False)
         e.start = e.left_bottom = p1
         e.end = e.right_up = p2
-#        e.is_marked = True
-#        e.color = gv.marked_entity_color
+        e.is_marked = True
+        e.color = gv.marked_entity_color
         self.entity_list.append(e)
         self.board.delete(self.new_line_edge_mark[0])
         self.board.delete(self.new_line_edge_mark[1])
@@ -260,9 +284,9 @@ class FabianBoard(Board):
 
     def find_nearest_entity(self, p):
         min_d_index = 0
-        min_d = self.get_distance_from_entity_and_nearest_point(p, 0)
+        min_d, nearest_point = self.get_distance_from_entity_and_nearest_point(p, 0)
         for i in range(len(self.entity_list)):
-            d = self.get_distance_from_entity_and_nearest_point(p, i)
+            d, nearest_point = self.get_distance_from_entity_and_nearest_point(p, i)
             if d < min_d:
                 min_d_index = i
                 min_d = d
@@ -276,17 +300,25 @@ class FabianBoard(Board):
         if e.shape == 'CIRCLE':
             d = math.fabs(gv.get_distance_between_points(e.center, p)-e.radius)
             alfa = self.get_alfa(e.center, p)*math.pi/180
-            x = math.cos(alfa)*e.radius
-            y = math.sin(alfa)*e.radius
-            nearest_point = Point(x, y)
+            if alfa is None:
+                d = e.radius
+                alfa = 0
+            px = e.center.x+math.cos(alfa)*e.radius
+            py = e.center.y+math.sin(alfa)*e.radius
+            nearest_point = Point(px, py)
         elif e.shape == 'ARC':
             alfa = self.get_alfa(e.center, p)
             if alfa is None:
                 d = e.radius
+                nearest_point = e.start
             if e.arc_end_angle > 360 and alfa < e.arc_start_angle:
                 alfa += 360
             if e.arc_start_angle <= alfa <= e.arc_end_angle:
                 d = math.fabs(gv.get_distance_between_points(e.center, p) - e.radius)
+                alfa = alfa*math.pi/180
+                px = e.center.x + math.cos(alfa) * e.radius
+                py = e.center.y + math.sin(alfa) * e.radius
+                nearest_point = Point(px, py)
             else:
                 mid_angle = (e.arc_start_angle + e.arc_end_angle)/2
                 if mid_angle < 180:
@@ -294,8 +326,10 @@ class FabianBoard(Board):
                 a1 = (mid_angle-180)
                 if a1 < alfa < mid_angle:
                     d = gv.get_distance_between_points(e.start, p)
+                    nearest_point = e.start
                 else:
                     d = gv.get_distance_between_points(e.end, p)
+                    nearest_point = e.end
         elif e.shape == 'LINE':
             alfa = self.get_alfa(e.start, e.end)
             endx = math.fabs(self.get_shifted_point(e.end, e.start, -alfa).x)
@@ -303,11 +337,17 @@ class FabianBoard(Board):
             x = p.x
             if 0 <= x <= endx:
                 d = math.fabs(p.y)
+                alfa = alfa * math.pi / 180
+                px = math.cos(alfa)*x+e.start.x
+                py = math.sin(alfa)*x+e.start.y
+                nearest_point = Point(px, py)
             elif x < 0:
                 d = gv.get_distance_between_points(Point(0, 0), p)
+                nearest_point = e.start
             else:
                 d = gv.get_distance_between_points(Point(endx, 0), p)
-        return round(d, 3)
+                nearest_point = e.end
+        return round(d, 3), nearest_point
 
     # return the angle vector of Point p relative to Point center, None if p == center
     def get_alfa(self, center, p):
@@ -391,10 +431,10 @@ class FabianBoard(Board):
             self.board.delete(self.selected_entity_mark)
             self.selected_entity_mark = None
 
-    def convert_doc_to_entity_list(self):
-        if self.dxfDoc is None:
+    def convert_doc_to_entity_list(self, doc=None):
+        if doc is None:
             return
-        msp = self.dxfDoc.modelspace()
+        msp = doc.modelspace()
         for shape in shapes:
             for dxf_entity in msp.query(shape):
                 e = Entity(shape)
