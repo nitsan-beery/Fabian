@@ -29,11 +29,15 @@ class FabianBoard(Board):
         self.scale = scale
         self.window_main.title("Fabian")
         self.button_load.config(command=lambda: self.load_dxf())
-        self.button_save.config(command=lambda: self.save_dxf())
+        self.button_save.config(text='Save dxf', command=lambda: self.save_dxf())
         self.button_zoom_in = tk.Button(self.frame_2, text='Zoom In', command=lambda: self.zoom(4/3))
         self.button_zoom_out = tk.Button(self.frame_2, text='Zoom Out', command=lambda: self.zoom(3/4))
+        self.button_center = tk.Button(self.frame_2, text='Center view', command=lambda: self.center_view())
         self.button_zoom_in.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_zoom_out.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
+        self.button_center.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
+        self.button_save_inp = tk.Button(self.frame_2, text='Save inp', command=lambda: self.save_inp())
+        self.button_save_inp.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
         self.board.config(bg=gv.board_bg_color)
 
         self.dxfDoc = None
@@ -45,6 +49,8 @@ class FabianBoard(Board):
         self.new_line_edge_mark = [None, None]
         self.new_line_mark = None
         self.temp_line_mark = None
+        self.temp_rect_start_point = None
+        self.temp_rect_mark = None
 
         self.board.bind('<Motion>', self.motion)
         self.board.bind('<Button-1>', self.mouse_1_pressed)
@@ -52,10 +58,33 @@ class FabianBoard(Board):
         self.board.bind('<ButtonRelease-1>', self.mouse_1_released)
         self.board.bind('<Button-3>', self.mouse_3_pressed)
 
+    def reset_board(self):
+        self.board.delete('all')
+        self.set_screen_position(self.center.x, self.center.y)
+        self.dxfDoc = None
+        self.entity_list = []
+        self.select_mode = gv.select_mode
+        self.selected_entity = 0
+        self.selected_entity_mark = None
+        self.new_line_edge = [None, None]
+        self.new_line_edge_mark = [None, None]
+        # line after selecting 2 points
+        self.new_line_mark = None
+        # line following mouse
+        self.temp_line_mark = None
+        self.temp_rect_start_point = None
+        self.temp_rect_mark = None
+
     def mouse_1_pressed(self, key):
-        if self.selected_entity_mark is None:
-            return
+        if self.temp_rect_mark is not None:
+            self.board.delete(self.temp_rect_mark)
         x, y = self.convert_screen_to_xy(key.x, key.y)
+        if self.selected_entity_mark is None:
+            self.temp_rect_start_point = Point(x, y)
+#            canvas_x = self.board.canvasx(key.x)
+#            canvas_y = self.board.canvasy(key.y)
+#            self.temp_rect_start_point = Point(canvas_x, canvas_y)
+            return
         e = self.entity_list[self.selected_entity]
         if self.select_mode == 'edge':
             d_left = gv.get_distance_between_points(Point(x, y), e.left_bottom)
@@ -110,10 +139,49 @@ class FabianBoard(Board):
                     self.new_line_edge[1] = None
 
     def mouse_1_motion(self, key):
-        self.motion(key)
+        if self.temp_rect_start_point is None:
+            self.motion(key)
+            return
+        p1 = Point()
+        p1.x, p1.y = self.convert_xy_to_screen(self.temp_rect_start_point.x, self.temp_rect_start_point.y)
+        canvas_x = self.board.canvasx(key.x)
+        canvas_y = self.board.canvasy(key.y)
+        p2 = Point(canvas_x, canvas_y)
+        if self.temp_rect_mark is not None:
+            self.board.delete(self.temp_rect_mark)
+        self.temp_rect_mark = self.board.create_rectangle(p1.x, p1.y, p2.x, p2.y)
 
     def mouse_1_released(self, key):
-        pass
+        if self.temp_rect_start_point is not None:
+            p1 = self.temp_rect_start_point
+            p1.x, p1.y = self.convert_xy_to_screen(p1.x, p1.y)
+            p2 = Point()
+            p2.x = self.board.canvasx(key.x)
+            p2.y = self.board.canvasy(key.y)
+            left = p1.x
+            right = p2.x
+            lower = p1.y
+            upper = p2.y
+            if left > right:
+                left, right = right, left
+            if upper > lower:
+                upper, lower = lower, upper
+            enclosed_parts = self.board.find_enclosed(left, upper, right, lower)
+            i = 0
+            for e in self.entity_list:
+                if e.board_part in enclosed_parts:
+                    if e.is_marked:
+                        e.is_marked = False
+                        self.change_entity_color(i, gv.default_color)
+                    else:
+                        e.is_marked = True
+                        self.change_entity_color(i, gv.marked_entity_color)
+                i += 1
+
+        if self.temp_rect_mark is not None:
+            self.board.delete(self.temp_rect_mark)
+            self.temp_rect_mark = None
+        self.temp_rect_start_point = None
 
     def mouse_3_pressed(self, key):
         menu = tk.Menu(self.board, tearoff=0)
@@ -151,6 +219,32 @@ class FabianBoard(Board):
             self.mark_entity(self.selected_entity)
             self.selected_entity = i
 
+    def save_inp(self):
+        node_list = []
+        element_list = []
+        for e in self.entity_list:
+            if e.shape == 'CIRCLE':
+                continue
+            p = Point(round(e.start.x, gv.accuracy), round(e.start.y, gv.accuracy))
+            if p not in node_list:
+                node_list.append(p)
+            p = Point(round(e.end.x, gv.accuracy), round(e.end.y, gv.accuracy))
+            if p not in node_list:
+                node_list.append(p)
+        filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./INP files/", title="Select file",
+                                                initialfile='Fabian', defaultextension=".inp",
+                                                filetypes=(("inp files", "*.inp"), ("all files", "*.*")))
+        if filename == '':
+            return
+        f = open(filename, 'w')
+        f.write('*Node\n')
+        i = 0
+        for p in node_list:
+            s = f'      {i}, {p.x}, {p.y}, 0\n'
+            f.write(s)
+            i += 1
+        f.close()
+
     def save_dxf(self):
         doc = ezdxf.new('R2010')
         msp = doc.modelspace()
@@ -175,9 +269,37 @@ class FabianBoard(Board):
                                               filetypes=(("DXF files", "*.dxf"), ("all files", "*.*")))
         if filename == '':
             return
+        self.reset_board()
         doc = ezdxf.readfile(filename)
         self.convert_doc_to_entity_list(doc)
+        self.center_view()
         self.show_all_entities()
+
+    def center_view(self):
+        x, y = self.get_center()
+        if x is None:
+            self.set_screen_position(self.center.x, self.center.y)
+        else:
+            self.set_screen_position(x, y)
+
+    def get_center(self):
+        if len(self.entity_list) == 0:
+            return 0, 0
+        left = self.entity_list[0].left_bottom.x
+        right = self.entity_list[0].right_up.x
+        top = self.entity_list[0].right_up.y
+        bottom = self.entity_list[0].left_bottom.y
+        for e in self.entity_list:
+            if e.left_bottom.x < left:
+                left = e.left_bottom.x
+            if e.left_bottom.y < bottom:
+                bottom = e.left_bottom.y
+            if e.right_up.x > right:
+                right = e.right_up.x
+            if e.right_up.y > top:
+                top = e.right_up.y
+        x, y = self.convert_xy_to_screen((left+right)/2, (bottom+top)/2)
+        return x, y
 
     def mark_selected_entity(self):
         if self.selected_entity_mark is None:
@@ -347,7 +469,7 @@ class FabianBoard(Board):
             else:
                 d = gv.get_distance_between_points(Point(endx, 0), p)
                 nearest_point = e.end
-        return round(d, 3), nearest_point
+        return round(d, gv.accuracy), nearest_point
 
     # return the angle vector of Point p relative to Point center, None if p == center
     def get_alfa(self, center, p):
@@ -472,7 +594,7 @@ class FabianBoard(Board):
     # if sort by x return left --> right points. if left == right return bottom --> up
     # else: return bottom --> up. if bottom == up return left --> right
     def get_sorted_points(self, p1, p2, sort_by_x=True):
-        if p1 == p2:
+        if p1.x == p2.x and p1.y == p2.y:
             return p1, p2
         if sort_by_x:
             if p1.x > p2.x:
@@ -491,6 +613,7 @@ class FabianBoard(Board):
 
     def zoom(self, factor):
         self.scale = round(self.scale*factor, 1)
+        self.center_view()
         self.update_view()
 
     def update_view(self):

@@ -32,14 +32,20 @@ class Board:
             self.button_save.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
 
         self.window_main.geometry(gv.WINDWO_SIZE)
-        self.board.xview_moveto((gv.BOARD_WIDTH-gv.WINDOW_WIDTH)/2/gv.BOARD_WIDTH)
-        self.board.yview_moveto((gv.BOARD_HEIGHT-gv.WINDOW_HEIGHT)/2/gv.BOARD_HEIGHT)
         self.window_main.update()
         self.center = Point(int(gv.BOARD_WIDTH/2), int(gv.BOARD_HEIGHT/2))
+        self.set_screen_position(self.center.x, self.center.y)
+#        self.board.xview_moveto((gv.BOARD_WIDTH-gv.WINDOW_WIDTH)/2/gv.BOARD_WIDTH)
+#        self.board.yview_moveto((gv.BOARD_HEIGHT-gv.WINDOW_HEIGHT)/2/gv.BOARD_HEIGHT)
 
         self.scale = 1
 
         self.board.bind('<MouseWheel>', self.mouse_wheel)
+
+    # scroll view to the center of (x, y) in canvas coordinates
+    def set_screen_position(self, x, y):
+        self.board.xview_moveto((x-self.board.winfo_width()/2)/gv.BOARD_WIDTH)
+        self.board.yview_moveto((y-self.board.winfo_height()/2)/gv.BOARD_HEIGHT)
 
     def mouse_wheel(self, key):
         if key.delta < 0:
@@ -57,17 +63,13 @@ class Board:
             data = json.load(json_file)
         return data
 
-    def get_data(self):
-        return 1
-
-    def save_data(self):
-        default_file_name = f'Fabian'
+    def save_data(self, data=None, file_name='Fabian'):
+        default_file_name = file_name
         filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./data_files/", title="Select file",
                                                 initialfile=default_file_name, defaultextension=".json",
                                                 filetypes=(("json files", "*.json"), ("all files", "*.*")))
-        if filename == '':
+        if filename == '' or data is None:
             return
-        data = self.get_data()
         with open(filename, "w") as json_file:
             json.dump(data, json_file)
 

@@ -6,13 +6,15 @@ WINDWO_SIZE = str(WINDOW_WIDTH)+'x'+str(WINDOW_HEIGHT)
 BOARD_HEIGHT = 10000
 BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
+edge_line_mark_radius = 5
+accuracy = 9
+
 select_mode = 'edge'
 board_bg_color = '#D1EDFF'
 default_color = '#0099FF'
 marked_entity_color = 'orange'
 selected_item_color = '#FFFFcc'
 temp_line_color = 'red'
-edge_line_mark_radius = 5
 
 class Point:
     def __init__(self, x=0, y=0):
