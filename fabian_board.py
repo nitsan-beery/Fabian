@@ -1,7 +1,7 @@
 from board import *
 import ezdxf
 import math
-from operator import attrgetter
+from operator import attrgetter, itemgetter
 
 #shapes = {'ARC'}
 shapes = {'CIRCLE', 'LINE', 'ARC'}
@@ -23,12 +23,25 @@ class Entity:
         self.color = gv.default_color
 
 
+class Neighbor:
+    def __init__(self, node_index=0, angle_from_p=0):
+        self.node_index = node_index
+        self.angle_from_p = angle_from_p
+        self.is_part_of_element = False
+
+
+class Node:
+    def __init__(self, point):
+        self.p = point
+        self.neighbors_list = []
+
+
 class FabianBoard(Board):
     def __init__(self, scale=1):
         super().__init__(True)
         self.scale = scale
         self.window_main.title("Fabian")
-        self.button_load.config(command=lambda: self.load_dxf())
+        self.button_load.config(text='Load dxf', command=lambda: self.load_dxf())
         self.button_save.config(text='Save dxf', command=lambda: self.save_dxf())
         self.button_zoom_in = tk.Button(self.frame_2, text='Zoom In', command=lambda: self.zoom(4/3))
         self.button_zoom_out = tk.Button(self.frame_2, text='Zoom Out', command=lambda: self.zoom(3/4))
@@ -42,12 +55,17 @@ class FabianBoard(Board):
 
         self.dxfDoc = None
         self.entity_list = []
+        self.node_list = []
+        self.element_list = []
         self.select_mode = gv.select_mode
+        self.work_mode = gv.work_mode
         self.selected_entity = 0
         self.selected_entity_mark = None
         self.new_line_edge = [None, None]
         self.new_line_edge_mark = [None, None]
+        # line after selecting 2 points
         self.new_line_mark = None
+        # line following mouse
         self.temp_line_mark = None
         self.temp_rect_start_point = None
         self.temp_rect_mark = None
@@ -63,14 +81,15 @@ class FabianBoard(Board):
         self.set_screen_position(self.center.x, self.center.y)
         self.dxfDoc = None
         self.entity_list = []
+        self.node_list = []
+        self.element_list = []
         self.select_mode = gv.select_mode
+        self.work_mode = gv.work_mode
         self.selected_entity = 0
         self.selected_entity_mark = None
         self.new_line_edge = [None, None]
         self.new_line_edge_mark = [None, None]
-        # line after selecting 2 points
         self.new_line_mark = None
-        # line following mouse
         self.temp_line_mark = None
         self.temp_rect_start_point = None
         self.temp_rect_mark = None
@@ -81,9 +100,6 @@ class FabianBoard(Board):
         x, y = self.convert_screen_to_xy(key.x, key.y)
         if self.selected_entity_mark is None:
             self.temp_rect_start_point = Point(x, y)
-#            canvas_x = self.board.canvasx(key.x)
-#            canvas_y = self.board.canvasy(key.y)
-#            self.temp_rect_start_point = Point(canvas_x, canvas_y)
             return
         e = self.entity_list[self.selected_entity]
         if self.select_mode == 'edge':
@@ -185,22 +201,48 @@ class FabianBoard(Board):
 
     def mouse_3_pressed(self, key):
         menu = tk.Menu(self.board, tearoff=0)
+        work_mode_menu = tk.Menu(menu, tearoff=0)
+        work_mode_menu.add_command(label="Select parts", command=lambda: self.change_work_mode('select'))
+        work_mode_menu.add_command(label="Build net", command=lambda: self.change_work_mode('net'))
+        work_mode_menu.add_command(label="Quit")
+        select_mode_menu = tk.Menu(menu, tearoff=0)
+        select_mode_menu.add_command(label="Edges", command=lambda: self.change_selection_mode('edge'))
+        select_mode_menu.add_command(label="Points", command=lambda: self.change_selection_mode('point'))
+        select_mode_menu.add_command(label="Quit")
+        menu.add_cascade(label='Work mode', menu=work_mode_menu)
+        menu.add_separator()
+        menu.add_cascade(label='Select mode', menu=select_mode_menu)
+        menu.add_separator()
         if self.new_line_edge[0] is not None:
             self.board.delete(self.temp_line_mark)
         if self.new_line_edge[1] is not None:
             menu.add_command(label="add line", command=self.add_line_to_entity_list)
             menu.add_command(label="remove line", command=self.remove_temp_line)
+            menu.add_separator()
         if self.selected_entity_mark is not None:
             menu.add_command(label="mark entity", command=self.mark_selected_entity)
             menu.add_command(label="unmark entity", command=self.unmark_selected_entity)
+            menu.add_command(label="split entity", command=lambda: self.split_entity(self.selected_entity))
             menu.add_command(label="delete entity", command=self.remove_selected_entity_from_list)
-        else:
+            menu.add_separator()
+        elif len(self.entity_list) > 0:
             menu.add_command(label="mark all entities", command=self.mark_all_entities)
             menu.add_command(label="unmark all entities", command=self.unmark_all_entities)
-            menu.add_command(label="delete marked entities", command=self.remove_marked_entities_from_list)
-            menu.add_command(label="delete all non marked entities", command=self.remove_non_marked_entities_from_list)
+            menu.add_separator()
+            if self.work_mode == 'select':
+                menu.add_command(label="delete marked entities", command=self.remove_marked_entities_from_list)
+                menu.add_command(label="delete all non marked entities", command=self.remove_non_marked_entities_from_list)
+                menu.add_separator()
+            elif self.work_mode == 'net':
+                pass
         menu.add_command(label="quit")
         menu.post(key.x_root, key.y_root)
+
+    def change_work_mode(self, mode):
+        self.work_mode = mode
+
+    def change_selection_mode(self, mode):
+        self.select_mode = mode
 
     def motion(self, key):
         if len(self.entity_list) == 0:
@@ -219,18 +261,117 @@ class FabianBoard(Board):
             self.mark_entity(self.selected_entity)
             self.selected_entity = i
 
-    def save_inp(self):
+    # split entity_list[i] into n parts
+    def split_entity(self, i=0, n=4):
+        e = self.entity_list[i]
+        new_part_list = []
+        for m in range(n):
+            new_part_list.append(Entity(e.shape))
+        if e.shape == 'ARC':
+            angle = (e.arc_end_angle-e.arc_start_angle) / n
+            new_part_list[0].center = e.center
+            new_part_list[0].radius = e.radius
+            new_part_list[0].arc_start_angle = e.arc_start_angle
+            new_part_list[0].arc_end_angle = e.arc_start_angle + angle
+            new_part_list[0] = self.set_arc_edge_points(new_part_list[0])
+            for m in range(1, n):
+                new_part_list[m].center = e.center
+                new_part_list[m].radius = e.radius
+                new_part_list[m].arc_start_angle = new_part_list[m-1].arc_end_angle
+                if new_part_list[m].arc_start_angle >= 360:
+                    new_part_list[m].arc_start_angle -= 360
+                new_part_list[m].arc_end_angle = new_part_list[m].arc_start_angle + angle
+                new_part_list[m] = self.set_arc_edge_points(new_part_list[m])
+        elif e.shape == 'LINE':
+            alfa = self.get_alfa(e.start, e.end)*math.pi/180
+            d = gv.get_distance_between_points(e.start, e.end)
+            step = d/n
+            new_part_list[0].start = new_part_list[0].left_bottom = e.start
+            new_part_list[0].end = new_part_list[0].right_up = Point(e.start.x+step*math.cos(alfa), e.start.y+step*math.sin(alfa))
+            for m in range(1, n):
+                new_part_list[m].start = new_part_list[m].left_bottom = new_part_list[m-1].end
+                new_part_list[m].end = new_part_list[m].right_up = Point(new_part_list[m].start.x + step * math.cos(alfa),
+                                                                         new_part_list[m].start.y + step * math.sin(alfa))
+        elif e.shape == 'CIRCLE':
+            return
+        self.hide_entity(i)
+        self.entity_list.remove(e)
+        for m in range(n):
+            self.entity_list.append(new_part_list[m])
+            self.show_entity(-1)
+
+    def get_index_of_node_with_point_p(self, p, node_list):
+        for i in range(len(node_list)):
+            if p.is_equal(node_list[i].p):
+                return i
+        return None
+
+    # return index of the neighbor that can make an element counter clockwise
+    def get_next_relevant_neighbor(self, node, prev_angle):
+        if len(node.neighbors_list) == 0:
+            return None
+        next_neighbor = None
+        min_angle = 180
+        for i in range(len(node.neighbors_list)):
+            n = node.neighbors_list[i]
+            if n.is_part_of_element:
+                continue
+            alfa = n.angle_from_p
+            if round(alfa, 0) <= round(prev_angle, 0):
+                alfa += 360
+            angle = alfa - prev_angle
+            if angle < min_angle:
+                min_angle = angle
+                next_neighbor = i
+        return next_neighbor
+
+    def create_node_list(self):
         node_list = []
-        element_list = []
-        for e in self.entity_list:
+        for i in range(len(self.entity_list)):
+            e = self.entity_list[i]
             if e.shape == 'CIRCLE':
                 continue
-            p = Point(round(e.start.x, gv.accuracy), round(e.start.y, gv.accuracy))
-            if p not in node_list:
-                node_list.append(p)
-            p = Point(round(e.end.x, gv.accuracy), round(e.end.y, gv.accuracy))
-            if p not in node_list:
-                node_list.append(p)
+            p1 = Point(round(e.start.x, gv.accuracy), round(e.start.y, gv.accuracy))
+            p2 = Point(round(e.end.x, gv.accuracy), round(e.end.y, gv.accuracy))
+            node1 = Node(p1)
+            node2 = Node(p2)
+            p1_index = self.get_index_of_node_with_point_p(p1, node_list)
+            p2_index = self.get_index_of_node_with_point_p(p2, node_list)
+            if p1_index is None:
+                p1_index = len(node_list)
+                node_list.append(node1)
+            if p2_index is None:
+                p2_index = len(node_list)
+                node_list.append(node2)
+            alfa = self.get_alfa(p1, p2)
+            node_list[p1_index].neighbors_list.append(Neighbor(p2_index, alfa))
+            alfa = (alfa+180) % 360
+            node_list[p2_index].neighbors_list.append(Neighbor(p1_index, alfa))
+        self.node_list = node_list
+
+    def create_element_list(self):
+        element_list = []
+        # try to set a new element
+        for i in range(len(self.node_list)):
+            node = self.node_list[i]
+            new_element = [i]
+            next_neighbor_index = self.get_next_relevant_neighbor(node, 0)
+            while next_neighbor_index is not None:
+                node.neighbors_list[next_neighbor_index].is_part_of_element = True
+                next_node_index = node.neighbors_list[next_neighbor_index].node_index
+                if next_node_index == i:
+                    break
+                new_element.append(next_node_index)
+                alfa = node.neighbors_list[next_neighbor_index].angle_from_p
+                node = self.node_list[next_node_index]
+                next_neighbor_index = self.get_next_relevant_neighbor(node, alfa)
+            if next_node_index == i and len(new_element) > 2:
+                element_list.append(new_element)
+        self.element_list = element_list
+
+    def save_inp(self):
+        self.create_node_list()
+        self.create_element_list()
         filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./INP files/", title="Select file",
                                                 initialfile='Fabian', defaultextension=".inp",
                                                 filetypes=(("inp files", "*.inp"), ("all files", "*.*")))
@@ -238,11 +379,21 @@ class FabianBoard(Board):
             return
         f = open(filename, 'w')
         f.write('*Node\n')
-        i = 0
-        for p in node_list:
-            s = f'      {i}, {p.x}, {p.y}, 0\n'
+        i = 1
+        for n in self.node_list:
+            s = f'{i}, {n.p.x}, {n.p.y}, 0\n'
             f.write(s)
             i += 1
+        f.write('*Element\n')
+        i = 1
+        for e in self.element_list:
+            s = f'{i}'
+            for j in range(len(e)):
+                s += f', {e[j]}'
+            s += '\n'
+            f.write(s)
+            i += 1
+
         f.close()
 
     def save_dxf(self):
@@ -284,7 +435,7 @@ class FabianBoard(Board):
 
     def get_center(self):
         if len(self.entity_list) == 0:
-            return 0, 0
+            return self.center.x, self.center.y
         left = self.entity_list[0].left_bottom.x
         right = self.entity_list[0].right_up.x
         top = self.entity_list[0].right_up.y
@@ -582,14 +733,21 @@ class FabianBoard(Board):
                         end_angle += 360
                     e.arc_start_angle = start_angle
                     e.arc_end_angle = end_angle
-                    p1 = Point(e.center.x + e.radius*math.cos(e.arc_start_angle*math.pi/180), e.center.y + e.radius*math.sin(e.arc_start_angle*math.pi/180))
-                    p2 = Point(e.center.x + e.radius*math.cos(e.arc_end_angle*math.pi/180), e.center.y + e.radius*math.sin(e.arc_end_angle*math.pi/180))
-                    e.start = p1
-                    e.end = p2
-                    p1, p2 = self.get_sorted_points(p1, p2, sort_by_x=True)
-                    e.left_bottom = p1
-                    e.right_up = p2
+                    e = self.set_arc_edge_points(e)
                 self.entity_list.append(e)
+
+    # ser arc start point, end point, left_bottom and right_up
+    def set_arc_edge_points(self, e):
+        p1 = Point(e.center.x + e.radius * math.cos(e.arc_start_angle * math.pi / 180),
+                   e.center.y + e.radius * math.sin(e.arc_start_angle * math.pi / 180))
+        p2 = Point(e.center.x + e.radius * math.cos(e.arc_end_angle * math.pi / 180),
+                   e.center.y + e.radius * math.sin(e.arc_end_angle * math.pi / 180))
+        e.start = p1
+        e.end = p2
+        p1, p2 = self.get_sorted_points(p1, p2, sort_by_x=True)
+        e.left_bottom = p1
+        e.right_up = p2
+        return e
 
     # if sort by x return left --> right points. if left == right return bottom --> up
     # else: return bottom --> up. if bottom == up return left --> right

@@ -35,8 +35,6 @@ class Board:
         self.window_main.update()
         self.center = Point(int(gv.BOARD_WIDTH/2), int(gv.BOARD_HEIGHT/2))
         self.set_screen_position(self.center.x, self.center.y)
-#        self.board.xview_moveto((gv.BOARD_WIDTH-gv.WINDOW_WIDTH)/2/gv.BOARD_WIDTH)
-#        self.board.yview_moveto((gv.BOARD_HEIGHT-gv.WINDOW_HEIGHT)/2/gv.BOARD_HEIGHT)
 
         self.scale = 1
 
