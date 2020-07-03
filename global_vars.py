@@ -31,4 +31,26 @@ class Point:
 def get_distance_between_points(p1, p2):
     return math.sqrt(pow(p1.x-p2.x, 2) + pow(p1.y-p2.y, 2))
 
+# if sort by x return left --> right points. if left == right return bottom --> up
+# else: return bottom --> up. if bottom == up return left --> right
+def get_sorted_points(p1, p2, sort_by_x=True):
+    if p1.x == p2.x and p1.y == p2.y:
+        return p1, p2
+    if sort_by_x:
+        if p1.x > p2.x:
+            return p2, p1
+        elif p1.x < p2.x:
+            return p1, p2
+        else:
+            return get_sorted_points(p1, p2, sort_by_x=False)
+    else:
+        if p1.y > p2.y:
+            return p2, p1
+        elif p1.y < p2.y:
+            return p1, p2
+        else:
+            return get_sorted_points(p1, p2, sort_by_x=True)
+
+
+
 

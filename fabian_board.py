@@ -8,19 +8,50 @@ shapes = {'CIRCLE', 'LINE', 'ARC'}
 
 
 class Entity:
-    def __init__(self, shape=None):
+    def __init__(self, shape=None, center=None, radius=None, start=None, end=None, start_angle=None, end_angle=None):
         self.shape = shape
-        self.center = None
-        self.radius = None
-        self.arc_start_angle = None
-        self.arc_end_angle = None
-        self.start = None
-        self.end = None
+        self.center = center
+        self.radius = radius
+        self.arc_start_angle = start_angle
+        self.arc_end_angle = end_angle
+        self.start = start
+        self.end = end
         self.left_bottom = None
         self.right_up = None
+        self.set_arc()
+        self.set_left_bottom_right_up()
         self.is_marked = False
         self.board_part = None
         self.color = gv.default_color
+
+    # ser arc start point, end point, left_bottom and right_up
+    def set_arc(self):
+        if self.shape != 'ARC' or self.arc_start_angle is None or self.arc_end_angle is None:
+            return
+        if self.arc_start_angle >= 360:
+            self.arc_start_angle -= 360
+            self.arc_end_angle -= 360
+        if self.arc_end_angle < self.arc_start_angle:
+            self.arc_end_angle += 360
+        p1 = Point(self.center.x + self.radius * math.cos(self.arc_start_angle * math.pi / 180),
+                   self.center.y + self.radius * math.sin(self.arc_start_angle * math.pi / 180))
+        p2 = Point(self.center.x + self.radius * math.cos(self.arc_end_angle * math.pi / 180),
+                   self.center.y + self.radius * math.sin(self.arc_end_angle * math.pi / 180))
+        self.start = p1
+        self.end = p2
+
+    def set_left_bottom_right_up(self):
+        if self.shape != 'CIRCLE':
+            if self.start is None or self.end is None:
+                self.left_bottom, self.right_up = None, None
+            else:
+                self.left_bottom, self.right_up = gv.get_sorted_points(self.start, self.end, sort_by_x=True)
+        else:
+            if self.center is None or self.radius is None:
+                self.left_bottom, self.right_up = None, None
+            else:
+                self.left_bottom = Point(self.center.x - self.radius, self.center.y - self.radius)
+                self.right_up = Point(self.center.x + self.radius, self.center.y + self.radius)
 
 
 class Neighbor:
@@ -265,33 +296,25 @@ class FabianBoard(Board):
     def split_entity(self, i=0, n=4):
         e = self.entity_list[i]
         new_part_list = []
-        for m in range(n):
-            new_part_list.append(Entity(e.shape))
         if e.shape == 'ARC':
             angle = (e.arc_end_angle-e.arc_start_angle) / n
-            new_part_list[0].center = e.center
-            new_part_list[0].radius = e.radius
-            new_part_list[0].arc_start_angle = e.arc_start_angle
-            new_part_list[0].arc_end_angle = e.arc_start_angle + angle
-            new_part_list[0] = self.set_arc_edge_points(new_part_list[0])
-            for m in range(1, n):
-                new_part_list[m].center = e.center
-                new_part_list[m].radius = e.radius
-                new_part_list[m].arc_start_angle = new_part_list[m-1].arc_end_angle
-                if new_part_list[m].arc_start_angle >= 360:
-                    new_part_list[m].arc_start_angle -= 360
-                new_part_list[m].arc_end_angle = new_part_list[m].arc_start_angle + angle
-                new_part_list[m] = self.set_arc_edge_points(new_part_list[m])
+            start_angle = e.arc_start_angle
+            for m in range(n):
+                end_angle = start_angle + angle
+                arc = Entity(shape=e.shape, center=e.center, radius=e.radius, start_angle=start_angle,
+                             end_angle=end_angle)
+                new_part_list.append(arc)
+                start_angle = end_angle
         elif e.shape == 'LINE':
             alfa = self.get_alfa(e.start, e.end)*math.pi/180
             d = gv.get_distance_between_points(e.start, e.end)
             step = d/n
-            new_part_list[0].start = new_part_list[0].left_bottom = e.start
-            new_part_list[0].end = new_part_list[0].right_up = Point(e.start.x+step*math.cos(alfa), e.start.y+step*math.sin(alfa))
-            for m in range(1, n):
-                new_part_list[m].start = new_part_list[m].left_bottom = new_part_list[m-1].end
-                new_part_list[m].end = new_part_list[m].right_up = Point(new_part_list[m].start.x + step * math.cos(alfa),
-                                                                         new_part_list[m].start.y + step * math.sin(alfa))
+            start = e.start
+            for m in range(n):
+                end = Point(start.x + step * math.cos(alfa), start.y + step * math.sin(alfa))
+                line = Entity(shape='LINE', start=start, end=end)
+                new_part_list.append(line)
+                start = end
         elif e.shape == 'CIRCLE':
             return
         self.hide_entity(i)
@@ -537,12 +560,7 @@ class FabianBoard(Board):
         p2 = self.new_line_edge[1]
         if p2 is None:
             return
-        e = Entity('LINE')
-        p1, p2 = self.get_sorted_points(p1, p2, sort_by_x=True)
-        if p1.x == p2.x:
-            p1, p2 = self.get_sorted_points(p1, p2, sort_by_x=False)
-        e.start = e.left_bottom = p1
-        e.end = e.right_up = p2
+        e = Entity('LINE', start=p1, end=p2)
         e.is_marked = True
         e.color = gv.marked_entity_color
         self.entity_list.append(e)
@@ -621,13 +639,13 @@ class FabianBoard(Board):
         return round(d, gv.accuracy), nearest_point
 
     def create_arc(self, center, radius, start_angle, end_angle):
-        pass
+        e = Entity('ARC')
 
     def create_line(self, p1, p2):
-        pass
+        e = Entity('ARC')
 
     def create_circle(self, center, radius):
-        pass
+        e = Entity('ARC')
 
     # return the angle vector of Point p relative to Point center, None if p == center
     def get_alfa(self, center, p):
@@ -717,64 +735,23 @@ class FabianBoard(Board):
         msp = doc.modelspace()
         for shape in shapes:
             for dxf_entity in msp.query(shape):
-                e = Entity(shape)
+                e = None
                 if shape == 'LINE':
                     p1 = Point(dxf_entity.dxf.start[0], dxf_entity.dxf.start[1])
                     p2 = Point(dxf_entity.dxf.end[0], dxf_entity.dxf.end[1])
-                    p1, p2 = self.get_sorted_points(p1, p2, sort_by_x=True)
-                    if p1.x == p2.x:
-                        p1, p2 = self.get_sorted_points(p1, p2, sort_by_x=False)
-                    e.start = e.left_bottom = p1
-                    e.end = e.right_up = p2
+                    e = Entity(shape='LINE', start=p1, end=p2)
                 elif shape == 'CIRCLE':
-                    e.center = Point(dxf_entity.dxf.center[0], dxf_entity.dxf.center[1])
-                    e.radius = dxf_entity.dxf.radius
-                    e.left_bottom = Point(e.center.x-e.radius, e.center.y-e.radius)
-                    e.right_up = Point(e.center.x+e.radius, e.center.y+e.radius)
+                    center = Point(dxf_entity.dxf.center[0], dxf_entity.dxf.center[1])
+                    radius = dxf_entity.dxf.radius
+                    e = Entity(shape='CIRCLE', center=center, radius=radius)
                 elif shape == 'ARC':
-                    e.center = Point(dxf_entity.dxf.center[0], dxf_entity.dxf.center[1])
-                    e.radius = dxf_entity.dxf.radius
+                    center = Point(dxf_entity.dxf.center[0], dxf_entity.dxf.center[1])
+                    radius = dxf_entity.dxf.radius
                     start_angle = round(dxf_entity.dxf.start_angle, 2) % 360
                     end_angle = round(dxf_entity.dxf.end_angle, 2)
-                    if end_angle < start_angle:
-                        end_angle += 360
-                    e.arc_start_angle = start_angle
-                    e.arc_end_angle = end_angle
-                    e = self.set_arc_edge_points(e)
-                self.entity_list.append(e)
-
-    # ser arc start point, end point, left_bottom and right_up
-    def set_arc_edge_points(self, e):
-        p1 = Point(e.center.x + e.radius * math.cos(e.arc_start_angle * math.pi / 180),
-                   e.center.y + e.radius * math.sin(e.arc_start_angle * math.pi / 180))
-        p2 = Point(e.center.x + e.radius * math.cos(e.arc_end_angle * math.pi / 180),
-                   e.center.y + e.radius * math.sin(e.arc_end_angle * math.pi / 180))
-        e.start = p1
-        e.end = p2
-        p1, p2 = self.get_sorted_points(p1, p2, sort_by_x=True)
-        e.left_bottom = p1
-        e.right_up = p2
-        return e
-
-    # if sort by x return left --> right points. if left == right return bottom --> up
-    # else: return bottom --> up. if bottom == up return left --> right
-    def get_sorted_points(self, p1, p2, sort_by_x=True):
-        if p1.x == p2.x and p1.y == p2.y:
-            return p1, p2
-        if sort_by_x:
-            if p1.x > p2.x:
-                return p2, p1
-            elif p1.x < p2.x:
-                return p1, p2
-            else:
-                return self.get_sorted_points(p1, p2, sort_by_x=False)
-        else:
-            if p1.y > p2.y:
-                return p2, p1
-            elif p1.y < p2.y:
-                return p1, p2
-            else:
-                return self.get_sorted_points(p1, p2, sort_by_x=True)
+                    e = Entity(shape='ARC', center=center, radius=radius, start_angle=start_angle, end_angle=end_angle)
+                if e is not None:
+                    self.entity_list.append(e)
 
     def zoom(self, factor):
         self.scale = round(self.scale*factor, 1)
