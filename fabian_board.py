@@ -114,7 +114,7 @@ class FabianBoard(Board):
         # first point
         if self.new_line_edge[0] is None:
             self.new_line_edge[0] = p
-            self.new_line_edge_mark[0] = self.create_circle(p, gv.edge_line_mark_radius/self.scale)
+            self.new_line_edge_mark[0] = self.draw_circle(p, gv.edge_line_mark_radius/self.scale)
         elif self.new_line_edge[0] == p:
             # only 1 edge exists
             self.board.delete(self.new_line_edge_mark[0])
@@ -140,8 +140,8 @@ class FabianBoard(Board):
             self.board.delete(self.temp_line_mark)
             if self.new_line_edge[1] is None:
                 self.new_line_edge[1] = p
-                self.new_line_edge_mark[1] = self.create_circle(p, gv.edge_line_mark_radius/self.scale)
-                self.new_line_mark = self.create_line(self.new_line_edge[0], self.new_line_edge[1])
+                self.new_line_edge_mark[1] = self.draw_circle(p, gv.edge_line_mark_radius/self.scale)
+                self.new_line_mark = self.draw_line(self.new_line_edge[0], self.new_line_edge[1])
             else:
                 self.board.delete(self.new_line_edge_mark[1])
                 self.new_line_edge_mark[1] = None
@@ -149,8 +149,8 @@ class FabianBoard(Board):
                 self.new_line_mark = None
                 if self.new_line_edge[1] != p:
                     self.new_line_edge[1] = p
-                    self.new_line_edge_mark[1] = self.create_circle(p, gv.edge_line_mark_radius / self.scale)
-                    self.new_line_mark = self.create_line(self.new_line_edge[0], self.new_line_edge[1])
+                    self.new_line_edge_mark[1] = self.draw_circle(p, gv.edge_line_mark_radius / self.scale)
+                    self.new_line_mark = self.draw_line(self.new_line_edge[0], self.new_line_edge[1])
                 else:
                     self.new_line_edge[1] = None
 
@@ -251,7 +251,7 @@ class FabianBoard(Board):
         p = Point(x, y)
         if self.new_line_edge[0] is not None:
             self.board.delete(self.temp_line_mark)
-            self.temp_line_mark = self.create_line(self.new_line_edge[0], p, gv.temp_line_color)
+            self.temp_line_mark = self.draw_line(self.new_line_edge[0], p, gv.temp_line_color)
         selected_d, nearest_point = self.get_distance_from_entity_and_nearest_point(p, self.selected_entity)
         i, d = self.find_nearest_entity(p)
         if selected_d*self.scale > 5:
@@ -301,7 +301,7 @@ class FabianBoard(Board):
             self.show_entity(-1)
 
     def get_index_of_node_with_point_p(self, p, node_list):
-        for i in range(len(node_list)):
+        for i in range(1, len(node_list)):
             if p.is_equal(node_list[i].p):
                 return i
         return None
@@ -326,7 +326,7 @@ class FabianBoard(Board):
         return next_neighbor
 
     def create_node_list(self):
-        node_list = []
+        node_list = [0]
         for i in range(len(self.entity_list)):
             e = self.entity_list[i]
             if e.shape == 'CIRCLE':
@@ -350,9 +350,9 @@ class FabianBoard(Board):
         self.node_list = node_list
 
     def create_element_list(self):
-        element_list = []
+        element_list = [0]
         # try to set a new element
-        for i in range(len(self.node_list)):
+        for i in range(1, len(self.node_list)):
             node = self.node_list[i]
             new_element = [i]
             next_neighbor_index = self.get_next_relevant_neighbor(node, 0)
@@ -379,20 +379,18 @@ class FabianBoard(Board):
             return
         f = open(filename, 'w')
         f.write('*Node\n')
-        i = 1
-        for n in self.node_list:
+        for i in range(1, len(self.node_list)):
+            n = self.node_list[i]
             s = f'{i}, {n.p.x}, {n.p.y}, 0\n'
             f.write(s)
-            i += 1
-        f.write('*Element\n')
-        i = 1
-        for e in self.element_list:
+        f.write('*Element, type=R3D4\n')
+        for i in range(1, len(self.element_list)):
+            e = self.element_list[i]
             s = f'{i}'
             for j in range(len(e)):
                 s += f', {e[j]}'
             s += '\n'
             f.write(s)
-            i += 1
 
         f.close()
 
@@ -622,6 +620,15 @@ class FabianBoard(Board):
                 nearest_point = e.end
         return round(d, gv.accuracy), nearest_point
 
+    def create_arc(self, center, radius, start_angle, end_angle):
+        pass
+
+    def create_line(self, p1, p2):
+        pass
+
+    def create_circle(self, center, radius):
+        pass
+
     # return the angle vector of Point p relative to Point center, None if p == center
     def get_alfa(self, center, p):
         dx = p.x - center.x
@@ -663,11 +670,11 @@ class FabianBoard(Board):
         if self.entity_list[i].board_part is not None:
             return
         if self.entity_list[i].shape == 'LINE':
-            part = self.create_line(self.entity_list[i].start, self.entity_list[i].end, self.entity_list[i].color)
+            part = self.draw_line(self.entity_list[i].start, self.entity_list[i].end, self.entity_list[i].color)
         elif self.entity_list[i].shape == 'CIRCLE':
-            part = self.create_circle(self.entity_list[i].center, self.entity_list[i].radius, self.entity_list[i].color)
+            part = self.draw_circle(self.entity_list[i].center, self.entity_list[i].radius, self.entity_list[i].color)
         elif self.entity_list[i].shape == 'ARC':
-            part = self.create_arc(self.entity_list[i].center, self.entity_list[i].radius, self.entity_list[i].arc_start_angle,
+            part = self.draw_arc(self.entity_list[i].center, self.entity_list[i].radius, self.entity_list[i].arc_start_angle,
                                    self.entity_list[i].arc_end_angle, self.entity_list[i].color)
         self.entity_list[i].board_part = part
 

@@ -93,19 +93,19 @@ class Board:
         self.create_line(p1, p2)
 
     #create line between Points() p1 and p2 with xy coordinates
-    def create_line(self, p1, p2, color=gv.default_color):
+    def draw_line(self, p1, p2, color=gv.default_color):
         x1, y1 = self.convert_xy_to_screen(p1.x, p1.y)
         x2, y2 = self.convert_xy_to_screen(p2.x, p2.y)
         return self.board.create_line(x1, y1, x2, y2, fill=color)
 
     #create circle with xy coordinates
-    def create_circle(self, center, radius, outline_color=gv.default_color):
+    def draw_circle(self, center, radius, outline_color=gv.default_color):
         xLeft, yTop = self.convert_xy_to_screen(center.x-radius, center.y+radius)
         xRight, yBottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
         return self.board.create_oval(xLeft, yTop, xRight, yBottom, outline=outline_color)
 
     #create arc with xy coordinates
-    def create_arc(self, center, radius, start_angle, end_angle, outline_color=gv.default_color):
+    def draw_arc(self, center, radius, start_angle, end_angle, outline_color=gv.default_color):
         xLeft, yTop = self.convert_xy_to_screen(center.x-radius, center.y+radius)
         xRight, yBottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
         return self.board.create_arc(xLeft, yTop, xRight, yBottom, start=start_angle, extent=(end_angle-start_angle),
