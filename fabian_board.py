@@ -334,17 +334,18 @@ class FabianBoard(Board):
         if len(node.neighbors_list) == 0:
             return None
         next_neighbor = None
-        min_angle = 180
+        min_angle = 180-gv.min_diff_angle_to_create_element
+        alfa = prev_angle + 180
         for i in range(len(node.neighbors_list)):
             n = node.neighbors_list[i]
             if n.is_part_of_element:
                 continue
-            alfa = n.angle_from_p
-            if round(alfa, 0) <= round(prev_angle, 0):
-                alfa += 360
-            angle = alfa - prev_angle
-            if angle < min_angle:
-                min_angle = angle
+            angle = n.angle_from_p
+            if angle < prev_angle:
+                angle += 360
+            diff_angle = alfa - angle
+            if gv.min_diff_angle_to_create_element < diff_angle < min_angle:
+                min_angle = diff_angle
                 next_neighbor = i
         return next_neighbor
 
@@ -373,23 +374,30 @@ class FabianBoard(Board):
         self.node_list = node_list
 
     def create_element_list(self):
-        element_list = [0]
-        # try to set a new element
+        element_list = []
+        # iterate all nodes
         for i in range(1, len(self.node_list)):
-            node = self.node_list[i]
-            new_element = [i]
-            next_neighbor_index = self.get_next_relevant_neighbor(node, 0)
-            while next_neighbor_index is not None:
-                node.neighbors_list[next_neighbor_index].is_part_of_element = True
-                next_node_index = node.neighbors_list[next_neighbor_index].node_index
-                if next_node_index == i:
-                    break
-                new_element.append(next_node_index)
-                alfa = node.neighbors_list[next_neighbor_index].angle_from_p
-                node = self.node_list[next_node_index]
-                next_neighbor_index = self.get_next_relevant_neighbor(node, alfa)
-            if next_node_index == i and len(new_element) > 2:
-                element_list.append(new_element)
+            start_node = self.node_list[i]
+            # iterate all nodes neighbors
+            for j in range(len(start_node.neighbors_list)):
+                new_element = [i]
+                n = start_node.neighbors_list[j]
+                if n.is_part_of_element:
+                    continue
+                node = start_node
+                next_neighbor_index = j
+                # try to set a new element starting from node[i] to neighbor j
+                while next_neighbor_index is not None:
+                    node.neighbors_list[next_neighbor_index].is_part_of_element = True
+                    next_node_index = node.neighbors_list[next_neighbor_index].node_index
+                    if next_node_index == i:
+                        break
+                    alfa = node.neighbors_list[next_neighbor_index].angle_from_p
+                    node = self.node_list[next_node_index]
+                    new_element.append(next_node_index)
+                    next_neighbor_index = self.get_next_relevant_neighbor(node, alfa)
+                if next_node_index == i and len(new_element) > 2:
+                    element_list.append(new_element)
         self.element_list = element_list
 
     def save_inp(self):
@@ -404,18 +412,37 @@ class FabianBoard(Board):
         f.write('*Node\n')
         for i in range(1, len(self.node_list)):
             n = self.node_list[i]
-            s = f'{i}, {n.p.x}, {n.p.y}, 0\n'
+            s = f'{i},    {n.p.x}, {n.p.y}, 0\n'
             f.write(s)
-        f.write('*Element, type=R3D4\n')
-        for i in range(1, len(self.element_list)):
+        element_3_list = []
+        element_4_list = []
+        for i in range(len(self.element_list)):
             e = self.element_list[i]
-            s = f'{i}'
-            for j in range(len(e)):
-                s += f', {e[j]}'
-            s += '\n'
-            f.write(s)
-
+            if len(e) == 3:
+                element_3_list.append(e)
+            else:
+                element_4_list.append(e)
+        element_index = 1
+        if len(element_3_list) > 0:
+            f.write('*Element, type=R3D3\n')
+            for i in range(len(element_3_list)):
+                e = element_3_list[i]
+                self.write_element_to_file(f, element_index, e)
+                element_index += 1
+        if len(element_4_list) > 0:
+            f.write('*Element, type=R3D4\n')
+            for i in range(len(element_4_list)):
+                e = element_4_list[i]
+                self.write_element_to_file(f, element_index, e)
+                element_index += 1
         f.close()
+
+    def write_element_to_file(self, f, index, e):
+        s = f'{index},    '
+        for j in range(len(e)-1):
+            s += f'{e[j]}, '
+        s += f'{e[-1]}\n'
+        f.write(s)
 
     def save_dxf(self):
         doc = ezdxf.new('R2010')

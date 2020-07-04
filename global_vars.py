@@ -8,6 +8,7 @@ BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
 edge_line_mark_radius = 5
 accuracy = 9
+min_diff_angle_to_create_element = 3
 
 select_mode = 'edge'
 work_mode = 'select'
