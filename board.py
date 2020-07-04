@@ -26,8 +26,8 @@ class Board:
             self.frame_2 = tk.Frame(self.window_main)
             self.frame_2.pack(fill='both', side='bottom', expand=tk.NO, pady=5)
 
-            self.button_load = tk.Button(self.frame_2, text='Load', command=lambda: self.load_data())
-            self.button_save = tk.Button(self.frame_2, text='Save', command=lambda: self.save_data())
+            self.button_load = tk.Button(self.frame_2, text='Load', command=lambda: self.load_json())
+            self.button_save = tk.Button(self.frame_2, text='Save', command=lambda: self.save_json())
             self.button_load.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
             self.button_save.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
 
@@ -52,18 +52,19 @@ class Board:
             i = '-1'
         self.board.yview('scroll', i, 'units')
 
-    def load_data(self):
-        filename = filedialog.askopenfilename(parent=self.window_main, initialdir="./data_files/", title="Select file",
-                                                   filetypes=(("json files", "*.json"), ("all files", "*.*")))
-        if filename == '':
-            return
+    def load_json(self, filename=None, my_dir="./data files/"):
+        if filename is None:
+            filename = filedialog.askopenfilename(parent=self.window_main, initialdir=my_dir, title="Select file",
+                                                       filetypes=(("json files", "*.json"), ("all files", "*.*")))
+            if filename == '':
+                return
         with open(filename, "r") as json_file:
             data = json.load(json_file)
         return data
 
-    def save_data(self, data=None, file_name='Fabian'):
+    def save_json(self, data=None, my_dir="./data files/", file_name='Fabian'):
         default_file_name = file_name
-        filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./data_files/", title="Select file",
+        filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir=my_dir, title="Select file",
                                                 initialfile=default_file_name, defaultextension=".json",
                                                 filetypes=(("json files", "*.json"), ("all files", "*.*")))
         if filename == '' or data is None:

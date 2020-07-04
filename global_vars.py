@@ -11,7 +11,7 @@ accuracy = 9
 min_diff_angle_to_create_element = 3
 
 select_mode = 'edge'
-work_mode = 'select'
+work_mode = 'dxf'
 
 board_bg_color = '#D1EDFF'
 default_color = '#0099FF'
@@ -27,6 +27,16 @@ class Point:
 
     def is_equal(self, p):
         return self.x == p.x and self.y == p.y
+
+    def convert_into_tupple(self):
+        t = (self.x, self.y)
+        return t
+
+    def get_data_from_tupple(self, t):
+        if len(t) < 2:
+            return
+        self.x = t[0]
+        self.y = t[1]
 
 
 def get_distance_between_points(p1, p2):

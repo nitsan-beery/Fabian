@@ -3,7 +3,6 @@ import ezdxf
 import math
 from operator import attrgetter, itemgetter
 
-#shapes = {'ARC'}
 shapes = {'CIRCLE', 'LINE', 'ARC'}
 
 
@@ -53,6 +52,43 @@ class Entity:
                 self.left_bottom = Point(self.center.x - self.radius, self.center.y - self.radius)
                 self.right_up = Point(self.center.x + self.radius, self.center.y + self.radius)
 
+    def convert_into_tupple(self):
+        center = self.center
+        if center is not None:
+            center = center.convert_into_tupple()
+        start = self.start
+        if start is not None:
+            start = start.convert_into_tupple()
+        end = self.end
+        if end is not None:
+            end = end.convert_into_tupple()
+        t = (self.shape, center, self.radius, self.arc_start_angle, self.arc_end_angle, start, end)
+        return t
+
+    def get_data_from_tupple(self, t):
+        if len(t) < 7:
+            return
+        self.shape = t[0]
+        center = t[1]
+        if center is not None:
+            center = Point()
+            center.get_data_from_tupple(t[1])
+        self.center = center
+        self.radius = t[2]
+        self.arc_start_angle = t[3]
+        self.arc_end_angle = t[4]
+        start = t[5]
+        if start is not None:
+            start = Point()
+            start.get_data_from_tupple(t[5])
+        self.start = start
+        end = t[6]
+        if end is not None:
+            end = Point()
+            end.get_data_from_tupple(t[6])
+        self.end = end
+        self.set_arc()
+        self.set_left_bottom_right_up()
 
 class Neighbor:
     def __init__(self, node_index=0, angle_from_p=0):
@@ -60,11 +96,42 @@ class Neighbor:
         self.angle_from_p = angle_from_p
         self.is_part_of_element = False
 
+    def convert_into_tupple(self):
+        t = (self.node_index, self.angle_from_p, self.is_part_of_element)
+        return t
+
+    def get_data_from_tupple(self, t):
+        if len(t) < 3:
+            return
+        self.node_index = t[0]
+        self.angle_from_p = t[1]
+        self.is_part_of_element = t[2]
+
 
 class Node:
-    def __init__(self, point):
+    def __init__(self, point=None):
+        if point is None:
+            point = Point()
         self.p = point
         self.neighbors_list = []
+
+    def convert_into_tupple(self):
+        tupple_neighbors_list = []
+        for n in self.neighbors_list:
+            tupple_neighbors_list.append(n.convert_into_tupple())
+        t = (self.p.convert_into_tupple(), tupple_neighbors_list)
+        return t
+
+    def get_data_from_tupple(self, t):
+        if len(t) < 2:
+            return
+        self.p.get_data_from_tupple(t[0])
+        neighbors_list = []
+        for i in t[1]:
+            n = Neighbor()
+            n.get_data_from_tupple(i)
+            neighbors_list.append(n)
+        self.neighbors_list = neighbors_list
 
 
 class FabianBoard(Board):
@@ -72,16 +139,14 @@ class FabianBoard(Board):
         super().__init__(True)
         self.scale = scale
         self.window_main.title("Fabian")
-        self.button_load.config(text='Load dxf', command=lambda: self.load_dxf())
-        self.button_save.config(text='Save dxf', command=lambda: self.save_dxf())
+        self.button_load.config(text='Load', command=lambda: self.load())
+        self.button_save.config(text='Save as', command=lambda: self.save_as())
         self.button_zoom_in = tk.Button(self.frame_2, text='Zoom In', command=lambda: self.zoom(4/3))
         self.button_zoom_out = tk.Button(self.frame_2, text='Zoom Out', command=lambda: self.zoom(3/4))
         self.button_center = tk.Button(self.frame_2, text='Center view', command=lambda: self.center_view())
         self.button_zoom_in.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_zoom_out.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_center.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
-        self.button_save_inp = tk.Button(self.frame_2, text='Save inp', command=lambda: self.save_inp())
-        self.button_save_inp.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
         self.board.config(bg=gv.board_bg_color)
 
         self.dxfDoc = None
@@ -217,12 +282,8 @@ class FabianBoard(Board):
             i = 0
             for e in self.entity_list:
                 if e.board_part in enclosed_parts:
-                    if e.is_marked:
-                        e.is_marked = False
-                        self.change_entity_color(i, gv.default_color)
-                    else:
-                        e.is_marked = True
-                        self.change_entity_color(i, gv.marked_entity_color)
+                    e.is_marked = True
+                    self.change_entity_color(i, gv.marked_entity_color)
                 i += 1
 
         if self.temp_rect_mark is not None:
@@ -233,7 +294,7 @@ class FabianBoard(Board):
     def mouse_3_pressed(self, key):
         menu = tk.Menu(self.board, tearoff=0)
         work_mode_menu = tk.Menu(menu, tearoff=0)
-        work_mode_menu.add_command(label="Select parts", command=lambda: self.change_work_mode('select'))
+        work_mode_menu.add_command(label="DXF", command=lambda: self.change_work_mode('dxf'))
         work_mode_menu.add_command(label="Build net", command=lambda: self.change_work_mode('net'))
         work_mode_menu.add_command(label="Quit")
         select_mode_menu = tk.Menu(menu, tearoff=0)
@@ -251,8 +312,8 @@ class FabianBoard(Board):
             menu.add_command(label="remove line", command=self.remove_temp_line)
             menu.add_separator()
         if self.selected_entity_mark is not None:
-            menu.add_command(label="mark entity", command=self.mark_selected_entity)
             menu.add_command(label="unmark entity", command=self.unmark_selected_entity)
+            menu.add_command(label="mark entity", command=self.mark_selected_entity)
             menu.add_command(label="split entity", command=lambda: self.split_entity(self.selected_entity))
             menu.add_command(label="delete entity", command=self.remove_selected_entity_from_list)
             menu.add_separator()
@@ -260,7 +321,7 @@ class FabianBoard(Board):
             menu.add_command(label="mark all entities", command=self.mark_all_entities)
             menu.add_command(label="unmark all entities", command=self.unmark_all_entities)
             menu.add_separator()
-            if self.work_mode == 'select':
+            if self.work_mode == 'dxf':
                 menu.add_command(label="delete marked entities", command=self.remove_marked_entities_from_list)
                 menu.add_command(label="delete all non marked entities", command=self.remove_non_marked_entities_from_list)
                 menu.add_separator()
@@ -350,7 +411,7 @@ class FabianBoard(Board):
         return next_neighbor
 
     def create_node_list(self):
-        node_list = [0]
+        node_list = [Node()]
         for i in range(len(self.entity_list)):
             e = self.entity_list[i]
             if e.shape == 'CIRCLE':
@@ -403,7 +464,7 @@ class FabianBoard(Board):
     def save_inp(self):
         self.create_node_list()
         self.create_element_list()
-        filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./INP files/", title="Select file",
+        filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./data files/", title="Select file",
                                                 initialfile='Fabian', defaultextension=".inp",
                                                 filetypes=(("inp files", "*.inp"), ("all files", "*.*")))
         if filename == '':
@@ -444,6 +505,32 @@ class FabianBoard(Board):
         s += f'{e[-1]}\n'
         f.write(s)
 
+    def save_as(self):
+        menu = tk.Menu(self.board, tearoff=0)
+        menu.add_command(label="DXF", command=lambda: self.save_dxf())
+        menu.add_command(label="INP", command=lambda: self.save_inp())
+        menu.add_command(label="DATA", command=lambda: self.save_data())
+        menu.add_separator()
+        menu.add_command(label="Quit")
+        x = self.frame_2.winfo_pointerx()
+        y = self.frame_2.winfo_pointery()
+        menu.post(x, y)
+
+    def save_data(self):
+        entity_list = []
+        for e in self.entity_list:
+            t = e.convert_into_tupple()
+            entity_list.append(t)
+        node_list = []
+        for e in self.node_list:
+            t = e.convert_into_tupple()
+            node_list.append(t)
+        data = {
+            "entity_list": entity_list,
+            "node_list": node_list
+        }
+        self.save_json(data)
+
     def save_dxf(self):
         doc = ezdxf.new('R2010')
         msp = doc.modelspace()
@@ -455,22 +542,37 @@ class FabianBoard(Board):
             elif e.shape == 'CIRCLE':
                 msp.add_circle((e.center.x, e.center.y), e.radius)
         default_file_name = f'Fabian'
-        filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./DXF files/", title="Select file",
+        filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./data files/", title="Select file",
                                                 initialfile=default_file_name, defaultextension=".dxf",
                                                 filetypes=(("dxf files", "*.dxf"), ("all files", "*.*")))
         if filename == '':
             return
         doc.saveas(filename)
 
-    def load_dxf(self):
-        filename = filedialog.askopenfilename(parent=self.window_main, initialdir="./DXF files/",
+    def load(self):
+        filename = filedialog.askopenfilename(parent=self.window_main, initialdir="./data files/",
                                               title="Select file",
-                                              filetypes=(("DXF files", "*.dxf"), ("all files", "*.*")))
+                                              filetypes=(("DXF files", "*.dxf"), ("Json files", "*.json"), ("all files", "*.*")))
         if filename == '':
             return
         self.reset_board()
-        doc = ezdxf.readfile(filename)
-        self.convert_doc_to_entity_list(doc)
+        i = filename.find('.')
+        filetype = filename[i+1:].lower()
+        if filetype == 'dxf':
+            doc = ezdxf.readfile(filename)
+            self.convert_doc_to_entity_list(doc)
+        elif filetype == 'json':
+            data = self.load_json(filename=filename)
+            entity_list = data.get("entity_list")
+            node_list = data.get("node_list")
+            for t in entity_list:
+                e = Entity()
+                e.get_data_from_tupple(t)
+                self.entity_list.append(e)
+            for t in node_list:
+                n = Node()
+                n.get_data_from_tupple(t)
+                self.node_list.append(n)
         self.center_view()
         self.show_all_entities()
 
