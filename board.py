@@ -45,6 +45,11 @@ class Board:
         self.board.xview_moveto((x-self.board.winfo_width()/2)/gv.BOARD_WIDTH)
         self.board.yview_moveto((y-self.board.winfo_height()/2)/gv.BOARD_HEIGHT)
 
+    def get_screen_center(self):
+        x = self.board.winfo_width()/2
+        y = self.board.winfo_height()/2
+        return x, y
+
     def mouse_wheel(self, key):
         if key.delta < 0:
             i = '1'

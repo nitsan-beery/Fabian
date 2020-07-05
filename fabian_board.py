@@ -985,8 +985,11 @@ class FabianBoard(Board):
                     self.entity_list.append(e)
 
     def zoom(self, factor):
+        x, y = self.get_screen_center()
+        x, y = self.convert_screen_to_xy(x, y)
         self.scale = round(self.scale*factor, 1)
-        self.center_view()
+        x, y = self.convert_xy_to_screen(x, y)
+        self.set_screen_position(x, y)
         self.update_view()
 
     def set_accuracy(self):
