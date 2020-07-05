@@ -1,13 +1,15 @@
 from board import *
 import ezdxf
 import math
+from tkinter import messagebox
 from operator import attrgetter, itemgetter
 
 shapes = {'CIRCLE', 'LINE', 'ARC'}
 
 
 class Entity:
-    def __init__(self, shape=None, center=None, radius=None, start=None, end=None, start_angle=None, end_angle=None):
+    def __init__(self, shape=None, center=None, radius=None, start=None, end=None, start_angle=None, end_angle=None, 
+                 color=gv.default_color, is_part_of_dxf=True):
         self.shape = shape
         self.center = center
         self.radius = radius
@@ -21,9 +23,10 @@ class Entity:
         self.set_left_bottom_right_up()
         self.is_marked = False
         self.board_part = None
-        self.color = gv.default_color
+        self.color = color
+        self.is_part_of_dxf = is_part_of_dxf
 
-    # ser arc start point, end point, left_bottom and right_up
+    # set arc start point, end point, left_bottom and right_up
     def set_arc(self):
         if self.shape != 'ARC' or self.arc_start_angle is None or self.arc_end_angle is None:
             return
@@ -52,6 +55,15 @@ class Entity:
                 self.left_bottom = Point(self.center.x - self.radius, self.center.y - self.radius)
                 self.right_up = Point(self.center.x + self.radius, self.center.y + self.radius)
 
+    def is_equal(self, e):
+        t1 = (self.shape == e.shape and self.radius == e.radius)
+        if self.shape == 'CIRCLE':
+            return t1 and self.center.is_equal(e.center)
+        else:
+            t2 = self.start.is_equal(e.start) and self.end.is_equal(e.end)
+            t3 = self.start.is_equal(e.end) and self.end.is_equal(e.start)
+            return t1 and (t2 or t3)
+
     def convert_into_tupple(self):
         center = self.center
         if center is not None:
@@ -62,11 +74,12 @@ class Entity:
         end = self.end
         if end is not None:
             end = end.convert_into_tupple()
-        t = (self.shape, center, self.radius, self.arc_start_angle, self.arc_end_angle, start, end)
+        t = (self.shape, center, self.radius, self.arc_start_angle, self.arc_end_angle, start, end, self.color, self.is_part_of_dxf)
         return t
 
     def get_data_from_tupple(self, t):
-        if len(t) < 7:
+        if len(t) < 9:
+            print(f"tuple doesn't match Entity type: {t}")
             return
         self.shape = t[0]
         center = t[1]
@@ -87,6 +100,8 @@ class Entity:
             end = Point()
             end.get_data_from_tupple(t[6])
         self.end = end
+        self.color = t[7]
+        self.is_part_of_dxf = t[8]
         self.set_arc()
         self.set_left_bottom_right_up()
 
@@ -102,6 +117,7 @@ class Neighbor:
 
     def get_data_from_tupple(self, t):
         if len(t) < 3:
+            print(f"tuple doesn't match Neighbor type: {t}")
             return
         self.node_index = t[0]
         self.angle_from_p = t[1]
@@ -114,6 +130,8 @@ class Node:
             point = Point()
         self.p = point
         self.neighbors_list = []
+        self.board_part = None
+        self.color = gv.node_color
 
     def convert_into_tupple(self):
         tupple_neighbors_list = []
@@ -124,6 +142,7 @@ class Node:
 
     def get_data_from_tupple(self, t):
         if len(t) < 2:
+            print(f"tuple doesn't match Node type: {t}")
             return
         self.p.get_data_from_tupple(t[0])
         neighbors_list = []
@@ -151,10 +170,11 @@ class FabianBoard(Board):
 
         self.dxfDoc = None
         self.entity_list = []
-        self.node_list = []
+        self.node_list = [Node()]
         self.element_list = []
-        self.select_mode = gv.select_mode
-        self.work_mode = gv.work_mode
+        self.net_line_list = []
+        self.select_mode = gv.default_select_mode
+        self.work_mode = gv.default_work_mode
         self.selected_entity = 0
         self.selected_entity_mark = None
         self.new_line_edge = [None, None]
@@ -165,6 +185,9 @@ class FabianBoard(Board):
         self.temp_line_mark = None
         self.temp_rect_start_point = None
         self.temp_rect_mark = None
+        self.show_entities = True
+        self.show_nodes = True
+        self.show_net = True
 
         self.board.bind('<Motion>', self.motion)
         self.board.bind('<Button-1>', self.mouse_1_pressed)
@@ -177,10 +200,11 @@ class FabianBoard(Board):
         self.set_screen_position(self.center.x, self.center.y)
         self.dxfDoc = None
         self.entity_list = []
-        self.node_list = []
+        self.node_list = [Node()]
         self.element_list = []
-        self.select_mode = gv.select_mode
-        self.work_mode = gv.work_mode
+        self.net_line_list = []
+        self.select_mode = gv.default_select_mode
+        self.work_mode = gv.default_work_mode
         self.selected_entity = 0
         self.selected_entity_mark = None
         self.new_line_edge = [None, None]
@@ -296,11 +320,19 @@ class FabianBoard(Board):
         work_mode_menu = tk.Menu(menu, tearoff=0)
         work_mode_menu.add_command(label="DXF", command=lambda: self.change_work_mode('dxf'))
         work_mode_menu.add_command(label="INP", command=lambda: self.change_work_mode('inp'))
+        work_mode_menu.add_separator()
         work_mode_menu.add_command(label="Quit")
         select_mode_menu = tk.Menu(menu, tearoff=0)
         select_mode_menu.add_command(label="Edges", command=lambda: self.change_selection_mode('edge'))
         select_mode_menu.add_command(label="Points", command=lambda: self.change_selection_mode('point'))
+        select_mode_menu.add_separator()
         select_mode_menu.add_command(label="Quit")
+        show_entities_menu = tk.Menu(menu, tearoff=0)
+        show_entities_menu.add_command(label="Weak", command=lambda: self.set_all_entities_color(gv.weak_entity_color))
+        show_entities_menu.add_command(label="Strong", command=lambda: self.set_all_entities_color(gv.default_color))
+        show_entities_menu.add_command(label="Hide", command=lambda: self.hide_dxf_entities())
+        show_entities_menu.add_separator()
+        show_entities_menu.add_command(label="Quit")
         menu.add_cascade(label='Work mode', menu=work_mode_menu)
         menu.add_separator()
         menu.add_cascade(label='Select mode', menu=select_mode_menu)
@@ -312,26 +344,40 @@ class FabianBoard(Board):
             menu.add_command(label="remove line", command=self.remove_temp_line)
             menu.add_separator()
         if self.selected_entity_mark is not None:
-            menu.add_command(label="unmark entity", command=self.unmark_selected_entity)
-            menu.add_command(label="mark entity", command=self.mark_selected_entity)
             menu.add_command(label="split entity", command=lambda: self.split_entity(self.selected_entity))
-            menu.add_command(label="delete entity", command=self.remove_selected_entity_from_list)
-            menu.add_separator()
-        elif len(self.entity_list) > 0:
-            menu.add_command(label="mark all entities", command=self.mark_all_entities)
-            menu.add_command(label="unmark all entities", command=self.unmark_all_entities)
-            menu.add_separator()
             if self.work_mode == 'dxf':
+                menu.add_command(label="unmark entity", command=self.unmark_selected_entity)
+                menu.add_command(label="mark entity", command=self.mark_selected_entity)
+                menu.add_command(label="delete entity", command=self.remove_selected_entity_from_list)
+            menu.add_separator()
+        if self.work_mode == 'dxf':
+            if len(self.entity_list) > 0:
+                menu.add_command(label="mark all entities", command=self.mark_all_entities)
+                menu.add_command(label="unmark all entities", command=self.unmark_all_entities)
                 menu.add_command(label="delete marked entities", command=self.remove_marked_entities_from_list)
                 menu.add_command(label="delete all non marked entities", command=self.remove_non_marked_entities_from_list)
                 menu.add_separator()
-            elif self.work_mode == 'net':
-                pass
+        elif self.work_mode == 'inp':
+            menu.add_command(label="Show net", command=self.show_net_lines)
+            menu.add_command(label="Hide net", command=self.hide_net_lines)
+            menu.add_cascade(label='Show entities', menu=show_entities_menu)
+            menu.add_separator()
         menu.add_command(label="quit")
         menu.post(key.x_root, key.y_root)
 
     def change_work_mode(self, mode):
         self.work_mode = mode
+        if mode.lower() == 'dxf':
+            self.set_all_entities_color(gv.default_color)
+            self.show_nodes = False
+            self.show_net = False
+        elif mode.lower() == 'inp':
+            self.set_all_entities_color(gv.weak_entity_color)
+            self.set_node_list_from_dxf()
+            self.show_nodes = True
+            if not self.is_node_list_valid():
+                messagebox.showwarning("Warning", "unattached nodes")
+        self.update_view()
 
     def change_selection_mode(self, mode):
         self.select_mode = mode
@@ -345,7 +391,9 @@ class FabianBoard(Board):
             self.board.delete(self.temp_line_mark)
             self.temp_line_mark = self.draw_line(self.new_line_edge[0], p, gv.temp_line_color)
         selected_d, nearest_point = self.get_distance_from_entity_and_nearest_point(p, self.selected_entity)
-        i, d = self.find_nearest_entity(p)
+        i, d = self.find_nearest_entity(p, only_visible=True)
+        if i is None:
+            return
         if selected_d*self.scale > 5:
             self.remove_selected_entity_mark()
         if d*self.scale < 5:
@@ -410,14 +458,34 @@ class FabianBoard(Board):
                 next_neighbor = i
         return next_neighbor
 
-    def create_node_list(self):
+    def get_duplicated_entities(self):
+        duplicate_entities_list = []
+        for i in range(len(self.entity_list)):
+            ei = self.entity_list[i]
+            for j in range(i):
+                ej = self.entity_list[j]
+                if ei.is_equal(ej):
+                    duplicate_entities_list.append(i)
+                    break
+        return duplicate_entities_list
+
+    def is_node_list_valid(self):
+        is_valid = True
+        for i in range(1, len(self.node_list)):
+            n = self.node_list[i]
+            if len(n.neighbors_list) < 2:
+                n.color = gv.invalid_node_color
+                is_valid = False
+        return is_valid
+
+    def set_node_list_from_dxf(self):
         node_list = [Node()]
         for i in range(len(self.entity_list)):
             e = self.entity_list[i]
             if e.shape == 'CIRCLE':
                 continue
-            p1 = Point(round(e.start.x, gv.accuracy), round(e.start.y, gv.accuracy))
-            p2 = Point(round(e.end.x, gv.accuracy), round(e.end.y, gv.accuracy))
+            p1 = e.start
+            p2 = e.end
             node1 = Node(p1)
             node2 = Node(p2)
             p1_index = self.get_index_of_node_with_point_p(p1, node_list)
@@ -433,8 +501,19 @@ class FabianBoard(Board):
             alfa = (alfa+180) % 360
             node_list[p2_index].neighbors_list.append(Neighbor(p1_index, alfa))
         self.node_list = node_list
+        # debug
+        self.print_node_list()
 
-    def create_element_list(self):
+    # debug
+    def print_node_list(self):
+        for i in range(1, len(self.node_list)):
+            n = self.node_list[i]
+            b = []
+            for j in n.neighbors_list:
+                b.append(j.node_index)
+            print(f'{i}: {n.p.convert_into_tupple()}   neigbors: {b}')
+
+    def create_net_element_list(self):
         element_list = []
         # iterate all nodes
         for i in range(1, len(self.node_list)):
@@ -462,8 +541,7 @@ class FabianBoard(Board):
         self.element_list = element_list
 
     def save_inp(self):
-        self.create_node_list()
-        self.create_element_list()
+        self.create_net_element_list()
         filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./data files/", title="Select file",
                                                 initialfile='Fabian', defaultextension=".inp",
                                                 filetypes=(("inp files", "*.inp"), ("all files", "*.*")))
@@ -507,9 +585,9 @@ class FabianBoard(Board):
 
     def save_as(self):
         menu = tk.Menu(self.board, tearoff=0)
-        menu.add_command(label="DXF", command=lambda: self.save_dxf())
-        menu.add_command(label="INP", command=lambda: self.save_inp())
         menu.add_command(label="DATA", command=lambda: self.save_data())
+        menu.add_command(label="INP", command=lambda: self.save_inp())
+        menu.add_command(label="DXF", command=lambda: self.save_dxf())
         menu.add_separator()
         menu.add_command(label="Quit")
         x = self.frame_2.winfo_pointerx()
@@ -556,12 +634,17 @@ class FabianBoard(Board):
         if filename == '':
             return
         self.reset_board()
+        work_mode = gv.default_work_mode
         i = filename.find('.')
         filetype = filename[i+1:].lower()
         if filetype == 'dxf':
             doc = ezdxf.readfile(filename)
             self.convert_doc_to_entity_list(doc)
-            self.work_mode = 'dxf'
+            d_list = self.get_duplicated_entities()
+            if len(d_list) > 0:
+                m = f'Duplicated entities {d_list}'
+                messagebox.showwarning("Warning", m)
+            work_mode = 'dxf'
         elif filetype == 'json':
             data = self.load_json(filename=filename)
             entity_list = data.get("entity_list")
@@ -574,9 +657,10 @@ class FabianBoard(Board):
                 n = Node()
                 n.get_data_from_tupple(t)
                 self.node_list.append(n)
-            self.work_mode = 'inp'
+            work_mode = 'inp'
+        self.set_accuracy()
         self.center_view()
-        self.show_all_entities()
+        self.change_work_mode(work_mode)
 
     def center_view(self):
         x, y = self.get_center()
@@ -646,7 +730,7 @@ class FabianBoard(Board):
         self.entity_list = temp_list
         self.selected_entity = 0
         self.board.delete('all')
-        self.show_all_entities()
+        self.show_dxf_entities()
 
     def remove_non_marked_entities_from_list(self):
         temp_list = []
@@ -666,7 +750,7 @@ class FabianBoard(Board):
             self.new_line_edge[0] = None
             self.board.delete(self.temp_line_mark)
         self.board.delete('all')
-        self.show_all_entities()
+        self.show_dxf_entities()
 
     def remove_selected_entity_from_list(self):
         if self.selected_entity_mark is None:
@@ -691,9 +775,13 @@ class FabianBoard(Board):
         p2 = self.new_line_edge[1]
         if p2 is None:
             return
-        e = Entity('LINE', start=p1, end=p2)
-        e.is_marked = True
-        e.color = gv.marked_entity_color
+        is_part_of_dxf = (self.work_mode == 'dxf')
+        e = Entity('LINE', start=p1, end=p2, is_part_of_dxf=is_part_of_dxf)
+        if is_part_of_dxf:
+            e.is_marked = True
+            e.color = gv.marked_entity_color
+        else:
+            e.color = gv.net_line_color
         self.entity_list.append(e)
         self.board.delete(self.new_line_edge_mark[0])
         self.board.delete(self.new_line_edge_mark[1])
@@ -702,19 +790,33 @@ class FabianBoard(Board):
         self.new_line_edge[1] = None
         self.show_entity(-1)
 
-    def find_nearest_entity(self, p):
-        min_d_index = 0
-        min_d, nearest_point = self.get_distance_from_entity_and_nearest_point(p, 0)
+    def get_first_visible_entity(self):
         for i in range(len(self.entity_list)):
-            d, nearest_point = self.get_distance_from_entity_and_nearest_point(p, i)
+            if self.entity_list[i].board_part is not None:
+                return i
+        return None
+
+    def find_nearest_entity(self, p, only_visible=False):
+        min_d_index = 0
+        if only_visible:
+            min_d_index = self.get_first_visible_entity()
+        if len(self.entity_list) == 0 or min_d_index is None:
+            return None, None
+        min_d, nearest_point = self.get_distance_from_entity_and_nearest_point(p, min_d_index, only_visible)
+        for i in range(len(self.entity_list)):
+            if only_visible and self.entity_list[i].board_part is None:
+                continue
+            d, nearest_point = self.get_distance_from_entity_and_nearest_point(p, i, only_visible)
             if d < min_d:
                 min_d_index = i
                 min_d = d
         return min_d_index, min_d
 
     # return the distance of Point p from entity[i]
-    def get_distance_from_entity_and_nearest_point(self, p, i):
+    def get_distance_from_entity_and_nearest_point(self, p, i, only_visible=False):
         e = self.entity_list[i]
+        if only_visible and e.board_part is None:
+            return None, None
         d = None
         nearest_point = None
         if e.shape == 'CIRCLE':
@@ -776,9 +878,27 @@ class FabianBoard(Board):
                 return i
         return None
 
+    def hide_node(self, i):
+        if self.node_list[i].board_part is None:
+            return
+        self.board.delete(self.node_list[i].board_part)
+        self.node_list[i].board_part = None
+
+    def hide_all_nodes(self):
+        for i in range(len(self.node_list)):
+            self.hide_node(i)
+
     def show_node(self, i):
-        pass
-    
+        if self.node_list[i].board_part is not None:
+            return
+        part = self.draw_circle(self.node_list[i].p, gv.node_mark_radius/self.scale, self.node_list[i].color)
+        self.node_list[i].board_part = part
+
+    def show_all_nodes(self):
+        self.show_nodes = True
+        for i in range(1, len(self.node_list)):
+            self.show_node(i)
+
     def show_entity(self, i):
         part = None
         if self.entity_list[i].board_part is not None:
@@ -792,9 +912,22 @@ class FabianBoard(Board):
                                    self.entity_list[i].arc_end_angle, self.entity_list[i].color)
         self.entity_list[i].board_part = part
 
-    def show_all_entities(self):
+    def show_net_lines(self):
+        self.show_net = True
         for i in range(len(self.entity_list)):
-            self.show_entity(i)
+            if not self.entity_list[i].is_part_of_dxf:
+                self.show_entity(i)
+
+    def hide_net_lines(self):
+        for i in range(len(self.entity_list)):
+            if not self.entity_list[i].is_part_of_dxf:
+                self.hide_entity(i)
+
+    def show_dxf_entities(self):
+        self.show_entities = True
+        for i in range(len(self.entity_list)):
+            if self.entity_list[i].is_part_of_dxf:
+                self.show_entity(i)
 
     def hide_entity(self, i):
         if self.entity_list[i].board_part is None:
@@ -802,9 +935,10 @@ class FabianBoard(Board):
         self.board.delete(self.entity_list[i].board_part)
         self.entity_list[i].board_part = None
 
-    def hide_all_entities(self):
+    def hide_dxf_entities(self):
         for i in range(len(self.entity_list)):
-            self.hide_entity(i)
+            if self.entity_list[i].is_part_of_dxf:
+                self.hide_entity(i)
 
     def set_entity_color(self, i, color):
         self.hide_entity(i)
@@ -844,8 +978,8 @@ class FabianBoard(Board):
                 elif shape == 'ARC':
                     center = Point(dxf_entity.dxf.center[0], dxf_entity.dxf.center[1])
                     radius = dxf_entity.dxf.radius
-                    start_angle = round(dxf_entity.dxf.start_angle, 2) % 360
-                    end_angle = round(dxf_entity.dxf.end_angle, 2)
+                    start_angle = dxf_entity.dxf.start_angle % 360
+                    end_angle = dxf_entity.dxf.end_angle
                     e = Entity(shape='ARC', center=center, radius=radius, start_angle=start_angle, end_angle=end_angle)
                 if e is not None:
                     self.entity_list.append(e)
@@ -855,8 +989,56 @@ class FabianBoard(Board):
         self.center_view()
         self.update_view()
 
+    def set_accuracy(self):
+        zeros = 0
+        if len(self.entity_list) > 0:
+            max = self.entity_list[0].start.x
+            min = self.entity_list[0].start.y
+            for e in self.entity_list:
+                if e.start is not None:
+                    m = e.start.x
+                    if m > max:
+                        max = m
+                    if m < min:
+                        min = m
+                    m = e.start.y
+                    if m > max:
+                        max = m
+                    if m < min:
+                        min = m
+                if e.end is not None:
+                    m = e.end.x
+                    if m > max:
+                        max = m
+                    if m < min:
+                        min = m
+                    m = e.end.y
+                    if m > max:
+                        max = m
+                    if m < min:
+                        min = m
+                if (max-min) > 1:
+                    break
+            if (max-min) < 1:
+                s = str(max-min)
+                p = s.find('.')
+                s = s[p+1:]
+                i = 0
+                while i < len(s) and s[i] == '0':
+                    i += 1
+                zeros = i
+        gv.accuracy = zeros+3
+
     def update_view(self):
-        for i in range(len(self.entity_list)):
-            self.hide_entity(i)
-        self.show_all_entities()
+        self.hide_dxf_entities()
+        self.hide_net_lines()
+        self.hide_all_nodes()
+        if self.show_entities:
+            self.show_dxf_entities()
+        if self.show_nodes:
+            self.show_all_nodes()
+        if self.show_net:
+            self.show_net_lines()            
         self.window_main.update()
+
+            

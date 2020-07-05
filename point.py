@@ -1,4 +1,5 @@
 import math
+import global_vars as gv
 
 
 class Point:
@@ -7,7 +8,10 @@ class Point:
         self.y = y
 
     def is_equal(self, p):
-        return self.x == p.x and self.y == p.y
+        if p == None:
+            return False
+        return round(self.x, gv.accuracy) == round(p.x, gv.accuracy) and \
+               round(self.y, gv.accuracy) == round(p.y, gv.accuracy)
 
     def convert_into_tupple(self):
         t = (self.x, self.y)
@@ -15,6 +19,7 @@ class Point:
 
     def get_data_from_tupple(self, t):
         if len(t) < 2:
+            print(f"tuple doesn't match Point type: {t}")
             return
         self.x = t[0]
         self.y = t[1]
