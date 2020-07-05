@@ -44,7 +44,7 @@ class Entity:
             if self.start is None or self.end is None:
                 self.left_bottom, self.right_up = None, None
             else:
-                self.left_bottom, self.right_up = gv.get_sorted_points(self.start, self.end, sort_by_x=True)
+                self.left_bottom, self.right_up = get_sorted_points(self.start, self.end, sort_by_x=True)
         else:
             if self.center is None or self.radius is None:
                 self.left_bottom, self.right_up = None, None
@@ -199,8 +199,8 @@ class FabianBoard(Board):
             return
         e = self.entity_list[self.selected_entity]
         if self.select_mode == 'edge':
-            d_left = gv.get_distance_between_points(Point(x, y), e.left_bottom)
-            d_right = gv.get_distance_between_points(Point(x, y), e.right_up)
+            d_left = e.left_bottom.get_distance_from_point(Point(x, y))
+            d_right = e.right_up.get_distance_from_point(Point(x, y))
             if d_left < d_right:
                 p = e.left_bottom
             else:
@@ -283,7 +283,7 @@ class FabianBoard(Board):
             for e in self.entity_list:
                 if e.board_part in enclosed_parts:
                     e.is_marked = True
-                    self.change_entity_color(i, gv.marked_entity_color)
+                    self.set_entity_color(i, gv.marked_entity_color)
                 i += 1
 
         if self.temp_rect_mark is not None:
@@ -295,7 +295,7 @@ class FabianBoard(Board):
         menu = tk.Menu(self.board, tearoff=0)
         work_mode_menu = tk.Menu(menu, tearoff=0)
         work_mode_menu.add_command(label="DXF", command=lambda: self.change_work_mode('dxf'))
-        work_mode_menu.add_command(label="Build net", command=lambda: self.change_work_mode('net'))
+        work_mode_menu.add_command(label="INP", command=lambda: self.change_work_mode('inp'))
         work_mode_menu.add_command(label="Quit")
         select_mode_menu = tk.Menu(menu, tearoff=0)
         select_mode_menu.add_command(label="Edges", command=lambda: self.change_selection_mode('edge'))
@@ -367,8 +367,8 @@ class FabianBoard(Board):
                 new_part_list.append(arc)
                 start_angle = end_angle
         elif e.shape == 'LINE':
-            alfa = self.get_alfa(e.start, e.end)*math.pi/180
-            d = gv.get_distance_between_points(e.start, e.end)
+            alfa = e.start.get_alfa_to(e.end)*math.pi/180
+            d = e.start.get_distance_from_point(e.end)
             step = d/n
             start = e.start
             for m in range(n):
@@ -428,7 +428,7 @@ class FabianBoard(Board):
             if p2_index is None:
                 p2_index = len(node_list)
                 node_list.append(node2)
-            alfa = self.get_alfa(p1, p2)
+            alfa = p1.get_alfa_to(p2)
             node_list[p1_index].neighbors_list.append(Neighbor(p2_index, alfa))
             alfa = (alfa+180) % 360
             node_list[p2_index].neighbors_list.append(Neighbor(p1_index, alfa))
@@ -561,6 +561,7 @@ class FabianBoard(Board):
         if filetype == 'dxf':
             doc = ezdxf.readfile(filename)
             self.convert_doc_to_entity_list(doc)
+            self.work_mode = 'dxf'
         elif filetype == 'json':
             data = self.load_json(filename=filename)
             entity_list = data.get("entity_list")
@@ -573,6 +574,7 @@ class FabianBoard(Board):
                 n = Node()
                 n.get_data_from_tupple(t)
                 self.node_list.append(n)
+            self.work_mode = 'inp'
         self.center_view()
         self.show_all_entities()
 
@@ -608,14 +610,14 @@ class FabianBoard(Board):
         i = self.selected_entity
         e = self.entity_list[i]
         e.is_marked = True
-        self.change_entity_color(i, gv.marked_entity_color)
+        self.set_entity_color(i, gv.marked_entity_color)
 
     def mark_all_entities(self):
         i = 0
         for e in self.entity_list:
             if not e.is_marked:
                 e.is_marked = True
-                self.change_entity_color(i, gv.marked_entity_color)
+                self.set_entity_color(i, gv.marked_entity_color)
             i += 1
 
     def unmark_all_entities(self):
@@ -623,7 +625,7 @@ class FabianBoard(Board):
         for e in self.entity_list:
             if e.is_marked:
                 e.is_marked = False
-                self.change_entity_color(i, gv.default_color)
+                self.set_entity_color(i, gv.default_color)
             i += 1
 
     def unmark_selected_entity(self):
@@ -632,7 +634,7 @@ class FabianBoard(Board):
         i = self.selected_entity
         e = self.entity_list[i]
         e.is_marked = False
-        self.change_entity_color(i, gv.default_color)
+        self.set_entity_color(i, gv.default_color)
 
     def remove_marked_entities_from_list(self):
         temp_list = []
@@ -716,8 +718,8 @@ class FabianBoard(Board):
         d = None
         nearest_point = None
         if e.shape == 'CIRCLE':
-            d = math.fabs(gv.get_distance_between_points(e.center, p)-e.radius)
-            alfa = self.get_alfa(e.center, p)*math.pi/180
+            d = math.fabs(e.center.get_distance_from_point(p)-e.radius)
+            alfa = e.center.get_alfa_to(p)*math.pi/180
             if alfa is None:
                 d = e.radius
                 alfa = 0
@@ -725,14 +727,14 @@ class FabianBoard(Board):
             py = e.center.y+math.sin(alfa)*e.radius
             nearest_point = Point(px, py)
         elif e.shape == 'ARC':
-            alfa = self.get_alfa(e.center, p)
+            alfa = e.center.get_alfa_to(p)
             if alfa is None:
                 d = e.radius
                 nearest_point = e.start
             if e.arc_end_angle > 360 and alfa < e.arc_start_angle:
                 alfa += 360
             if e.arc_start_angle <= alfa <= e.arc_end_angle:
-                d = math.fabs(gv.get_distance_between_points(e.center, p) - e.radius)
+                d = math.fabs(e.center.get_distance_from_point(p) - e.radius)
                 alfa = alfa*math.pi/180
                 px = e.center.x + math.cos(alfa) * e.radius
                 py = e.center.y + math.sin(alfa) * e.radius
@@ -743,15 +745,15 @@ class FabianBoard(Board):
                     mid_angle += 360
                 a1 = (mid_angle-180)
                 if a1 < alfa < mid_angle:
-                    d = gv.get_distance_between_points(e.start, p)
+                    d = e.start.get_distance_from_point(p)
                     nearest_point = e.start
                 else:
-                    d = gv.get_distance_between_points(e.end, p)
+                    d = e.end.get_distance_from_point(p)
                     nearest_point = e.end
         elif e.shape == 'LINE':
-            alfa = self.get_alfa(e.start, e.end)
-            endx = math.fabs(self.get_shifted_point(e.end, e.start, -alfa).x)
-            p = self.get_shifted_point(p, e.start, -alfa)
+            alfa = e.start.get_alfa_to(e.end)
+            endx = math.fabs(get_shifted_point(e.end, e.start, -alfa).x)
+            p = get_shifted_point(p, e.start, -alfa)
             x = p.x
             if 0 <= x <= endx:
                 d = math.fabs(p.y)
@@ -760,58 +762,23 @@ class FabianBoard(Board):
                 py = math.sin(alfa)*x+e.start.y
                 nearest_point = Point(px, py)
             elif x < 0:
-                d = gv.get_distance_between_points(Point(0, 0), p)
+                d = p.get_distance_from_point(Point(0, 0))
                 nearest_point = e.start
             else:
-                d = gv.get_distance_between_points(Point(endx, 0), p)
+                d = p.get_distance_from_point(Point(endx, 0))
                 nearest_point = e.end
         return round(d, gv.accuracy), nearest_point
 
-    def create_arc(self, center, radius, start_angle, end_angle):
-        e = Entity('ARC')
+    def get_entity_by_board_part(self, board_part):
+        i = 0
+        for i in range(len(self.entity_list)):
+            if self.entity_list[i].board_part == board_part:
+                return i
+        return None
 
-    def create_line(self, p1, p2):
-        e = Entity('ARC')
-
-    def create_circle(self, center, radius):
-        e = Entity('ARC')
-
-    # return the angle vector of Point p relative to Point center, None if p == center
-    def get_alfa(self, center, p):
-        dx = p.x - center.x
-        dy = p.y - center.y
-        if dx == 0 and dy == 0:
-            return None
-        if dx == 0:
-            if dy > 0:
-                alfa = 90
-            else:
-                alfa = 270
-        elif dy == 0:
-            if dx > 0:
-                alfa = 0
-            else:
-                alfa = 180
-        else:
-            alfa = math.atan(dy / dx) * 180 / math.pi
-            if dx < 0:
-                alfa += 180
-            elif alfa < 0:
-                alfa += 360
-        return alfa
-
-    # return new coordinates of Point p relative to Point new00 with rotation_angle
-    def get_shifted_point(self, p, new00, rotation_angle):
-        shifted_p = Point(p.x - new00.x, p.y - new00.y)
-        r = gv.get_distance_between_points(Point(0, 0), shifted_p)
-        if r == 0:
-            return shifted_p
-        alfa = self.get_alfa(Point(0, 0), shifted_p) + rotation_angle
-        alfa = alfa*math.pi/180
-        shifted_p.x = math.cos(alfa)*r
-        shifted_p.y = math.sin(alfa)*r
-        return shifted_p
-
+    def show_node(self, i):
+        pass
+    
     def show_entity(self, i):
         part = None
         if self.entity_list[i].board_part is not None:
@@ -825,13 +792,6 @@ class FabianBoard(Board):
                                    self.entity_list[i].arc_end_angle, self.entity_list[i].color)
         self.entity_list[i].board_part = part
 
-    def get_entity_by_board_part(self, board_part):
-        i = 0
-        for i in range(len(self.entity_list)):
-            if self.entity_list[i].board_part == board_part:
-                return i
-        return None
-
     def show_all_entities(self):
         for i in range(len(self.entity_list)):
             self.show_entity(i)
@@ -842,11 +802,19 @@ class FabianBoard(Board):
         self.board.delete(self.entity_list[i].board_part)
         self.entity_list[i].board_part = None
 
-    def change_entity_color(self, i, color):
+    def hide_all_entities(self):
+        for i in range(len(self.entity_list)):
+            self.hide_entity(i)
+
+    def set_entity_color(self, i, color):
         self.hide_entity(i)
         self.entity_list[i].color = color
         self.show_entity(i)
         
+    def set_all_entities_color(self, color):
+        for i in range(len(self.entity_list)):
+            self.set_entity_color(i, color)
+
     def mark_entity(self, i):
         b = self.board.bbox(self.entity_list[i].board_part)
         self.selected_entity_mark = self.board.create_rectangle(b)

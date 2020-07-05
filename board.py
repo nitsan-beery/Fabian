@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import filedialog
 import json
 import global_vars as gv
-from global_vars import Point
+from point import *
 
 
 class Board:
@@ -99,13 +99,13 @@ class Board:
         x2, y2 = self.convert_xy_to_screen(p2.x, p2.y)
         return self.board.create_line(x1, y1, x2, y2, fill=color)
 
-    #create circle with xy coordinates
+    #create circle center = Point(x, y)
     def draw_circle(self, center, radius, outline_color=gv.default_color):
         xLeft, yTop = self.convert_xy_to_screen(center.x-radius, center.y+radius)
         xRight, yBottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
         return self.board.create_oval(xLeft, yTop, xRight, yBottom, outline=outline_color)
 
-    #create arc with xy coordinates
+    #create arc center = Point(x, y)
     def draw_arc(self, center, radius, start_angle, end_angle, outline_color=gv.default_color):
         xLeft, yTop = self.convert_xy_to_screen(center.x-radius, center.y+radius)
         xRight, yBottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
