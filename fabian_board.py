@@ -1,7 +1,7 @@
 from board import *
 import ezdxf
 import math
-from tkinter import messagebox
+from tkinter import messagebox, ttk
 from operator import attrgetter, itemgetter
 
 shapes = {'CIRCLE', 'LINE', 'ARC'}
@@ -203,6 +203,7 @@ class FabianBoard(Board):
         self.show_entities = True
         self.show_nodes = True
         self.show_net = True
+        self.progress_bar = None
 
         self.board.bind('<Motion>', self.motion)
         self.board.bind('<Button-1>', self.mouse_1_pressed)
@@ -232,7 +233,7 @@ class FabianBoard(Board):
     def mouse_1_pressed(self, key):
         if self.temp_rect_mark is not None:
             self.board.delete(self.temp_rect_mark)
-        x, y = self.convert_screen_to_xy(key.x, key.y)
+        x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
         if self.selected_entity_mark is None:
             self.temp_rect_start_point = Point(x, y)
             return
@@ -388,11 +389,12 @@ class FabianBoard(Board):
             self.show_net = False
         elif mode.lower() == 'inp':
             self.set_all_entities_color(gv.weak_entity_color)
-            print('setting nodes list')
+            self.show_text_on_screen('setting nodes list')
             self.set_initial_node_list()
             self.show_nodes = True
-            print('checking unattached nodes')
+            self.show_text_on_screen('checking unattached nodes')
             tmp_list = self.get_unattached_nodes()
+            self.hide_text_on_screen()
             counter = len(tmp_list)
             if counter > 0:
                 print(f'found {counter} unattached nodes')
@@ -409,8 +411,12 @@ class FabianBoard(Board):
     def motion(self, key):
         if len(self.entity_list) == 0:
             return
-        x, y = self.convert_screen_to_xy(key.x, key.y)
+        x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
         p = Point(x, y)
+        text = f'{round(x, gv.accuracy)}    {round(y, gv.accuracy)}'
+        text_pos = 'lt'
+        self.hide_text_on_screen()
+        self.show_text_on_screen(text, text_pos)
         if self.new_line_edge[0] is not None:
             self.board.delete(self.temp_line_mark)
             self.temp_line_mark = self.draw_line(self.new_line_edge[0], p, gv.temp_line_color)
@@ -500,24 +506,43 @@ class FabianBoard(Board):
                 next_neighbor = i
         return next_neighbor
 
+    def show_progress_bar(self, max_counter=100):
+        self.progress_bar = ttk.Progressbar(self.frame_1, orient=tk.HORIZONTAL, length=300, mode='determinate', maximum=max_counter)
+        self.progress_bar.pack(side=tk.TOP, fill=tk.BOTH, pady=5)
+
+    def hide_progress_bar(self):
+        if self.progress_bar is not None:
+            self.progress_bar.destroy()
+            self.progress_bar = None
+
     def get_duplicated_entities(self):
         duplicate_entities_list = []
-        for i in range(len(self.entity_list)):
+        c = len(self.entity_list)
+        self.show_progress_bar(c)
+        for i in range(c):
             ei = self.entity_list[i]
             for j in range(i):
                 ej = self.entity_list[j]
                 if ei.is_equal(ej):
                     duplicate_entities_list.append(ei)
                     break
+            self.progress_bar['value'] += 1
+            self.frame_1.update_idletasks()
+        self.hide_progress_bar()
         return duplicate_entities_list
 
     def get_unattached_nodes(self):
         tmp_list = []
-        for i in range(1, len(self.node_list)):
+        c = len(self.node_list)
+        self.show_progress_bar(c)
+        for i in range(1, c):
             n = self.node_list[i]
             if len(n.neighbors_list) < 2:
                 n.color = gv.invalid_node_color
                 tmp_list.append(i)
+            self.progress_bar['value'] += 1
+            self.frame_1.update_idletasks()
+        self.hide_progress_bar()
         return tmp_list
 
     def add_node_to_node_list(self, n):
@@ -526,7 +551,9 @@ class FabianBoard(Board):
             self.node_list.append(n)
 
     def set_initial_node_list(self):
-        for i in range(len(self.entity_list)):
+        c = len(self.entity_list)
+        self.show_progress_bar(c)
+        for i in range(c):
             e = self.entity_list[i]
             if e.shape == 'CIRCLE':
                 continue
@@ -536,14 +563,24 @@ class FabianBoard(Board):
             node2 = Node(p2)
             self.add_node_to_node_list(node1)
             self.add_node_to_node_list(node2)
+            self.progress_bar['value'] += 1
+            self.frame_1.update_idletasks()
+        self.hide_progress_bar()
+        self.show_text_on_screen('setting neighbors')
         self.set_all_nodes_neighbor_list()
+        self.hide_text_on_screen()
         # debug
         # self.print_node_list()
     
     def set_all_nodes_neighbor_list(self):
-        for i in range(1, len(self.node_list)):
+        c = len(self.node_list)
+        self.show_progress_bar(c)
+        for i in range(1, c):
             n = self.node_list[i]
             self.set_node_neighbors_list(n)
+            self.progress_bar['value'] += 1
+            self.frame_1.update_idletasks()
+        self.hide_progress_bar()
 
     def is_node_in_node_list(self, node):
         for n in self.node_list:
@@ -705,9 +742,12 @@ class FabianBoard(Board):
         if filetype == 'dxf':
             doc = ezdxf.readfile(filename)
             self.convert_doc_to_entity_list(doc)
+            self.center_view()
             print(f'{len(self.entity_list)} Entities in {filetype} file')
-            print('checking for duplicated entities')
+            text = 'checking for duplicated entities'
+            self.show_text_on_screen(text)
             d_list = self.get_duplicated_entities()
+            self.hide_text_on_screen()
             if len(d_list) > 0:
                 print(f'found {len(d_list)} duplicated entities')
                 m = f'Removed {len(d_list)} duplicated entities'
@@ -733,7 +773,6 @@ class FabianBoard(Board):
                 self.node_list.append(n)
             work_mode = 'inp'
         self.set_accuracy()
-        self.center_view()
         self.change_work_mode(work_mode)
 
     def center_view(self):
@@ -743,6 +782,7 @@ class FabianBoard(Board):
         else:
             self.set_screen_position(x, y)
 
+    # return x, y of center in canvas coordinates
     def get_center(self):
         if len(self.entity_list) == 0:
             return self.center.x, self.center.y
@@ -1059,8 +1099,8 @@ class FabianBoard(Board):
                     self.entity_list.append(e)
 
     def zoom(self, factor):
-        x, y = self.get_screen_center()
-        x, y = self.convert_screen_to_xy(x, y)
+        x, y = self.get_center_keyx_keyy()
+        x, y = self.convert_keyx_keyy_to_xy(x, y)
         self.scale = round(self.scale*factor, 1)
         x, y = self.convert_xy_to_screen(x, y)
         self.set_screen_position(x, y)

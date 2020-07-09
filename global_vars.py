@@ -22,6 +22,7 @@ temp_line_color = 'red'
 node_color = 'red'
 invalid_node_color = 'green'
 net_line_color = 'red'
+text_color = 'green'
 
 
 

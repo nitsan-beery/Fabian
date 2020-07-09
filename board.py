@@ -33,22 +33,90 @@ class Board:
 
         self.window_main.geometry(gv.WINDWO_SIZE)
         self.window_main.update()
+        # center of canvas
         self.center = Point(int(gv.BOARD_WIDTH/2), int(gv.BOARD_HEIGHT/2))
         self.set_screen_position(self.center.x, self.center.y)
 
         self.scale = 1
+        self.text_on_screen = None
 
         self.board.bind('<MouseWheel>', self.mouse_wheel)
 
-    # scroll view to the center of (x, y) in canvas coordinates
+    # scroll view to x, y in canvas coordinates
     def set_screen_position(self, x, y):
         self.board.xview_moveto((x-self.board.winfo_width()/2)/gv.BOARD_WIDTH)
         self.board.yview_moveto((y-self.board.winfo_height()/2)/gv.BOARD_HEIGHT)
 
-    def get_screen_center(self):
+    # return x, y of screen center in canvas coordinates
+    def get_screen_position(self):
+        x = self.board.canvasx(self.board.winfo_width()/2)
+        y = self.board.canvasy(self.board.winfo_height()/2)
+        return x, y
+
+    # return center window position (key.x, key.y coordinates)
+    def get_center_keyx_keyy(self):
         x = self.board.winfo_width()/2
         y = self.board.winfo_height()/2
         return x, y
+
+    # convert window events key.x key.y to x, y
+    def convert_keyx_keyy_to_xy(self, keyx, keyy):
+        canvas_x = self.board.canvasx(keyx)
+        canvas_y = self.board.canvasy(keyy)
+        x = (canvas_x - self.center.x)/self.scale
+        y = (self.center.y - canvas_y)/self.scale
+        return x, y
+
+    # convert x, y to canvas coordinates
+    def convert_xy_to_screen(self, x, y):
+        x = self.center.x + x*self.scale
+        y = self.center.y - y*self.scale
+        return x, y
+
+    # show text on screen 'center' or left-top (lt) or left-bottom (lb)
+    def show_text_on_screen(self, text, p='center', color=gv.text_color):
+        x, y = self.get_screen_position()
+        if p == 'lb':
+            x = x - self.board.winfo_width()/2 + 40
+            y = y + self.board.winfo_height()/2 - 30
+        elif p == 'lt':
+            x = x - self.board.winfo_width()/2 + 40
+            y = y - self.board.winfo_height()/2 + 15
+        if self.text_on_screen is not None:
+            self.board.delete(self.text_on_screen)
+        self.text_on_screen = self.board.create_text(x, y, text=text, fill=color)
+
+    def hide_text_on_screen(self):
+        if self.text_on_screen is not None:
+            self.board.delete(self.text_on_screen)
+            self.text_on_screen = None
+
+    #create line between Points() p1 and p2 with xy coordinates
+    def draw_line(self, p1, p2, color=gv.default_color):
+        x1, y1 = self.convert_xy_to_screen(p1.x, p1.y)
+        x2, y2 = self.convert_xy_to_screen(p2.x, p2.y)
+        return self.board.create_line(x1, y1, x2, y2, fill=color)
+
+    #create circle center = Point(x, y)
+    def draw_circle(self, center, radius, outline_color=gv.default_color):
+        xLeft, yTop = self.convert_xy_to_screen(center.x-radius, center.y+radius)
+        xRight, yBottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
+        return self.board.create_oval(xLeft, yTop, xRight, yBottom, outline=outline_color)
+
+    #create arc center = Point(x, y)
+    def draw_arc(self, center, radius, start_angle, end_angle, outline_color=gv.default_color):
+        xLeft, yTop = self.convert_xy_to_screen(center.x-radius, center.y+radius)
+        xRight, yBottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
+        return self.board.create_arc(xLeft, yTop, xRight, yBottom, start=start_angle, extent=(end_angle-start_angle),
+                              style=tk.ARC, outline=outline_color)
+
+    def show_center(self):
+        p1 = Point(-15, 0)
+        p2 = Point(15, 0)
+        self.create_line(p1, p2)
+        p1 = Point(0, 15)
+        p2 = Point(0, -15)
+        self.create_line(p1, p2)
 
     def mouse_wheel(self, key):
         if key.delta < 0:
@@ -76,45 +144,4 @@ class Board:
             return
         with open(filename, "w") as json_file:
             json.dump(data, json_file)
-
-    # convert screen points (key.x, key.y) to x, y
-    def convert_screen_to_xy(self, keyx, keyy):
-        canvas_x = self.board.canvasx(keyx)
-        canvas_y = self.board.canvasy(keyy)
-        x = (canvas_x - self.center.x)/self.scale
-        y = (self.center.y - canvas_y)/self.scale
-        return x, y
-
-    def convert_xy_to_screen(self, x, y):
-        x = self.center.x + x*self.scale
-        y = self.center.y - y*self.scale
-        return x, y
-
-    def show_center(self):
-        p1 = Point(-15, 0)
-        p2 = Point(15, 0)
-        self.create_line(p1, p2)
-        p1 = Point(0, 15)
-        p2 = Point(0, -15)
-        self.create_line(p1, p2)
-
-    #create line between Points() p1 and p2 with xy coordinates
-    def draw_line(self, p1, p2, color=gv.default_color):
-        x1, y1 = self.convert_xy_to_screen(p1.x, p1.y)
-        x2, y2 = self.convert_xy_to_screen(p2.x, p2.y)
-        return self.board.create_line(x1, y1, x2, y2, fill=color)
-
-    #create circle center = Point(x, y)
-    def draw_circle(self, center, radius, outline_color=gv.default_color):
-        xLeft, yTop = self.convert_xy_to_screen(center.x-radius, center.y+radius)
-        xRight, yBottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
-        return self.board.create_oval(xLeft, yTop, xRight, yBottom, outline=outline_color)
-
-    #create arc center = Point(x, y)
-    def draw_arc(self, center, radius, start_angle, end_angle, outline_color=gv.default_color):
-        xLeft, yTop = self.convert_xy_to_screen(center.x-radius, center.y+radius)
-        xRight, yBottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
-        return self.board.create_arc(xLeft, yTop, xRight, yBottom, start=start_angle, extent=(end_angle-start_angle),
-                              style=tk.ARC, outline=outline_color)
-
 
