@@ -390,13 +390,9 @@ class FabianBoard(Board):
             self.show_net = False
         elif mode.lower() == 'inp':
             self.set_all_dxf_entities_color(gv.weak_entity_color)
-            self.show_text_on_screen('setting nodes list')
             if len(self.node_list) < 2:
                 self.set_initial_node_list()
-            self.show_nodes = True
-            self.show_text_on_screen('checking unattached nodes')
             tmp_list = self.get_unattached_nodes()
-            self.hide_text_on_screen()
             counter = len(tmp_list)
             if counter > 0:
                 print(f'found {counter} unattached nodes')
@@ -404,7 +400,7 @@ class FabianBoard(Board):
             else:
                 # debug
                 print('no unattached nodes')
-                pass
+        self.show_nodes = True
         self.update_view()
 
     def change_selection_mode(self, mode):
@@ -519,6 +515,7 @@ class FabianBoard(Board):
     def get_duplicated_entities(self):
         duplicate_entities_list = []
         c = len(self.entity_list)
+        self.show_text_on_screen('checking duplicated entities')
         self.show_progress_bar(c)
         for i in range(c):
             ei = self.entity_list[i]
@@ -529,12 +526,14 @@ class FabianBoard(Board):
                     break
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
+        self.hide_text_on_screen()
         self.hide_progress_bar()
         return duplicate_entities_list
 
     def get_unattached_nodes(self):
         tmp_list = []
         c = len(self.node_list)
+        self.show_text_on_screen('checking unattached nodes')
         self.show_progress_bar(c)
         for i in range(1, c):
             n = self.node_list[i]
@@ -543,6 +542,7 @@ class FabianBoard(Board):
                 tmp_list.append(i)
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
+        self.hide_text_on_screen()
         self.hide_progress_bar()
         return tmp_list
 
@@ -553,6 +553,7 @@ class FabianBoard(Board):
 
     def set_initial_node_list(self):
         c = len(self.entity_list)
+        self.show_text_on_screen('setting initial node list')
         self.show_progress_bar(c)
         for i in range(c):
             e = self.entity_list[i]
@@ -566,21 +567,22 @@ class FabianBoard(Board):
             self.add_node_to_node_list(node2)
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
-        self.hide_progress_bar()
-        self.show_text_on_screen('setting neighbors')
-        self.set_all_nodes_neighbor_list()
         self.hide_text_on_screen()
+        self.hide_progress_bar()
+        self.set_all_nodes_neighbor_list()
         # debug
         # self.print_node_list()
     
     def set_all_nodes_neighbor_list(self):
         c = len(self.node_list)
+        self.show_text_on_screen('setting neighbors')
         self.show_progress_bar(c)
         for i in range(1, c):
             n = self.node_list[i]
             self.set_node_neighbors_list(n)
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
+        self.hide_text_on_screen()
         self.hide_progress_bar()
 
     def is_node_in_node_list(self, node):
@@ -733,7 +735,7 @@ class FabianBoard(Board):
     def load(self):
         filename = filedialog.askopenfilename(parent=self.window_main, initialdir="./data files/",
                                               title="Select file",
-                                              filetypes=(("DXF files", "*.dxf"), ("Json files", "*.json"), ("all files", "*.*")))
+                                              filetypes=(("Json files", "*.json"), ("DXF files", "*.dxf"), ("all files", "*.*")))
         if filename == '':
             return
         self.reset_board()
@@ -745,8 +747,6 @@ class FabianBoard(Board):
             self.convert_doc_to_entity_list(doc)
             self.center_view()
             print(f'{len(self.entity_list)} Entities in {filetype} file')
-            text = 'checking for duplicated entities'
-            self.show_text_on_screen(text)
             d_list = self.get_duplicated_entities()
             self.hide_text_on_screen()
             if len(d_list) > 0:
