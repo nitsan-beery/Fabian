@@ -74,7 +74,8 @@ class Entity:
         end = self.end
         if end is not None:
             end = end.convert_into_tuple()
-        t = (self.shape, center, self.radius, self.arc_start_angle, self.arc_end_angle, start, end, self.color, self.is_part_of_dxf)
+        t = (self.shape, center, self.radius, self.arc_start_angle, self.arc_end_angle, start, end, self.color,
+             self.is_part_of_dxf)
         return t
 
     def get_data_from_tuple(self, t):
@@ -168,6 +169,34 @@ class Node:
         self.neighbors_list = neighbors_list
 
 
+class NetLine:
+    def __init__(self, p1=None, p2=None, board_part=None):
+        self.p1 = p1
+        self.p2 = p2
+        self.board_part = board_part
+
+    def is_eqal(self, line):
+        t1 = self.p1.is_equal(line.p1) and self.p2.is_equal(line.p2)
+        t2 = self.p1.is_equal(line.p2) and self.p2.is_equal(line.p1)
+        return t1 or t2
+
+    def is_in_list(self, line_list):
+        for i in range(len(line_list)):
+            if self.is_eqal(line_list[i]):
+                return True
+        return False
+
+    def convert_into_tuple(self):
+        t = (self.p1.convert_into_tuple(), self.p1.convert_into_tuple())
+        return t
+
+    def get_data_from_tuple(self, t):
+        if len(t) < 2:
+            print(f"tuple doesn't match NetLine type: {t}")
+            return
+        self.p1.get_data_from_tuple(t[0])
+        self.p2.get_data_from_tuple(t[1])
+
 class FabianBoard(Board):
     def __init__(self, scale=1):
         super().__init__(True)
@@ -229,6 +258,7 @@ class FabianBoard(Board):
         self.temp_line_mark = None
         self.temp_rect_start_point = None
         self.temp_rect_mark = None
+        self.progress_bar = None
 
     def mouse_1_pressed(self, key):
         if self.temp_rect_mark is not None:
@@ -378,6 +408,8 @@ class FabianBoard(Board):
             menu.add_command(label="Hide net", command=self.hide_net_lines)
             menu.add_command(label="Clear net", command=self.clear_net)
             menu.add_cascade(label='Show entities', menu=show_entities_menu)
+            menu.add_separator()
+            menu.add_command(label="Set net", command=self.set_net)
             menu.add_separator()
         menu.add_command(label="Quit")
         menu.post(key.x_root, key.y_root)
@@ -593,6 +625,7 @@ class FabianBoard(Board):
 
     def set_node_neighbors_list(self, n):
         e_list = n.entities_list
+        n.neighbors_list = []
         for i in e_list:
             n_index = None
             alfa = None
@@ -603,7 +636,7 @@ class FabianBoard(Board):
                 alfa = e.start.get_alfa_to(e.end)
             elif n.p.is_equal(e.end):
                 n_index = self.get_index_of_node_with_point_p(e.start)
-                alfa = e.start.get_alfa_to(e.start)
+                alfa = e.end.get_alfa_to(e.start)
             if n_index is not None and not n.is_in_neighbors_list(n_index):
                 neighbor.node_index = n_index
                 neighbor.angle_from_p = alfa
@@ -618,7 +651,18 @@ class FabianBoard(Board):
                 b.append(j.node_index)
             print(f'{i}: {n.p.convert_into_tuple()}   neigbors: {b}')
 
+    def set_net(self):
+        self.create_net_element_list()
+        self.show_net_lines()
+
     def create_net_element_list(self):
+        self.set_all_nodes_neighbor_list()
+        self.net_line_list = []
+        c = len(self.node_list)
+        self.show_text_on_screen('creating net elements')
+        self.show_progress_bar(c)
+        # debug
+        self.print_node_list()
         element_list = []
         # iterate all nodes
         for i in range(1, len(self.node_list)):
@@ -643,7 +687,20 @@ class FabianBoard(Board):
                     next_neighbor_index = self.get_next_relevant_neighbor(node, alfa)
                 if next_node_index == i and len(new_element) > 2:
                     element_list.append(new_element)
+                    self.add_element_lines_to_net_list(new_element)
+        self.hide_text_on_screen()
+        self.hide_progress_bar()
         self.element_list = element_list
+
+    def add_element_lines_to_net_list(self, element):
+        for i in range(len(element)):
+            start = i
+            end = (i+1) % len(element)
+            p1 = self.node_list[element[start]].p
+            p2 = self.node_list[element[end]].p
+            line = NetLine(p1, p2)
+            if not line.is_in_list(self.net_line_list):
+                self.net_line_list.append(line)
 
     def save_inp(self):
         self.create_net_element_list()
@@ -997,6 +1054,8 @@ class FabianBoard(Board):
         return None
 
     def clear_net(self):
+        self.hide_net_lines()
+        self.net_line_list = []
         i = len(self.entity_list)-1
         while i > 0:
             e = self.entity_list[i]
@@ -1039,16 +1098,35 @@ class FabianBoard(Board):
                                    self.entity_list[i].arc_end_angle, self.entity_list[i].color)
         self.entity_list[i].board_part = part
 
+    def show_net_line(self, i, color=gv.net_line_color):
+        line = self.net_line_list[i]
+        if line.board_part is None:
+            line.board_part = self.draw_line(line.p1, line.p2, color)
+
+    def hide_net_line(self, i):
+        line = self.net_line_list[i]
+        if line.board_part is not None:
+            self.board.delete(line.board_part)
+            line.board_part = None
+
     def show_net_lines(self):
         self.show_net = True
-        for i in range(len(self.entity_list)):
-            if not self.entity_list[i].is_part_of_dxf:
-                self.show_entity(i)
+        if len(self.net_line_list) == 0:
+            for i in range(len(self.entity_list)):
+                if not self.entity_list[i].is_part_of_dxf:
+                    self.show_entity(i)
+        else:
+            for i in range(len(self.net_line_list)):
+                self.show_net_line(i)
 
     def hide_net_lines(self):
-        for i in range(len(self.entity_list)):
-            if not self.entity_list[i].is_part_of_dxf:
-                self.hide_entity(i)
+        if len(self.net_line_list) == 0:
+            for i in range(len(self.entity_list)):
+                if not self.entity_list[i].is_part_of_dxf:
+                    self.hide_entity(i)
+        else:
+            for i in range(len(self.net_line_list)):
+                self.hide_net_line(i)
 
     def show_dxf_entities(self):
         self.show_entities = True
