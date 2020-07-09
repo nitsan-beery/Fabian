@@ -344,15 +344,15 @@ class FabianBoard(Board):
         select_mode_menu.add_separator()
         select_mode_menu.add_command(label="Quit")
         show_entities_menu = tk.Menu(menu, tearoff=0)
-        show_entities_menu.add_command(label="Weak", command=lambda: self.set_all_entities_color(gv.weak_entity_color))
-        show_entities_menu.add_command(label="Strong", command=lambda: self.set_all_entities_color(gv.default_color))
+        show_entities_menu.add_command(label="Weak", command=lambda: self.set_all_dxf_entities_color(gv.weak_entity_color))
+        show_entities_menu.add_command(label="Strong", command=lambda: self.set_all_dxf_entities_color(gv.default_color))
         show_entities_menu.add_command(label="Hide", command=lambda: self.hide_dxf_entities())
         show_entities_menu.add_separator()
         show_entities_menu.add_command(label="Quit")
         menu.add_cascade(label='Work mode', menu=work_mode_menu)
         menu.add_separator()
-        menu.add_cascade(label='Select mode', menu=select_mode_menu)
-        menu.add_separator()
+        # menu.add_cascade(label='Select mode', menu=select_mode_menu)
+        # menu.add_separator()
         if self.new_line_edge[0] is not None:
             self.board.delete(self.temp_line_mark)
         if self.new_line_edge[1] is not None:
@@ -376,21 +376,23 @@ class FabianBoard(Board):
         elif self.work_mode == 'inp':
             menu.add_command(label="Show net", command=self.show_net_lines)
             menu.add_command(label="Hide net", command=self.hide_net_lines)
+            menu.add_command(label="Clear net", command=self.clear_net)
             menu.add_cascade(label='Show entities', menu=show_entities_menu)
             menu.add_separator()
-        menu.add_command(label="quit")
+        menu.add_command(label="Quit")
         menu.post(key.x_root, key.y_root)
 
     def change_work_mode(self, mode):
         self.work_mode = mode
         if mode.lower() == 'dxf':
-            self.set_all_entities_color(gv.default_color)
+            self.set_all_dxf_entities_color(gv.default_color)
             self.show_nodes = False
             self.show_net = False
         elif mode.lower() == 'inp':
-            self.set_all_entities_color(gv.weak_entity_color)
+            self.set_all_dxf_entities_color(gv.weak_entity_color)
             self.show_text_on_screen('setting nodes list')
-            self.set_initial_node_list()
+            if len(self.node_list) < 2:
+                self.set_initial_node_list()
             self.show_nodes = True
             self.show_text_on_screen('checking unattached nodes')
             tmp_list = self.get_unattached_nodes()
@@ -414,9 +416,8 @@ class FabianBoard(Board):
         x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
         p = Point(x, y)
         text = f'{round(x, gv.accuracy)}    {round(y, gv.accuracy)}'
-        text_pos = 'lt'
         self.hide_text_on_screen()
-        self.show_text_on_screen(text, text_pos)
+        self.show_text_on_screen(text, 'lt')
         if self.new_line_edge[0] is not None:
             self.board.delete(self.temp_line_mark)
             self.temp_line_mark = self.draw_line(self.new_line_edge[0], p, gv.temp_line_color)
@@ -761,6 +762,7 @@ class FabianBoard(Board):
             work_mode = 'dxf'
         elif filetype == 'json':
             data = self.load_json(filename=filename)
+            self.node_list = []
             entity_list = data.get("entity_list")
             node_list = data.get("node_list")
             for t in entity_list:
@@ -773,9 +775,11 @@ class FabianBoard(Board):
                 self.node_list.append(n)
             work_mode = 'inp'
         self.set_accuracy()
+        self.center_view()
         self.change_work_mode(work_mode)
 
     def center_view(self):
+        self.hide_text_on_screen()
         x, y = self.get_center()
         if x is None:
             self.set_screen_position(self.center.x, self.center.y)
@@ -992,6 +996,15 @@ class FabianBoard(Board):
                 return i
         return None
 
+    def clear_net(self):
+        i = len(self.entity_list)-1
+        while i > 0:
+            e = self.entity_list[i]
+            if not e.is_part_of_dxf:
+                self.hide_entity(i)
+                self.entity_list.pop(i)
+            i -= 1
+
     def hide_node(self, i):
         if self.node_list[i].board_part is None:
             return
@@ -1059,9 +1072,10 @@ class FabianBoard(Board):
         self.entity_list[i].color = color
         self.show_entity(i)
 
-    def set_all_entities_color(self, color):
+    def set_all_dxf_entities_color(self, color):
         for i in range(len(self.entity_list)):
-            self.set_entity_color(i, color)
+            if self.entity_list[i].is_part_of_dxf:
+                self.set_entity_color(i, color)
 
     def mark_entity(self, i):
         b = self.board.bbox(self.entity_list[i].board_part)
@@ -1099,6 +1113,7 @@ class FabianBoard(Board):
                     self.entity_list.append(e)
 
     def zoom(self, factor):
+        self.hide_text_on_screen()
         x, y = self.get_center_keyx_keyy()
         x, y = self.convert_keyx_keyy_to_xy(x, y)
         self.scale = round(self.scale*factor, 1)

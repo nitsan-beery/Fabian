@@ -119,6 +119,7 @@ class Board:
         self.create_line(p1, p2)
 
     def mouse_wheel(self, key):
+        self.hide_text_on_screen()
         if key.delta < 0:
             i = '1'
         else:
