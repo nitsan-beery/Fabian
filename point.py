@@ -13,11 +13,11 @@ class Point:
         return round(self.x, gv.accuracy) == round(p.x, gv.accuracy) and \
                round(self.y, gv.accuracy) == round(p.y, gv.accuracy)
 
-    def convert_into_tupple(self):
+    def convert_into_tuple(self):
         t = (self.x, self.y)
         return t
 
-    def get_data_from_tupple(self, t):
+    def get_data_from_tuple(self, t):
         if len(t) < 2:
             print(f"tuple doesn't match Point type: {t}")
             return

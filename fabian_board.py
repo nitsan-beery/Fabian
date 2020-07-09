@@ -64,20 +64,20 @@ class Entity:
             t3 = self.start.is_equal(e.end) and self.end.is_equal(e.start)
             return t1 and (t2 or t3)
 
-    def convert_into_tupple(self):
+    def convert_into_tuple(self):
         center = self.center
         if center is not None:
-            center = center.convert_into_tupple()
+            center = center.convert_into_tuple()
         start = self.start
         if start is not None:
-            start = start.convert_into_tupple()
+            start = start.convert_into_tuple()
         end = self.end
         if end is not None:
-            end = end.convert_into_tupple()
+            end = end.convert_into_tuple()
         t = (self.shape, center, self.radius, self.arc_start_angle, self.arc_end_angle, start, end, self.color, self.is_part_of_dxf)
         return t
 
-    def get_data_from_tupple(self, t):
+    def get_data_from_tuple(self, t):
         if len(t) < 9:
             print(f"tuple doesn't match Entity type: {t}")
             return
@@ -85,7 +85,7 @@ class Entity:
         center = t[1]
         if center is not None:
             center = Point()
-            center.get_data_from_tupple(t[1])
+            center.get_data_from_tuple(t[1])
         self.center = center
         self.radius = t[2]
         self.arc_start_angle = t[3]
@@ -93,17 +93,18 @@ class Entity:
         start = t[5]
         if start is not None:
             start = Point()
-            start.get_data_from_tupple(t[5])
+            start.get_data_from_tuple(t[5])
         self.start = start
         end = t[6]
         if end is not None:
             end = Point()
-            end.get_data_from_tupple(t[6])
+            end.get_data_from_tuple(t[6])
         self.end = end
         self.color = t[7]
         self.is_part_of_dxf = t[8]
         self.set_arc()
         self.set_left_bottom_right_up()
+
 
 class Neighbor:
     def __init__(self, node_index=0, angle_from_p=0):
@@ -111,11 +112,11 @@ class Neighbor:
         self.angle_from_p = angle_from_p
         self.is_part_of_element = False
 
-    def convert_into_tupple(self):
+    def convert_into_tuple(self):
         t = (self.node_index, self.angle_from_p, self.is_part_of_element)
         return t
 
-    def get_data_from_tupple(self, t):
+    def get_data_from_tuple(self, t):
         if len(t) < 3:
             print(f"tuple doesn't match Neighbor type: {t}")
             return
@@ -129,26 +130,40 @@ class Node:
         if point is None:
             point = Point()
         self.p = point
+        self.entities_list = []
         self.neighbors_list = []
         self.board_part = None
         self.color = gv.node_color
 
-    def convert_into_tupple(self):
-        tupple_neighbors_list = []
+    def is_in_neighbors_list(self, i):
         for n in self.neighbors_list:
-            tupple_neighbors_list.append(n.convert_into_tupple())
-        t = (self.p.convert_into_tupple(), tupple_neighbors_list)
+            if i == n:
+                return True
+        return False
+
+    def is_in_entities_list(self, i):
+        for e in self.entities_list:
+            if i == e:
+                return True
+        return False
+
+    def convert_into_tuple(self):
+        tuple_neighbors_list = []
+        for n in self.neighbors_list:
+            tuple_neighbors_list.append(n.convert_into_tuple())
+        t = (self.p.convert_into_tuple(), self.entities_list, tuple_neighbors_list)
         return t
 
-    def get_data_from_tupple(self, t):
-        if len(t) < 2:
+    def get_data_from_tuple(self, t):
+        if len(t) < 3:
             print(f"tuple doesn't match Node type: {t}")
             return
-        self.p.get_data_from_tupple(t[0])
+        self.p.get_data_from_tuple(t[0])
+        self.entities_list = t[1]
         neighbors_list = []
-        for i in t[1]:
+        for i in t[2]:
             n = Neighbor()
-            n.get_data_from_tupple(i)
+            n.get_data_from_tuple(i)
             neighbors_list.append(n)
         self.neighbors_list = neighbors_list
 
@@ -373,10 +388,19 @@ class FabianBoard(Board):
             self.show_net = False
         elif mode.lower() == 'inp':
             self.set_all_entities_color(gv.weak_entity_color)
-            self.set_node_list_from_dxf()
+            print('setting nodes list')
+            self.set_initial_node_list()
             self.show_nodes = True
-            if not self.is_node_list_valid():
-                messagebox.showwarning("Warning", "unattached nodes")
+            print('checking unattached nodes')
+            tmp_list = self.get_unattached_nodes()
+            counter = len(tmp_list)
+            if counter > 0:
+                print(f'found {counter} unattached nodes')
+                messagebox.showwarning("Warning", f"{counter} unattached nodes")
+            else:
+                # debug
+                print('no unattached nodes')
+                pass
         self.update_view()
 
     def change_selection_mode(self, mode):
@@ -384,7 +408,7 @@ class FabianBoard(Board):
 
     def motion(self, key):
         if len(self.entity_list) == 0:
-            return 
+            return
         x, y = self.convert_screen_to_xy(key.x, key.y)
         p = Point(x, y)
         if self.new_line_edge[0] is not None:
@@ -430,11 +454,29 @@ class FabianBoard(Board):
         self.entity_list.remove(e)
         for m in range(n):
             self.entity_list.append(new_part_list[m])
+            self.define_new_entity_color(-1)
             self.show_entity(-1)
 
-    def get_index_of_node_with_point_p(self, p, node_list):
-        for i in range(1, len(node_list)):
-            if p.is_equal(node_list[i].p):
+    def define_new_entity_color(self, i):
+        if self.work_mode == 'inp':
+            if self.entity_list[i].is_part_of_dxf:
+                self.entity_list[i].color = gv.weak_entity_color
+            else:
+                self.entity_list[i].color = gv.net_line_color
+        else:
+            self.entity_list[i].color = gv.default_color
+
+    def set_node_list_of_entities(self, n):
+        e_list = []
+        for i in range(len(self.entity_list)):
+            e = self.entity_list[i]
+            if n.p.is_equal(e.start) or n.p.is_equal(e.end):
+                e_list.append(i)
+        return e_list
+    
+    def get_index_of_node_with_point_p(self, p):
+        for i in range(1, len(self.node_list)):
+            if p.is_equal(self.node_list[i].p):
                 return i
         return None
 
@@ -465,21 +507,25 @@ class FabianBoard(Board):
             for j in range(i):
                 ej = self.entity_list[j]
                 if ei.is_equal(ej):
-                    duplicate_entities_list.append(i)
+                    duplicate_entities_list.append(ei)
                     break
         return duplicate_entities_list
 
-    def is_node_list_valid(self):
-        is_valid = True
+    def get_unattached_nodes(self):
+        tmp_list = []
         for i in range(1, len(self.node_list)):
             n = self.node_list[i]
             if len(n.neighbors_list) < 2:
                 n.color = gv.invalid_node_color
-                is_valid = False
-        return is_valid
+                tmp_list.append(i)
+        return tmp_list
 
-    def set_node_list_from_dxf(self):
-        node_list = [Node()]
+    def add_node_to_node_list(self, n):
+        if not self.is_node_in_node_list(n):
+            n.entities_list = self.set_node_list_of_entities(n)
+            self.node_list.append(n)
+
+    def set_initial_node_list(self):
         for i in range(len(self.entity_list)):
             e = self.entity_list[i]
             if e.shape == 'CIRCLE':
@@ -488,21 +534,40 @@ class FabianBoard(Board):
             p2 = e.end
             node1 = Node(p1)
             node2 = Node(p2)
-            p1_index = self.get_index_of_node_with_point_p(p1, node_list)
-            p2_index = self.get_index_of_node_with_point_p(p2, node_list)
-            if p1_index is None:
-                p1_index = len(node_list)
-                node_list.append(node1)
-            if p2_index is None:
-                p2_index = len(node_list)
-                node_list.append(node2)
-            alfa = p1.get_alfa_to(p2)
-            node_list[p1_index].neighbors_list.append(Neighbor(p2_index, alfa))
-            alfa = (alfa+180) % 360
-            node_list[p2_index].neighbors_list.append(Neighbor(p1_index, alfa))
-        self.node_list = node_list
+            self.add_node_to_node_list(node1)
+            self.add_node_to_node_list(node2)
+        self.set_all_nodes_neighbor_list()
         # debug
-        self.print_node_list()
+        # self.print_node_list()
+    
+    def set_all_nodes_neighbor_list(self):
+        for i in range(1, len(self.node_list)):
+            n = self.node_list[i]
+            self.set_node_neighbors_list(n)
+
+    def is_node_in_node_list(self, node):
+        for n in self.node_list:
+            if n.p.is_equal(node.p):
+                return True
+        return False
+
+    def set_node_neighbors_list(self, n):
+        e_list = n.entities_list
+        for i in e_list:
+            n_index = None
+            alfa = None
+            e = self.entity_list[i]
+            neighbor = Neighbor()
+            if n.p.is_equal(e.start):
+                n_index = self.get_index_of_node_with_point_p(e.end)
+                alfa = e.start.get_alfa_to(e.end)
+            elif n.p.is_equal(e.end):
+                n_index = self.get_index_of_node_with_point_p(e.start)
+                alfa = e.start.get_alfa_to(e.start)
+            if n_index is not None and not n.is_in_neighbors_list(n_index):
+                neighbor.node_index = n_index
+                neighbor.angle_from_p = alfa
+                n.neighbors_list.append(neighbor)
 
     # debug
     def print_node_list(self):
@@ -511,7 +576,7 @@ class FabianBoard(Board):
             b = []
             for j in n.neighbors_list:
                 b.append(j.node_index)
-            print(f'{i}: {n.p.convert_into_tupple()}   neigbors: {b}')
+            print(f'{i}: {n.p.convert_into_tuple()}   neigbors: {b}')
 
     def create_net_element_list(self):
         element_list = []
@@ -597,11 +662,11 @@ class FabianBoard(Board):
     def save_data(self):
         entity_list = []
         for e in self.entity_list:
-            t = e.convert_into_tupple()
+            t = e.convert_into_tuple()
             entity_list.append(t)
         node_list = []
         for e in self.node_list:
-            t = e.convert_into_tupple()
+            t = e.convert_into_tuple()
             node_list.append(t)
         data = {
             "entity_list": entity_list,
@@ -640,10 +705,19 @@ class FabianBoard(Board):
         if filetype == 'dxf':
             doc = ezdxf.readfile(filename)
             self.convert_doc_to_entity_list(doc)
+            print(f'{len(self.entity_list)} Entities in {filetype} file')
+            print('checking for duplicated entities')
             d_list = self.get_duplicated_entities()
             if len(d_list) > 0:
-                m = f'Duplicated entities {d_list}'
+                print(f'found {len(d_list)} duplicated entities')
+                m = f'Removed {len(d_list)} duplicated entities'
                 messagebox.showwarning("Warning", m)
+                for e in d_list:
+                    self.entity_list.remove(e)
+            else:
+                # debug
+                print('no duplicated entities')
+                pass
             work_mode = 'dxf'
         elif filetype == 'json':
             data = self.load_json(filename=filename)
@@ -651,11 +725,11 @@ class FabianBoard(Board):
             node_list = data.get("node_list")
             for t in entity_list:
                 e = Entity()
-                e.get_data_from_tupple(t)
+                e.get_data_from_tuple(t)
                 self.entity_list.append(e)
             for t in node_list:
                 n = Node()
-                n.get_data_from_tupple(t)
+                n.get_data_from_tuple(t)
                 self.node_list.append(n)
             work_mode = 'inp'
         self.set_accuracy()
@@ -760,7 +834,7 @@ class FabianBoard(Board):
         self.selected_entity = 0
         self.hide_entity(i)
         self.entity_list.remove(e)
-        
+
     def remove_temp_line(self):
         if self.new_line_edge[1] is None:
             return
@@ -944,7 +1018,7 @@ class FabianBoard(Board):
         self.hide_entity(i)
         self.entity_list[i].color = color
         self.show_entity(i)
-        
+
     def set_all_entities_color(self, color):
         for i in range(len(self.entity_list)):
             self.set_entity_color(i, color)
@@ -992,11 +1066,18 @@ class FabianBoard(Board):
         self.set_screen_position(x, y)
         self.update_view()
 
+    def get_first_entity_to_set_accuracy(self):
+        for i in range(len(self.entity_list)):
+            if self.entity_list[i].start is not None:
+                return i
+        return None
+    
     def set_accuracy(self):
         zeros = 0
+        i = self.get_first_entity_to_set_accuracy()
         if len(self.entity_list) > 0:
-            max = self.entity_list[0].start.x
-            min = self.entity_list[0].start.y
+            max = self.entity_list[i].start.x
+            min = self.entity_list[i].start.y
             for e in self.entity_list:
                 if e.start is not None:
                     m = e.start.x
