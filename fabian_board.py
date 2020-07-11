@@ -427,6 +427,7 @@ class FabianBoard(Board):
             self.selected_part_mark = None
         self.selected_part = None
         if mode.lower() == 'dxf':
+            self.show_nodes = False
             self.show_net = False
             self.change_select_parts_mode('entity') 
             self.set_all_dxf_entities_color(gv.default_color)
@@ -499,6 +500,7 @@ class FabianBoard(Board):
 
     def set_entity_edge_nodes(self, i):
         e = self.entity_list[i]
+        e.nodes_list = []
         start_node = Node(e.start, entity=i)
         node_index = self.add_node_to_node_list(start_node)
         e.add_node_to_entity_nodes_list(node_index)
@@ -700,6 +702,7 @@ class FabianBoard(Board):
     # set net with nodes only on entity edges
     def set_initial_net(self):
         self.node_list = [Node()]
+        self.reset_net()
         c = len(self.entity_list)
         self.show_text_on_screen('setting initial net')
         self.show_progress_bar(c)
@@ -726,19 +729,19 @@ class FabianBoard(Board):
     
     # debug
     def print_node_list(self):
+        print('nodes:')
         for i in range(1, len(self.node_list)):
             n = self.node_list[i]
             b = []
-            print('nodes:')
             for j in n.lines_list:
                 b.append(j)
-            print(f'{i}: {n.p.convert_into_tuple()}   lines: {b}')
+            print(f'{i}: {n.p.convert_into_tuple()}   entity: {n.entity}   lines: {b}')
 
     # debug
     def print_line_list(self):
+        print('lines:')
         for i in range(len(self.net_line_list)):
             line = self.net_line_list[i]
-            print('lines:')
             print(f'{i}: start node: {line.start_node}   end node: {line.end_node}   entity: {line.entity}')
 
     def set_net(self):
