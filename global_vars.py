@@ -12,6 +12,7 @@ min_diff_angle_to_create_element = 3
 
 default_select_mode = 'edge'
 default_work_mode = 'dxf'
+default_select_parts_mode = 'entity'
 
 board_bg_color = '#D1EDFF'
 default_color = '#0099FF'

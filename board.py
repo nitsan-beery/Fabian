@@ -76,15 +76,18 @@ class Board:
     # show text on screen 'center' or left-top (lt) or left-bottom (lb)
     def show_text_on_screen(self, text, p='center', color=gv.text_color):
         x, y = self.get_screen_position()
+        justify = tk.CENTER
         if p == 'lb':
-            x = x - self.board.winfo_width()/2 + 40
+            x = x - self.board.winfo_width()/2 + 50
             y = y + self.board.winfo_height()/2 - 30
+            justify = tk.RIGHT
         elif p == 'lt':
-            x = x - self.board.winfo_width()/2 + 40
+            x = x - self.board.winfo_width()/2 + 50
             y = y - self.board.winfo_height()/2 + 15
+            justify = tk.RIGHT
         if self.text_on_screen is not None:
             self.board.delete(self.text_on_screen)
-        self.text_on_screen = self.board.create_text(x, y, text=text, fill=color)
+        self.text_on_screen = self.board.create_text(x, y, text=text, fill=color, justify=justify)
 
     def hide_text_on_screen(self):
         if self.text_on_screen is not None:
