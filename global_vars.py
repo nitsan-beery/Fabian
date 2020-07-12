@@ -25,6 +25,8 @@ invalid_node_color = 'green'
 net_line_color = 'red'
 text_color = 'green'
 
+mark_option = 'mark'
+
 
 
 

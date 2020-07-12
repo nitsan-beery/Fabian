@@ -13,6 +13,20 @@ class Point:
         return round(self.x, gv.accuracy) == round(p.x, gv.accuracy) and \
                round(self.y, gv.accuracy) == round(p.y, gv.accuracy)
 
+    def is_smaller(self, p, by_x=True):
+        if by_x:
+            if self.x < p.x:
+                return True
+            elif self.x == p.x and self.y < p.y:
+                return True
+            return False
+        else:
+            if self.y < p.y:
+                return True
+            elif self.y == p.y and self.x < p.x:
+                return True
+            return False
+
     def convert_into_tuple(self):
         t = (self.x, self.y)
         return t

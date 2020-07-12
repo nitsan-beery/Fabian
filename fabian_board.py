@@ -9,8 +9,7 @@ shapes = {'CIRCLE', 'LINE', 'ARC'}
 
 class Entity:
     def __init__(self, shape=None, center=None, radius=None, start=None, end=None, start_angle=None, end_angle=None, 
-                 color=gv.default_color, original_start=None, original_end=None, original_start_angle=None,
-                 original_end_angle = None):
+                 color=gv.default_color):
         self.shape = shape
         self.center = center
         self.radius = radius
@@ -26,10 +25,6 @@ class Entity:
         self.board_part = None
         self.color = color
         self.nodes_list = []
-        self.original_start = original_start
-        self.original_end = original_end
-        self.original_start_angle = original_start_angle
-        self.original_end_angle = original_end_angle
 
     # set arc start point, end point, left_bottom and right_up
     def set_arc(self):
@@ -68,14 +63,6 @@ class Entity:
             t2 = self.start.is_equal(e.start) and self.end.is_equal(e.end)
             t3 = self.start.is_equal(e.end) and self.end.is_equal(e.start)
             return t1 and (t2 or t3)
-
-    def is_originated_from_same_entity(self, entity):
-        if self.original_start is None or self.original_end is None or entity.original_start is None or entity.original_end is None:
-            return False
-        if self.original_start == entity.original_start and self.original_end == entity.original_end:
-            return True
-        else:
-            return False
 
     # node[0] = start node,   node[-1] = end node
     def add_node_to_entity_nodes_list(self, i):
@@ -363,17 +350,32 @@ class FabianBoard(Board):
             if upper > lower:
                 upper, lower = lower, upper
             enclosed_parts = self.board.find_enclosed(left, upper, right, lower)
-            i = 0
-            for e in self.entity_list:
-                if e.board_part in enclosed_parts:
-                    e.is_marked = True
-                    self.set_entity_color(i, gv.marked_entity_color)
-                i += 1
-
+            mark_option = {
+                "mark": True,
+                "unmark": False
+            }
+            option = gv.mark_option
+            if option != 'quit':
+                i = 0
+                for e in self.entity_list:
+                    if e.board_part in enclosed_parts:
+                        if option == "mark" or option == "unmark":
+                            e.is_marked = mark_option.get(option)
+                        # invert
+                        else:
+                            e.is_marked = not e.is_marked
+                        if e.is_marked:
+                            self.set_entity_color(i, gv.marked_entity_color)
+                        else:
+                            self.set_entity_color(i, gv.default_color)
+                    i += 1
         if self.temp_rect_mark is not None:
             self.board.delete(self.temp_rect_mark)
             self.temp_rect_mark = None
         self.temp_rect_start_point = None
+
+    def choose_mark_option(self, option):
+        gv.mark_option = option
 
     def mouse_3_pressed(self, key):
         menu = tk.Menu(self.board, tearoff=0)
@@ -390,6 +392,12 @@ class FabianBoard(Board):
         select_mode_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode('point'))
         select_mode_menu.add_separator()
         select_mode_menu.add_command(label="Quit")
+        mark_option_menu = tk.Menu(self.board, tearoff=0)
+        mark_option_menu.add_command(label="mark", command=lambda: self.choose_mark_option("mark"))
+        mark_option_menu.add_command(label="unmark", command=lambda: self.choose_mark_option("unmark"))
+        mark_option_menu.add_command(label="invert", command=lambda: self.choose_mark_option("invert"))
+        mark_option_menu.add_separator()
+        mark_option_menu.add_command(label="Quit", command=lambda: self.choose_mark_option("quit"))
         show_entities_menu = tk.Menu(menu, tearoff=0)
         show_entities_menu.add_command(label="Weak", command=lambda: self.set_all_dxf_entities_color(gv.weak_entity_color))
         show_entities_menu.add_command(label="Strong", command=lambda: self.set_all_dxf_entities_color(gv.default_color))
@@ -400,12 +408,14 @@ class FabianBoard(Board):
         menu.add_separator()
         menu.add_cascade(label='Work mode', menu=work_mode_menu)
         menu.add_separator()
+        menu.add_cascade(label='Mark mode', menu=mark_option_menu)
+        menu.add_separator()
         # menu.add_cascade(label='Select mode', menu=select_mode_menu)
         # menu.add_separator()
-        if self.new_line_edge[0] is not None:
-            self.board.delete(self.temp_line_mark)
         if self.new_line_edge[1] is not None:
             menu.add_command(label="add line", command=self.add_line)
+        if self.new_line_edge[0] is not None:
+            self.board.delete(self.temp_line_mark)
             menu.add_command(label="remove line", command=self.remove_temp_line)
             menu.add_separator()
         if self.selected_part_mark is not None:
@@ -559,7 +569,71 @@ class FabianBoard(Board):
         if self.work_mode == 'dxf':
             self.merge_entities()
         elif self.work_mode == 'inp':
-            self.merge_net_lines(part)
+            self.merge_net_lines()
+
+    # return continues list of parts from same entity, None if the list is broken
+    def sort_entity_parts(self, part_list):
+        if part_list is None:
+            return None
+        elif len(part_list) == 0:
+            return None
+        elif len(part_list) == 1:
+            return part_list
+        sorted_list = []
+        first_part = part_list[0]
+        e_0 = self.entity_list[first_part]
+        shape = e_0.shape
+        if shape == 'ARC':
+            # find smallest start_angle, and check all parts with same center and radius
+            for i in part_list:
+                ei = self.entity_list[i]
+                if ei.shape != e_0.shape or ei.center != e_0.center or ei.radius != e_0.radius:
+                    return None
+                if ei.arc_start_angle < e_0.arc_start_angle:
+                    first_part = i
+                    e_0 = self.entity_list[first_part]
+            sorted_list.append(first_part)
+            part_list.remove(first_part)
+            # iterate list to find connected parts, add to list or return None if can't find
+            while len(part_list) > 0:
+                start = self.entity_list[sorted_list[-1]].arc_end_angle
+                for j in part_list:
+                    found_part = False
+                    if self.entity_list[j].arc_start_angle == start:
+                        sorted_list.append(j)
+                        found_part = True
+                        part_list.remove(j)
+                        break
+                if not found_part:
+                    return None
+        elif shape == 'LINE':
+            # find smallest start_angle, and check all parts with same center and radius
+            for i in part_list:
+                ei = self.entity_list[i]
+                if ei.shape != e_0.shape:
+                    return None
+                if ei.left_bottom.is_smaller(e_0.left_bottom):
+                    first_part = i
+                    e_0 = self.entity_list[first_part]
+            sorted_list.append(first_part)
+            part_list.remove(first_part)
+            # iterate list to find connected parts, add to list or return None if can't find
+            while len(part_list) > 0:
+                start = self.entity_list[sorted_list[-1]].right_up
+                for j in part_list:
+                    found_part = False
+                    if self.entity_list[j].left_bottom == start:
+                        sorted_list.append(j)
+                        found_part = True
+                        part_list.remove(j)
+                        break
+                if not found_part:
+                    return None
+            # set start and end points accordingly
+            for i in sorted_list:
+                e = self.entity_list[i]
+                e.start, e.end = e.left_bottom, e.right_up
+        return sorted_list
 
     def merge_entities(self):
         if self.work_mode != 'dxf':
@@ -567,18 +641,15 @@ class FabianBoard(Board):
         e_list = self.get_marked_entities()
         if len(e_list) < 2:
             return
-        # entities originated by split function are sorted in self.entity_list from start to end
+        e_list = self.sort_entity_parts(e_list)
+        if e_list is None:
+            m = "can't merge strange entities"
+            messagebox.showwarning(m)
+            return
         e_start = self.entity_list[e_list[0]]
-        for i in e_list:
-            e = self.entity_list[i]
-            if not e.is_originated_from_same_entity(e_start):
-                m = "can't merge strange entities"
-                messagebox.showwarning(m)
-                return
         e_end = self.entity_list[e_list[-1]]
-        new_entity = e_start
-        new_entity.end = e_end.end
-        new_entity.arc_end_angle = e_end.arc_end_angle
+        new_entity = Entity(shape=e_start.shape, center=e_start.center, radius=e_start.radius, start=e_start.start,
+                            end=e_end.end, start_angle=e_start.arc_start_angle, end_angle=e_end.arc_end_angle)
         self.remove_parts_from_list(e_list, 'entities')
         self.entity_list.append(new_entity)
         self.show_entity(-1)
@@ -606,9 +677,7 @@ class FabianBoard(Board):
             start_angle = e.arc_start_angle
             for m in range(n):
                 end_angle = start_angle + angle
-                arc = Entity(shape=e.shape, center=e.center, radius=e.radius, start_angle=start_angle,end_angle=end_angle,
-                             original_start = e.start, original_end = e.end, original_start_angle = e.arc_start_angle,
-                             original_end_angle = e.arc_end_angle)
+                arc = Entity(shape=e.shape, center=e.center, radius=e.radius, start_angle=start_angle, end_angle=end_angle)
                 new_part_list.append(arc)
                 start_angle = end_angle
         elif e.shape == 'LINE':
@@ -618,7 +687,7 @@ class FabianBoard(Board):
             start = e.start
             for m in range(n):
                 end = Point(start.x + step * math.cos(alfa), start.y + step * math.sin(alfa))
-                line = Entity(shape='LINE', start=start, end=end, original_start = e.start, original_end = e.end)
+                line = Entity(shape='LINE', start=start, end=end)
                 new_part_list.append(line)
                 start = end
         elif e.shape == 'CIRCLE':
@@ -1125,12 +1194,7 @@ class FabianBoard(Board):
             e.board_part = None
             e.color = gv.default_color
         self.entity_list = temp_list
-        if self.new_line_edge[1] is not None:
-            self.remove_temp_line()
-        elif self.new_line_edge[0] is not None:
-            self.board.delete(self.new_line_edge_mark[0])
-            self.new_line_edge[0] = None
-            self.board.delete(self.temp_line_mark)
+        self.remove_temp_line()
         self.selected_part = None
         self.board.delete('all')
         self.show_dxf_entities()
@@ -1141,13 +1205,14 @@ class FabianBoard(Board):
         self.remove_parts_from_list([self.selected_part], 'entities')
 
     def remove_temp_line(self):
-        if self.new_line_edge[1] is None:
-            return
-        self.board.delete(self.new_line_edge_mark[0])
-        self.board.delete(self.new_line_edge_mark[1])
-        self.board.delete(self.new_line_mark)
-        self.new_line_edge[0] = None
-        self.new_line_edge[1] = None
+        if self.new_line_edge[1] is not None:
+            self.board.delete(self.new_line_edge_mark[1])
+            self.new_line_edge[1] = None
+            self.board.delete(self.new_line_mark)
+        if self.new_line_edge[0] is not None:
+            self.board.delete(self.new_line_edge_mark[0])
+            self.new_line_edge[0] = None
+            self.board.delete(self.temp_line_mark)
 
     def add_line(self):
         p1 = self.new_line_edge[0]
