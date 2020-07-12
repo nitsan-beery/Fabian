@@ -9,7 +9,8 @@ shapes = {'CIRCLE', 'LINE', 'ARC'}
 
 class Entity:
     def __init__(self, shape=None, center=None, radius=None, start=None, end=None, start_angle=None, end_angle=None, 
-                 color=gv.default_color):
+                 color=gv.default_color, original_start=None, original_end=None, original_start_angle=None,
+                 original_end_angle = None):
         self.shape = shape
         self.center = center
         self.radius = radius
@@ -25,6 +26,10 @@ class Entity:
         self.board_part = None
         self.color = color
         self.nodes_list = []
+        self.original_start = original_start
+        self.original_end = original_end
+        self.original_start_angle = original_start_angle
+        self.original_end_angle = original_end_angle
 
     # set arc start point, end point, left_bottom and right_up
     def set_arc(self):
@@ -63,6 +68,14 @@ class Entity:
             t2 = self.start.is_equal(e.start) and self.end.is_equal(e.end)
             t3 = self.start.is_equal(e.end) and self.end.is_equal(e.start)
             return t1 and (t2 or t3)
+
+    def is_originated_from_same_entity(self, entity):
+        if self.original_start is None or self.original_end is None or entity.original_start is None or entity.original_end is None:
+            return False
+        if self.original_start == entity.original_start and self.original_end == entity.original_end:
+            return True
+        else:
+            return False
 
     # node[0] = start node,   node[-1] = end node
     def add_node_to_entity_nodes_list(self, i):
@@ -398,16 +411,17 @@ class FabianBoard(Board):
         if self.selected_part_mark is not None:
             menu.add_command(label="split", command=lambda: self.split(self.selected_part))
             if self.work_mode == 'dxf':
-                menu.add_command(label="unmark entity", command=self.unmark_selected_entity)
-                menu.add_command(label="mark entity", command=self.mark_selected_entity)
-                menu.add_command(label="delete entity", command=self.remove_selected_entity_from_list)
+                menu.add_command(label="unmark", command=self.unmark_selected_entity)
+                menu.add_command(label="mark", command=self.mark_selected_entity)
+                menu.add_command(label="delete", command=self.remove_selected_entity_from_list)
             menu.add_separator()
         if self.work_mode == 'dxf':
             if len(self.entity_list) > 0:
                 menu.add_command(label="mark all entities", command=self.mark_all_entities)
                 menu.add_command(label="unmark all entities", command=self.unmark_all_entities)
+                menu.add_command(label="merge marked entities", command=self.merge)
                 menu.add_command(label="delete marked entities", command=self.remove_marked_entities_from_list)
-                menu.add_command(label="delete all non marked entities", command=self.remove_non_marked_entities_from_list)
+                menu.add_command(label="delete NON marked entities", command=self.remove_non_marked_entities_from_list)
                 menu.add_separator()
         elif self.work_mode == 'inp':
             menu.add_command(label="Show net", command=self.show_net_lines)
@@ -429,7 +443,7 @@ class FabianBoard(Board):
         if mode.lower() == 'dxf':
             self.show_nodes = False
             self.show_net = False
-            self.change_select_parts_mode('entity') 
+            self.change_select_parts_mode('entity')
             self.set_all_dxf_entities_color(gv.default_color)
         elif mode.lower() == 'inp':
             self.set_all_dxf_entities_color(gv.weak_entity_color)
@@ -448,7 +462,7 @@ class FabianBoard(Board):
 
     def change_mouse_selection_mode(self, mode):
         self.select_mode = mode
-        
+
     def change_select_parts_mode(self, mode):
         if self.selected_part_mark is not None:
             self.board.delete(self.selected_part_mark)
@@ -498,6 +512,14 @@ class FabianBoard(Board):
             elif self.select_parts_mode == 'net_line':
                 self.mark_net_line(self.selected_part)
 
+    # return list of marked entities
+    def get_marked_entities(self):
+        mark_list = []
+        for i in range(len(self.entity_list)):
+            if self.entity_list[i].is_marked:
+                mark_list.append(i)
+        return mark_list
+
     def set_entity_edge_nodes(self, i):
         e = self.entity_list[i]
         e.nodes_list = []
@@ -508,8 +530,8 @@ class FabianBoard(Board):
         node_index = self.add_node_to_node_list(end_node)
         e.add_node_to_entity_nodes_list(node_index)
 
-    def get_split_entity_points(self, i=0, n=2):
-        e = self.entity_list[i]
+    def get_split_entity_points(self, entity=0, n=2):
+        e = self.entity_list[entity]
         point_list = [e.start]
         if e.shape == 'ARC':
             angle = (e.arc_end_angle-e.arc_start_angle) / n
@@ -533,25 +555,60 @@ class FabianBoard(Board):
             return None
         return point_list
 
-    def split(self, i=0, n=2):
+    def merge(self):
         if self.work_mode == 'dxf':
-            self.split_entity(i, n)
+            self.merge_entities()
         elif self.work_mode == 'inp':
-            self.split_net_line(i, n)
+            self.merge_net_lines(part)
+
+    def merge_entities(self):
+        if self.work_mode != 'dxf':
+            return
+        e_list = self.get_marked_entities()
+        if len(e_list) < 2:
+            return
+        # entities originated by split function are sorted in self.entity_list from start to end
+        e_start = self.entity_list[e_list[0]]
+        for i in e_list:
+            e = self.entity_list[i]
+            if not e.is_originated_from_same_entity(e_start):
+                m = "can't merge strange entities"
+                messagebox.showwarning(m)
+                return
+        e_end = self.entity_list[e_list[-1]]
+        new_entity = e_start
+        new_entity.end = e_end.end
+        new_entity.arc_end_angle = e_end.arc_end_angle
+        self.remove_parts_from_list(e_list, 'entities')
+        self.entity_list.append(new_entity)
+        self.show_entity(-1)
+
+    def merge_net_lines(self):
+        if self.work_mode != 'inp':
+            return
+        # fix me
+        pass
+
+    def split(self, part=0, n=2):
+        if self.work_mode == 'dxf':
+            self.split_entity(part, n)
+        elif self.work_mode == 'inp':
+            self.split_net_line(part, n)
 
     # split entity_list[i] into n parts
-    def split_entity(self, i=0, n=2):
+    def split_entity(self, part=0, n=2):
         if self.work_mode != 'dxf':
-            return 
-        e = self.entity_list[i]
+            return
+        e = self.entity_list[part]
         new_part_list = []
         if e.shape == 'ARC':
             angle = (e.arc_end_angle-e.arc_start_angle) / n
             start_angle = e.arc_start_angle
             for m in range(n):
                 end_angle = start_angle + angle
-                arc = Entity(shape=e.shape, center=e.center, radius=e.radius, start_angle=start_angle,
-                             end_angle=end_angle)
+                arc = Entity(shape=e.shape, center=e.center, radius=e.radius, start_angle=start_angle,end_angle=end_angle,
+                             original_start = e.start, original_end = e.end, original_start_angle = e.arc_start_angle,
+                             original_end_angle = e.arc_end_angle)
                 new_part_list.append(arc)
                 start_angle = end_angle
         elif e.shape == 'LINE':
@@ -561,48 +618,92 @@ class FabianBoard(Board):
             start = e.start
             for m in range(n):
                 end = Point(start.x + step * math.cos(alfa), start.y + step * math.sin(alfa))
-                line = Entity(shape='LINE', start=start, end=end)
+                line = Entity(shape='LINE', start=start, end=end, original_start = e.start, original_end = e.end)
                 new_part_list.append(line)
                 start = end
         elif e.shape == 'CIRCLE':
             return None
-        self.hide_entity(i)
-        self.entity_list.remove(e)
+        self.remove_parts_from_list([part], 'entities')
         for m in range(n):
             self.entity_list.append(new_part_list[m])
             self.define_new_entity_color(-1)
             self.show_entity(-1)
 
-    def split_net_line(self, i=0, n=2):
+    def split_net_line(self, part=0, n=2):
+        # debug
+        # print(f'selected part: {self.selected_part}   Entity: {part}')
         if self.work_mode != 'inp':
-            return 
-        line = self.net_line_list[i]
-        self.node_list[line.start_node].remove_line(i)
-        self.node_list[line.end_node].remove_line(i)
-        new_lines = []
-        new_points = self.get_split_entity_points(line.entity, n)
-        start_node = line.start_node
-        for j in range(len(new_points) - 1):
-            end_node = Node(new_points[j+1], entity=line.entity)
-            node_index = self.add_node_to_node_list(end_node)
-            self.entity_list[line.entity].add_node_to_entity_nodes_list(node_index)
-            new_lines.append(NetLine(start_node, end_node, line.entity))
-            start_node = end_node
-        self.hide_net_line(i)
-        for j in range(len(new_lines)):
-            index = len(self.net_line_list)
-            start_node = new_lines[j].start_node
-            end_node = new_lines[j].end_node
-            self.net_line_list.append(new_lines[j])
-            self.node_list[start_node].lines_list.append(index)
-            self.node_list[end_node].lines_list.append(index)
-            self.show_net_line(-1)
+            return
+        # split net line not on entity
+        if self.select_parts_mode == 'net_line':
+            # fix me
+            return
+        elif self.select_parts_mode == 'entity':
+            net_lines = self.get_lines_attached_to_entity(part)
+            if len(net_lines) < 1:
+                # fix me
+                return
+            for i in net_lines:
+                line = self.net_line_list[i]
+                self.node_list[line.start_node].remove_line(i)
+                self.node_list[line.end_node].remove_line(i)
+            new_lines = []
+            n = n * len(net_lines)
+            new_points = self.get_split_entity_points(part, n)
+            start_node = self.net_line_list[net_lines[0]].start_node
+            for j in range(len(new_points) - 1):
+                new_node = Node(new_points[j+1], entity=line.entity)
+                end_node = self.add_node_to_node_list(new_node)
+                self.entity_list[line.entity].add_node_to_entity_nodes_list(end_node)
+                new_lines.append(NetLine(start_node, end_node, line.entity))
+                start_node = end_node
+            self.remove_parts_from_list(net_lines, 'net_lines')
+            for j in range(len(new_lines)):
+                start_node = new_lines[j].start_node
+                end_node = new_lines[j].end_node
+                self.net_line_list.append(new_lines[j])
+                index = len(self.net_line_list) - 1
+                self.node_list[start_node].lines_list.append(index)
+                self.node_list[end_node].lines_list.append(index)
+                self.show_net_line(index)
 
-    def define_new_entity_color(self, i):
+    def hide_part(self, part, list_name):
+        if list_name == 'entities':
+            self.hide_entity(part)
+        elif list_name == 'net_lines':
+            self.hide_net_line(part)
+        elif list_name == 'nodes':
+            self.hide_node(part)
+
+    def remove_parts_from_list(self, part_list, list_name):
+        original_list = None
+        if list_name == 'entities':
+            original_list = self.entity_list
+        elif list_name == 'net_lines':
+            original_list = self.net_line_list
+        elif list_name == 'nodes':
+            original_list = self.node_list
+        part_list = sorted(part_list, reverse=True)
+        for part in part_list:
+            if part is None:
+                return
+            self.hide_part(part, list_name)
+            original_list.pop(part)
+        self.selected_part = None
+
+    def get_lines_attached_to_entity(self, entity):
+        net_lines = []
+        for i in range(len(self.net_line_list)):
+            line = self.net_line_list[i]
+            if line.entity == entity:
+                net_lines.append(i)
+        return net_lines
+
+    def define_new_entity_color(self, entity):
         if self.work_mode == 'inp':
-            self.entity_list[i].color = gv.weak_entity_color
+            self.entity_list[entity].color = gv.weak_entity_color
         else:
-            self.entity_list[i].color = gv.default_color
+            self.entity_list[entity].color = gv.default_color
 
     # return index of the neighbor that can make an element counter clockwise
     def get_next_relevant_neighbor(self, node, prev_angle):
@@ -698,7 +799,7 @@ class FabianBoard(Board):
             self.frame_1.update_idletasks()
         self.hide_text_on_screen()
         self.hide_progress_bar()
-    
+
     # set net with nodes only on entity edges
     def set_initial_net(self):
         self.node_list = [Node()]
@@ -724,9 +825,9 @@ class FabianBoard(Board):
         self.hide_text_on_screen()
         self.hide_progress_bar()
         # debug
-        self.print_node_list()
-        self.print_line_list()
-    
+        #self.print_node_list()
+        #self.print_line_list()
+
     # debug
     def print_node_list(self):
         print('nodes:')
@@ -1024,24 +1125,20 @@ class FabianBoard(Board):
             e.board_part = None
             e.color = gv.default_color
         self.entity_list = temp_list
-        self.selected_part = None
         if self.new_line_edge[1] is not None:
             self.remove_temp_line()
         elif self.new_line_edge[0] is not None:
             self.board.delete(self.new_line_edge_mark[0])
             self.new_line_edge[0] = None
             self.board.delete(self.temp_line_mark)
+        self.selected_part = None
         self.board.delete('all')
         self.show_dxf_entities()
 
     def remove_selected_entity_from_list(self):
-        if self.selected_part_mark is None:
+        if self.selected_part is None:
             return
-        i = self.selected_part
-        e = self.entity_list[i]
-        self.selected_part = None
-        self.hide_entity(i)
-        self.entity_list.remove(e)
+        self.remove_parts_from_list([self.selected_part], 'entities')
 
     def remove_temp_line(self):
         if self.new_line_edge[1] is None:
@@ -1285,8 +1382,8 @@ class FabianBoard(Board):
         if line.board_part is None:
             line.board_part = self.draw_line(p1, p2, color)
 
-    def hide_net_line(self, i):
-        line = self.net_line_list[i]
+    def hide_net_line(self, part):
+        line = self.net_line_list[part]
         if line.board_part is not None:
             self.board.delete(line.board_part)
             line.board_part = None
@@ -1303,20 +1400,20 @@ class FabianBoard(Board):
         for i in range(len(self.entity_list)):
             self.show_entity(i)
 
-    def hide_entity(self, i):
-        if self.entity_list[i].board_part is None:
+    def hide_entity(self, part):
+        if self.entity_list[part].board_part is None:
             return
-        self.board.delete(self.entity_list[i].board_part)
-        self.entity_list[i].board_part = None
+        self.board.delete(self.entity_list[part].board_part)
+        self.entity_list[part].board_part = None
 
     def hide_dxf_entities(self):
         for i in range(len(self.entity_list)):
             self.hide_entity(i)
 
-    def set_entity_color(self, i, color):
-        self.hide_entity(i)
-        self.entity_list[i].color = color
-        self.show_entity(i)
+    def set_entity_color(self, part, color):
+        self.hide_entity(part)
+        self.entity_list[part].color = color
+        self.show_entity(part)
 
     def reset_net(self):
         self.hide_net_lines()
