@@ -192,6 +192,20 @@ class NetLine:
         self.entity = t[2]
 
 
+class FabianState:
+    def __init__(self):
+        self.entity_list = None
+        self.node_list = None
+        self.net_line_list = None
+        self.select_mode = None
+        self.work_mode = None
+        self.select_parts_mode = None
+        self.show_entities = True
+        self.show_nodes = True
+        self.show_net = True
+        self.scale = None
+
+
 class FabianBoard(Board):
     def __init__(self, scale=1):
         super().__init__(True)
@@ -207,7 +221,6 @@ class FabianBoard(Board):
         self.button_center.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.board.config(bg=gv.board_bg_color)
 
-        self.dxfDoc = None
         self.entity_list = []
         self.node_list = [Node()]
         self.element_list = []
@@ -229,6 +242,7 @@ class FabianBoard(Board):
         self.show_nodes = True
         self.show_net = True
         self.progress_bar = None
+        self.state = []
 
         self.board.bind('<Motion>', self.motion)
         self.board.bind('<Button-1>', self.mouse_1_pressed)
@@ -236,12 +250,15 @@ class FabianBoard(Board):
         self.board.bind('<ButtonRelease-1>', self.mouse_1_released)
         self.board.bind('<Button-3>', self.mouse_3_pressed)
 
-    def reset_board(self):
+    def reset_board(self, empty_node_list=False, center_screen_position=True):
         self.board.delete('all')
-        self.set_screen_position(self.center.x, self.center.y)
-        self.dxfDoc = None
+        if center_screen_position:
+            self.set_screen_position(self.center.x, self.center.y)
         self.entity_list = []
-        self.node_list = [Node()]
+        if empty_node_list:
+            self.node_list = []
+        else:
+            self.node_list = [Node()]
         self.element_list = []
         self.net_line_list = []
         self.select_mode = gv.default_select_mode
@@ -256,6 +273,61 @@ class FabianBoard(Board):
         self.temp_rect_start_point = None
         self.temp_rect_mark = None
         self.progress_bar = None
+
+    def resume_state(self):
+        if len(self.state) < 1:
+            return
+        state = self.state[-1]
+        self.reset_board(empty_node_list=True, center_screen_position=False)
+        for t in state.entity_list:
+            e = Entity()
+            e.get_data_from_tuple(t)
+            self.entity_list.append(e)
+        for t in state.node_list:
+            n = Node()
+            n.get_data_from_tuple(t)
+            self.node_list.append(n)
+        for t in state.net_line_list:
+            line = NetLine()
+            line.get_data_from_tuple(t)
+            self.net_line_list.append(line)
+        self.select_mode = state.select_mode
+        self.work_mode = state.work_mode
+        self.select_parts_mode = state.select_parts_mode
+        self.show_entities = state.show_entities
+        self.show_nodes = state.show_nodes
+        self.show_net = state.show_net
+        self.scale = state.scale
+        self.state.pop(-1)
+        self.update_view()
+
+    def keep_state(self):
+        if len(self.state) >= gv.max_state_stack:
+            return
+        state = FabianState()
+        entity_list = []
+        for e in self.entity_list:
+            t = e.convert_into_tuple()
+            entity_list.append(t)
+        node_list = []
+        for e in self.node_list:
+            t = e.convert_into_tuple()
+            node_list.append(t)
+        net_list = []
+        for e in self.net_line_list:
+            t = e.convert_into_tuple()
+            net_list.append(t)
+        state.entity_list = entity_list
+        state.node_list = node_list
+        state.net_line_list = net_list
+        state.select_mode = self.select_mode
+        state.work_mode = self.work_mode
+        state.select_parts_mode = self.select_parts_mode
+        state.show_entities = self.show_entities
+        state.show_nodes = self.show_nodes
+        state.show_net = self.show_net
+        state.scale = self.scale
+        self.state.append(state)
 
     def mouse_1_pressed(self, key):
         if self.temp_rect_mark is not None:
@@ -404,6 +476,8 @@ class FabianBoard(Board):
         show_entities_menu.add_command(label="Hide", command=lambda: self.hide_dxf_entities())
         show_entities_menu.add_separator()
         show_entities_menu.add_command(label="Quit")
+        menu.add_command(label="Undo", command=self.resume_state)
+        menu.add_separator()
         menu.add_cascade(label='Select mode', menu=select_part_menu)
         menu.add_separator()
         menu.add_cascade(label='Work mode', menu=work_mode_menu)
@@ -427,16 +501,19 @@ class FabianBoard(Board):
             menu.add_separator()
         if self.work_mode == 'dxf':
             if len(self.entity_list) > 0:
+                mark_list = self.get_marked_entities()
+                if len(mark_list) > 1:
+                    menu.add_command(label="merge marked entities", command=self.merge)
+                    menu.add_separator()
                 menu.add_command(label="mark all entities", command=self.mark_all_entities)
                 menu.add_command(label="unmark all entities", command=self.unmark_all_entities)
-                menu.add_command(label="merge marked entities", command=self.merge)
                 menu.add_command(label="delete marked entities", command=self.remove_marked_entities_from_list)
                 menu.add_command(label="delete NON marked entities", command=self.remove_non_marked_entities_from_list)
                 menu.add_separator()
         elif self.work_mode == 'inp':
             menu.add_command(label="Show net", command=self.show_net_lines)
             menu.add_command(label="Hide net", command=self.hide_net_lines)
-            menu.add_command(label="Clear net", command=self.reset_net)
+            menu.add_command(label="Clear net", command=lambda: self.reset_net(True))
             menu.add_cascade(label='Show entities', menu=show_entities_menu)
             menu.add_separator()
             menu.add_command(label="Set net", command=self.set_net)
@@ -456,7 +533,6 @@ class FabianBoard(Board):
             self.change_select_parts_mode('entity')
             self.set_all_dxf_entities_color(gv.default_color)
         elif mode.lower() == 'inp':
-            self.set_all_dxf_entities_color(gv.weak_entity_color)
             self.set_initial_net()
             tmp_list = self.get_unattached_nodes()
             counter = len(tmp_list)
@@ -466,6 +542,7 @@ class FabianBoard(Board):
             else:
                 # debug
                 print('no unattached nodes')
+            self.set_all_dxf_entities_color(gv.weak_entity_color)
             self.show_net = True
             self.show_nodes = True
         self.update_view()
@@ -566,10 +643,13 @@ class FabianBoard(Board):
         return point_list
 
     def merge(self):
+        self.keep_state()
         if self.work_mode == 'dxf':
-            self.merge_entities()
+            changed = self.merge_entities()
         elif self.work_mode == 'inp':
-            self.merge_net_lines()
+            changed = self.merge_net_lines()
+        if not changed:
+            self.state.pop(-1)
 
     # return continues list of parts from same entity, None if the list is broken
     def sort_entity_parts(self, part_list):
@@ -637,15 +717,15 @@ class FabianBoard(Board):
 
     def merge_entities(self):
         if self.work_mode != 'dxf':
-            return
+            return False
         e_list = self.get_marked_entities()
         if len(e_list) < 2:
-            return
+            return False
         e_list = self.sort_entity_parts(e_list)
         if e_list is None:
             m = "can't merge strange entities"
             messagebox.showwarning(m)
-            return
+            return False
         e_start = self.entity_list[e_list[0]]
         e_end = self.entity_list[e_list[-1]]
         new_entity = Entity(shape=e_start.shape, center=e_start.center, radius=e_start.radius, start=e_start.start,
@@ -653,23 +733,28 @@ class FabianBoard(Board):
         self.remove_parts_from_list(e_list, 'entities')
         self.entity_list.append(new_entity)
         self.show_entity(-1)
+        return True
 
     def merge_net_lines(self):
         if self.work_mode != 'inp':
-            return
+            return False
         # fix me
         pass
 
     def split(self, part=0, n=2):
+        self.keep_state()
         if self.work_mode == 'dxf':
-            self.split_entity(part, n)
+            changed = self.split_entity(part, n)
         elif self.work_mode == 'inp':
-            self.split_net_line(part, n)
+            changed = self.split_net_line(part, n)
+        self.update_view()
+        if not changed:
+            self.state.pop(-1)
 
     # split entity_list[i] into n parts
     def split_entity(self, part=0, n=2):
         if self.work_mode != 'dxf':
-            return
+            return False
         e = self.entity_list[part]
         new_part_list = []
         if e.shape == 'ARC':
@@ -691,27 +776,28 @@ class FabianBoard(Board):
                 new_part_list.append(line)
                 start = end
         elif e.shape == 'CIRCLE':
-            return None
+            return False
         self.remove_parts_from_list([part], 'entities')
         for m in range(n):
             self.entity_list.append(new_part_list[m])
             self.define_new_entity_color(-1)
             self.show_entity(-1)
+        return True
 
     def split_net_line(self, part=0, n=2):
         # debug
         # print(f'selected part: {self.selected_part}   Entity: {part}')
         if self.work_mode != 'inp':
-            return
+            return False
         # split net line not on entity
         if self.select_parts_mode == 'net_line':
             # fix me
-            return
+            return False
         elif self.select_parts_mode == 'entity':
             net_lines = self.get_lines_attached_to_entity(part)
             if len(net_lines) < 1:
                 # fix me
-                return
+                return False
             for i in net_lines:
                 line = self.net_line_list[i]
                 self.node_list[line.start_node].remove_line(i)
@@ -734,7 +820,7 @@ class FabianBoard(Board):
                 index = len(self.net_line_list) - 1
                 self.node_list[start_node].lines_list.append(index)
                 self.node_list[end_node].lines_list.append(index)
-                self.show_net_line(index)
+        return True
 
     def hide_part(self, part, list_name):
         if list_name == 'entities':
@@ -850,7 +936,7 @@ class FabianBoard(Board):
         if i is None:
             self.node_list.append(n)
             i = len(self.node_list) - 1
-            self.show_node(-1)
+#            self.show_node(-1)
         return i
 
     # set nodes out of entities edges
@@ -886,7 +972,6 @@ class FabianBoard(Board):
             line = NetLine(start_node, end_node, i)
             self.net_line_list.append(line)
             line_index = len(self.net_line_list) - 1
-            self.show_net_line(line_index)
             self.node_list[start_node].lines_list.append(line_index)
             self.node_list[end_node].lines_list.append(line_index)
             self.progress_bar['value'] += 1
@@ -1024,22 +1109,18 @@ class FabianBoard(Board):
         menu.post(x, y)
 
     def save_data(self):
-        entity_list = []
-        for e in self.entity_list:
-            t = e.convert_into_tuple()
-            entity_list.append(t)
-        node_list = []
-        for e in self.node_list:
-            t = e.convert_into_tuple()
-            node_list.append(t)
-        net_list = []
-        for e in self.net_line_list:
-            t = e.convert_into_tuple()
-            net_list.append(t)
+        self.keep_state()
+        state = self.state[-1]
         data = {
-            "entity_list": entity_list,
-            "node_list": node_list,
-            "net_list": net_list
+            "entity_list": state.entity_list,
+            "node_list": state.node_list,
+            "net_line_list": state.net_line_list,
+            "work_mode": state.work_mode,
+            "select_parts_mode": state.select_parts_mode,
+            "show_entities": state.show_entities,
+            "show_nodes": state.show_nodes,
+            "show_net": state.show_net,
+            "scale": state.scale
         }
         self.save_json(data)
 
@@ -1068,7 +1149,6 @@ class FabianBoard(Board):
         if filename == '':
             return
         self.reset_board()
-        work_mode = gv.default_work_mode
         i = filename.find('.')
         filetype = filename[i+1:].lower()
         if filetype == 'dxf':
@@ -1088,13 +1168,13 @@ class FabianBoard(Board):
             else:
                 # debug
                 print('no duplicated entities')
-            work_mode = 'dxf'
+            self.change_work_mode('dxf')
         elif filetype == 'json':
             data = self.load_json(filename=filename)
             self.node_list = []
             entity_list = data.get("entity_list")
             node_list = data.get("node_list")
-            net_list = data.get("net_list")
+            net_line_list = data.get("net_line_list")
             for t in entity_list:
                 e = Entity()
                 e.get_data_from_tuple(t)
@@ -1103,14 +1183,19 @@ class FabianBoard(Board):
                 n = Node()
                 n.get_data_from_tuple(t)
                 self.node_list.append(n)
-            for t in net_list:
+            for t in net_line_list:
                 line = NetLine()
                 line.get_data_from_tuple(t)
                 self.net_line_list.append(line)
-            work_mode = 'inp'
+            self.work_mode = data.get('work_mode')
+            self.select_parts_mode = data.get('select_parts_mode')
+            self.show_entities = data.get('show_entities')
+            self.show_nodes = data.get('show_nodes')
+            self.show_net = data.get('show_net')
+            self.scale = data.get('scale')
         self.set_accuracy()
         self.center_view()
-        self.change_work_mode(work_mode)
+        self.update_view()
 
     def center_view(self):
         self.hide_text_on_screen()
@@ -1143,12 +1228,14 @@ class FabianBoard(Board):
     def mark_selected_entity(self):
         if self.selected_part_mark is None:
             return
+        self.keep_state()
         i = self.selected_part
         e = self.entity_list[i]
         e.is_marked = True
         self.set_entity_color(i, gv.marked_entity_color)
 
     def mark_all_entities(self):
+        self.keep_state()
         i = 0
         for e in self.entity_list:
             if not e.is_marked:
@@ -1157,6 +1244,7 @@ class FabianBoard(Board):
             i += 1
 
     def unmark_all_entities(self):
+        self.keep_state()
         i = 0
         for e in self.entity_list:
             if e.is_marked:
@@ -1167,12 +1255,14 @@ class FabianBoard(Board):
     def unmark_selected_entity(self):
         if self.selected_part_mark is None:
             return
+        self.keep_state()
         i = self.selected_part
         e = self.entity_list[i]
         e.is_marked = False
         self.set_entity_color(i, gv.default_color)
 
     def remove_marked_entities_from_list(self):
+        self.keep_state()
         temp_list = []
         for e in self.entity_list:
             if not e.is_marked:
@@ -1185,6 +1275,7 @@ class FabianBoard(Board):
         self.show_dxf_entities()
 
     def remove_non_marked_entities_from_list(self):
+        self.keep_state()
         temp_list = []
         for e in self.entity_list:
             if e.is_marked:
@@ -1202,6 +1293,7 @@ class FabianBoard(Board):
     def remove_selected_entity_from_list(self):
         if self.selected_part is None:
             return
+        self.keep_state()
         self.remove_parts_from_list([self.selected_part], 'entities')
 
     def remove_temp_line(self):
@@ -1219,6 +1311,7 @@ class FabianBoard(Board):
         p2 = self.new_line_edge[1]
         if p2 is None:
             return
+        self.keep_state()
         if self.work_mode == 'dxf':
             self.add_line_to_entity_list(p1, p2)
         elif self.work_mode == 'inp':
@@ -1480,7 +1573,9 @@ class FabianBoard(Board):
         self.entity_list[part].color = color
         self.show_entity(part)
 
-    def reset_net(self):
+    def reset_net(self, keep_state=False):
+        if keep_state:
+            self.keep_state()
         self.hide_net_lines()
         self.net_line_list = []
 
