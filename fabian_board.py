@@ -325,22 +325,29 @@ class FabianBoard(Board):
             return
         if self.select_parts_mode == 'entity' and self.selected_part is not None:
             e = self.entity_list[self.selected_part]
-            if self.select_mode == 'edge':
-                d_left = e.left_bottom.get_distance_from_point(Point(x, y))
-                d_right = e.right_up.get_distance_from_point(Point(x, y))
-                if d_left < d_right:
-                    p = e.left_bottom
-                else:
-                    p = e.right_up
-            else:
-                d, p = self.get_distance_from_entity_and_nearest_point(Point(x, y), self.selected_part)
+            p1 = e.left_bottom
+            p2 = e.right_up
+            d, p = self.get_distance_from_entity_and_nearest_point(Point(x, y), self.selected_part)
         elif self.select_parts_mode == 'net_line' and self.selected_part is not None:
-            pass
+            line = self.net_line_list[self.selected_part]
+            node_1 = self.node_list[line.start_node]
+            node_2 = self.node_list[line.end_node]
+            p1 = node_1.p
+            p2 = node_2.p
+            d, p = self.get_distance_from_line_and_nearest_point(Point(x, y), p1, p2)
+        if self.select_mode == 'edge':
+            d1 = p1.get_distance_from_point(Point(x, y))
+            d2 = p2.get_distance_from_point(Point(x, y))
+            p = p2
+            if d1 < d2:
+                p = p1
 
         # first point
         if self.new_line_edge[0] is None:
             self.new_line_edge[0] = p
             self.new_line_edge_mark[0] = self.draw_circle(p, gv.edge_line_mark_radius/self.scale)
+            return
+        # remove selection of first point
         elif self.new_line_edge[0] == p:
             # only 1 edge exists
             self.board.delete(self.new_line_edge_mark[0])
@@ -356,9 +363,10 @@ class FabianBoard(Board):
                 self.new_line_edge[0] = self.new_line_edge[1]
                 self.new_line_edge_mark[1] = None
                 self.new_line_edge[1] = None
+            return
 
-        # second point on the same entity
-        elif self.new_line_edge[0] == e.left_bottom or self.new_line_edge[0] == e.right_up:
+        # second point on the same entity or line
+        if self.new_line_edge[0].is_equal(p1) or self.new_line_edge[0].is_equal(p2):
             return
 
         # second point
@@ -854,25 +862,32 @@ class FabianBoard(Board):
         else:
             self.entity_list[entity].color = gv.default_color
 
-    # return index of the neighbor that can make an element counter clockwise
-    def get_next_relevant_neighbor(self, node, prev_angle):
-        if len(node.neighbors_list) == 0:
+    # return index of the node that can make an element counter clockwise
+    def get_next_relevant_node(self, current_node_index, line_list, prev_node_index):
+        if len(line_list) == 0:
             return None
-        next_neighbor = None
-        min_angle = 180-gv.min_diff_angle_to_create_element
+        current_node = self.node_list[current_node_index]
+        prev_node = self.node_list[prev_node_index]
+        prev_angle = prev_node.p.get_alfa_to(current_node.p)
+        next_node = None
+        net_line = None
         alfa = prev_angle + 180
-        for i in range(len(node.neighbors_list)):
-            n = node.neighbors_list[i]
-            if n.is_part_of_element:
+        min_angle = 180-gv.min_diff_angle_to_create_element
+        for l in line_list:
+            line = self.net_line_list[l]
+            node_index = self.get_second_net_line_node(line, current_node_index)
+            if node_index == prev_node_index:
                 continue
-            angle = n.angle_from_p
+            n = self.node_list[node_index]
+            angle = current_node.p.get_alfa_to(n.p)
             if angle < prev_angle:
                 angle += 360
             diff_angle = alfa - angle
             if gv.min_diff_angle_to_create_element < diff_angle < min_angle:
                 min_angle = diff_angle
-                next_neighbor = i
-        return next_neighbor
+                next_node = node_index
+                net_line = l
+        return next_node, net_line
 
     def show_progress_bar(self, max_counter=100):
         self.progress_bar = ttk.Progressbar(self.frame_1, orient=tk.HORIZONTAL, length=300, mode='determinate', maximum=max_counter)
@@ -1002,60 +1017,72 @@ class FabianBoard(Board):
             line = self.net_line_list[i]
             print(f'{i}: start node: {line.start_node}   end node: {line.end_node}   entity: {line.entity}')
 
+    # debug
+    def print_elements(self):
+        print('elements:')
+        for i in range(len(self.element_list)):
+            e = self.element_list[i]
+            print(f'{i}: {e}')
+
+    # debug
+    def print_nodes_line_list(self, n_list):
+        print('lines attached to each node:')
+        for i in range(1, len(n_list)):
+            line = n_list[i]
+            print(f'{i}: {line}')
+
     def set_net(self):
         self.create_net_element_list()
         self.show_net_lines()
 
+    # net_line = NetLine   node_1 = index in self.nodes_list
+    def get_second_net_line_node(self, net_line, node_1):
+        if net_line.start_node == node_1:
+            return net_line.end_node
+        elif net_line.end_node == node_1:
+            return net_line.start_node
+        else:
+            return None
+
     def create_net_element_list(self):
-        self.set_all_nodes_neighbor_list()
-        self.net_line_list = []
+        node_lines_list = self.get_all_nodes_attached_line_list()
+        # debug
+        #self.print_nodes_line_list(node_lines_list)
         c = len(self.node_list)
         self.show_text_on_screen('creating net elements')
         self.show_progress_bar(c)
         # debug
         self.print_node_list()
+        self.print_line_list()
         element_list = []
         # iterate all nodes
         for i in range(1, len(self.node_list)):
-            start_node = self.node_list[i]
-            # iterate all nodes neighbors
-            for j in range(len(start_node.neighbors_list)):
+            # iterate all nodes attached_lines
+            for j in node_lines_list[i]:
+                prev_node_index = i
                 new_element = [i]
-                n = start_node.neighbors_list[j]
-                if n.is_part_of_element:
-                    continue
-                node = start_node
-                next_neighbor_index = j
-                # try to set a new element starting from node[i] to neighbor j
-                while next_neighbor_index is not None:
-                    node.neighbors_list[next_neighbor_index].is_part_of_element = True
-                    next_node_index = node.neighbors_list[next_neighbor_index].node_index
+                line = self.net_line_list[j]
+                node_index = self.get_second_net_line_node(line, prev_node_index)
+                # try to set a new element starting from node[i] to next_node
+                while node_index is not None:
+                    new_element.append(node_index)
+                    next_node_index, line = self.get_next_relevant_node(node_index, node_lines_list[node_index], prev_node_index)
+                    if line is not None:
+                        node_lines_list[node_index].remove(line)
                     if next_node_index == i:
                         break
-                    alfa = node.neighbors_list[next_neighbor_index].angle_from_p
-                    node = self.node_list[next_node_index]
-                    new_element.append(next_node_index)
-                    next_neighbor_index = self.get_next_relevant_neighbor(node, alfa)
+                    prev_node_index = node_index
+                    node_index = next_node_index
                 if next_node_index == i and len(new_element) > 2:
                     element_list.append(new_element)
-                    self.add_element_lines_to_net_list(new_element)
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
         self.hide_text_on_screen()
         self.hide_progress_bar()
-        # debug
-        print(f'net created with {len(element_list)} elements')
         self.element_list = element_list
-
-    def add_element_lines_to_net_list(self, element):
-        for i in range(len(element)):
-            start = i
-            end = (i+1) % len(element)
-            p1 = self.node_list[element[start]].p
-            p2 = self.node_list[element[end]].p
-            line = NetLine(p1, p2)
-            if not line.is_in_list(self.net_line_list):
-                self.net_line_list.append(line)
+        # debug
+        self.print_elements()
+        print(f'net created with {len(element_list)} elements')
 
     def save_inp(self):
         self.create_net_element_list()
@@ -1446,24 +1473,6 @@ class FabianBoard(Board):
                     nearest_point = e.end
         elif e.shape == 'LINE':
             d, nearest_point = self.get_distance_from_line_and_nearest_point(p, e.start, e.end)
-            '''
-            alfa = e.start.get_alfa_to(e.end)
-            endx = math.fabs(get_shifted_point(e.end, e.start, -alfa).x)
-            p = get_shifted_point(p, e.start, -alfa)
-            x = p.x
-            if 0 <= x <= endx:
-                d = math.fabs(p.y)
-                alfa = alfa * math.pi / 180
-                px = math.cos(alfa)*x+e.start.x
-                py = math.sin(alfa)*x+e.start.y
-                nearest_point = Point(px, py)
-            elif x < 0:
-                d = p.get_distance_from_point(Point(0, 0))
-                nearest_point = e.start
-            else:
-                d = p.get_distance_from_point(Point(endx, 0))
-                nearest_point = e.end
-            '''
         return round(d, gv.accuracy), nearest_point
 
     def get_distance_from_line_and_nearest_point(self, p, line_start, line_end):
