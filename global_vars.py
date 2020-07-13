@@ -7,7 +7,7 @@ BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
 accuracy = 3
 min_diff_angle_to_create_element = 3
-max_state_stack = 5
+max_state_stack = 10
 
 default_select_mode = 'edge'
 default_work_mode = 'dxf'

@@ -123,25 +123,12 @@ class Node:
             point = Point()
         self.p = point
         self.entity = entity
-        self.lines_list = []
         self.board_part = None
         self.color = gv.node_color
 
     def is_equal(self, node):
         return self.p.is_equal(node.p)
     
-    def is_in_net_line_list(self, i):
-        for n in self.lines_list:
-            if i == n:
-                return True
-        return False
-
-    def remove_line(self, i):
-        for n in self.lines_list:
-            if i == n:
-                self.lines_list.remove(n)
-                return
-
     def get_index_of_node_in(self, node_list):
         for i in range(len(node_list)):
             node = node_list[i]
@@ -150,16 +137,16 @@ class Node:
         return None
 
     def convert_into_tuple(self):
-        t = (self.p.convert_into_tuple(), self.entity, self.lines_list)
+        t = (self.p.convert_into_tuple(), self.entity)
         return t
 
     def get_data_from_tuple(self, t):
-        if len(t) < 3:
+        if len(t) < 2:
             print(f"tuple doesn't match Node type: {t}")
             return
         self.p.get_data_from_tuple(t[0])
         self.entity = t[1]
-        self.lines_list = t[2]
+
 
 class NetLine:
     def __init__(self, start_node=None, end_node=None, entity=None, board_part=None):
@@ -422,25 +409,27 @@ class FabianBoard(Board):
             if upper > lower:
                 upper, lower = lower, upper
             enclosed_parts = self.board.find_enclosed(left, upper, right, lower)
-            mark_option = {
-                "mark": True,
-                "unmark": False
-            }
-            option = gv.mark_option
-            if option != 'quit':
-                i = 0
-                for e in self.entity_list:
-                    if e.board_part in enclosed_parts:
-                        if option == "mark" or option == "unmark":
-                            e.is_marked = mark_option.get(option)
-                        # invert
-                        else:
-                            e.is_marked = not e.is_marked
-                        if e.is_marked:
-                            self.set_entity_color(i, gv.marked_entity_color)
-                        else:
-                            self.set_entity_color(i, gv.default_color)
-                    i += 1
+            if len(enclosed_parts) > 0:
+                self.keep_state()
+                mark_option = {
+                    "mark": True,
+                    "unmark": False
+                }
+                option = gv.mark_option
+                if option != 'quit':
+                    i = 0
+                    for e in self.entity_list:
+                        if e.board_part in enclosed_parts:
+                            if option == "mark" or option == "unmark":
+                                e.is_marked = mark_option.get(option)
+                            # invert
+                            else:
+                                e.is_marked = not e.is_marked
+                            if e.is_marked:
+                                self.set_entity_color(i, gv.marked_entity_color)
+                            else:
+                                self.set_entity_color(i, gv.default_color)
+                        i += 1
         if self.temp_rect_mark is not None:
             self.board.delete(self.temp_rect_mark)
             self.temp_rect_mark = None
@@ -531,6 +520,7 @@ class FabianBoard(Board):
             self.show_nodes = False
             self.show_net = False
             self.change_select_parts_mode('entity')
+            self.choose_mark_option('mark')
             self.set_all_dxf_entities_color(gv.default_color)
         elif mode.lower() == 'inp':
             self.set_initial_net()
@@ -545,6 +535,7 @@ class FabianBoard(Board):
             self.set_all_dxf_entities_color(gv.weak_entity_color)
             self.show_net = True
             self.show_nodes = True
+            self.choose_mark_option('quit')
         self.update_view()
 
     def change_mouse_selection_mode(self, mode):
@@ -798,28 +789,21 @@ class FabianBoard(Board):
             if len(net_lines) < 1:
                 # fix me
                 return False
-            for i in net_lines:
-                line = self.net_line_list[i]
-                self.node_list[line.start_node].remove_line(i)
-                self.node_list[line.end_node].remove_line(i)
             new_lines = []
             n = n * len(net_lines)
             new_points = self.get_split_entity_points(part, n)
-            start_node = self.net_line_list[net_lines[0]].start_node
+            line = self.net_line_list[net_lines[0]]
+            entity = line.entity
+            start_node = line.start_node
             for j in range(len(new_points) - 1):
-                new_node = Node(new_points[j+1], entity=line.entity)
+                new_node = Node(new_points[j+1], entity=entity)
                 end_node = self.add_node_to_node_list(new_node)
                 self.entity_list[line.entity].add_node_to_entity_nodes_list(end_node)
                 new_lines.append(NetLine(start_node, end_node, line.entity))
                 start_node = end_node
             self.remove_parts_from_list(net_lines, 'net_lines')
             for j in range(len(new_lines)):
-                start_node = new_lines[j].start_node
-                end_node = new_lines[j].end_node
                 self.net_line_list.append(new_lines[j])
-                index = len(self.net_line_list) - 1
-                self.node_list[start_node].lines_list.append(index)
-                self.node_list[end_node].lines_list.append(index)
         return True
 
     def hide_part(self, part, list_name):
@@ -851,6 +835,16 @@ class FabianBoard(Board):
         for i in range(len(self.net_line_list)):
             line = self.net_line_list[i]
             if line.entity == entity:
+                net_lines.append(i)
+        return net_lines
+
+    def get_lines_attached_to_node(self, node):
+        net_lines = []
+        for i in range(len(self.net_line_list)):
+            line = self.net_line_list[i]
+            start_node = self.node_list[line.start_node]
+            end_node = self.node_list[line.end_node]
+            if start_node.is_equal(node) or end_node.is_equal(node):
                 net_lines.append(i)
         return net_lines
 
@@ -907,15 +901,30 @@ class FabianBoard(Board):
         self.hide_progress_bar()
         return duplicate_entities_list
 
+    def get_all_nodes_attached_line_list(self):
+        final_list = [[]]
+        c = len(self.node_list)
+        self.show_text_on_screen('matching lines to nodes')
+        self.show_progress_bar(c)
+        for i in range(1, len(self.node_list)):
+            n = self.node_list[i]
+            node_line_list = self.get_lines_attached_to_node(n)
+            final_list.append(node_line_list)
+            self.progress_bar['value'] += 1
+            self.frame_1.update_idletasks()
+        self.hide_text_on_screen()
+        self.hide_progress_bar()
+        return final_list
+
     def get_unattached_nodes(self):
         tmp_list = []
-        c = len(self.node_list)
+        lines_list = self.get_all_nodes_attached_line_list()
+        c = len(lines_list)
         self.show_text_on_screen('checking unattached nodes')
         self.show_progress_bar(c)
-        for i in range(1, c):
-            n = self.node_list[i]
-            if len(n.lines_list) < 2:
-                n.color = gv.invalid_node_color
+        for i in range(1, len(lines_list)):
+            if len(lines_list[i]) < 2:
+                self.node_list[i].color = gv.invalid_node_color
                 tmp_list.append(i)
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
@@ -971,9 +980,6 @@ class FabianBoard(Board):
             end_node = e.nodes_list[1]
             line = NetLine(start_node, end_node, i)
             self.net_line_list.append(line)
-            line_index = len(self.net_line_list) - 1
-            self.node_list[start_node].lines_list.append(line_index)
-            self.node_list[end_node].lines_list.append(line_index)
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
         self.hide_text_on_screen()
@@ -987,10 +993,7 @@ class FabianBoard(Board):
         print('nodes:')
         for i in range(1, len(self.node_list)):
             n = self.node_list[i]
-            b = []
-            for j in n.lines_list:
-                b.append(j)
-            print(f'{i}: {n.p.convert_into_tuple()}   entity: {n.entity}   lines: {b}')
+            print(f'{i}: {n.p.convert_into_tuple()}   entity: {n.entity}')
 
     # debug
     def print_line_list(self):
@@ -1122,6 +1125,9 @@ class FabianBoard(Board):
             "show_net": state.show_net,
             "scale": state.scale
         }
+        # debug
+        #self.print_node_list()
+        #self.print_line_list()
         self.save_json(data)
 
     def save_dxf(self):
@@ -1196,6 +1202,9 @@ class FabianBoard(Board):
         self.set_accuracy()
         self.center_view()
         self.update_view()
+        # debug
+        #self.print_node_list()
+        #self.print_line_list()
 
     def center_view(self):
         self.hide_text_on_screen()
@@ -1338,20 +1347,10 @@ class FabianBoard(Board):
         if self.work_mode != 'dxf':
             return
         e = Entity('LINE', start=p1, end=p2)
-        e.is_marked = True
-        e.color = gv.marked_entity_color
+        e.is_marked = False
+        e.color = gv.default_color
         self.entity_list.append(e)
         self.show_entity(-1)
-
-    # return common entity of node 1 and 2. None if not found
-    def get_common_entity(self, node1, node2):
-        l1 = self.node_list[node1].lines_list
-        l2 = self.node_list[node2].lines_list
-        for i in l1:
-            for j in l2:
-                if self.net_line_list[i].entity == self.net_line_list[j].entity:
-                    return self.net_line_list[i].entity
-        return None
 
     def get_first_visible_entity(self):
         for i in range(len(self.entity_list)):
