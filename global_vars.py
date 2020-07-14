@@ -7,13 +7,15 @@ BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
 accuracy = 3
 min_diff_angle_to_create_element = 3
-max_state_stack = 10
+max_state_stack = 100
 
 default_select_mode = 'edge'
 default_work_mode = 'dxf'
 default_select_parts_mode = 'entity'
+default_mark_option = 'mark'
+default_show_node_number = False
 
-mark_option = 'mark'
+default_split_parts = 2
 
 edge_line_mark_radius = 5
 node_mark_radius = 3
@@ -27,6 +29,7 @@ temp_line_color = 'red'
 node_color = 'red'
 invalid_node_color = 'green'
 net_line_color = 'red'
+marked_net_line_color = 'orange'
 text_color = 'green'
 
 

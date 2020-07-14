@@ -41,7 +41,7 @@ class Point:
     def get_distance_from_point(self, p):
         return math.sqrt(pow(self.x-p.x, 2) + pow(self.y-p.y, 2))
 
-    # return the angle vector to Point p, None if p == self
+    # return the angle vector to Point p (degrees), None if p == self
     def get_alfa_to(self, p):
         if self.is_equal(p):
             return None
