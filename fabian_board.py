@@ -187,6 +187,12 @@ class NetLine(Part):
         self.is_marked = t[4]
 
 
+class Element(Part):
+    def __init__(self, color=gv.element_color):
+        super().__init__(color)
+        self.nodes = []
+
+
 class FabianState:
     def __init__(self):
         self.entity_list = None
@@ -219,8 +225,8 @@ class FabianBoard(Board):
 
         self.entity_list = []
         self.node_list = [Node()]
-        self.element_list = []
         self.net_line_list = []
+        self.element_list = []
         self.select_mode = gv.default_select_mode
         self.work_mode = gv.default_work_mode
         self.select_parts_mode = gv.default_select_parts_mode
@@ -257,8 +263,8 @@ class FabianBoard(Board):
             self.node_list = []
         else:
             self.node_list = [Node()]
-        self.element_list = []
         self.net_line_list = []
+        self.element_list = []
         self.select_mode = gv.default_select_mode
         self.work_mode = gv.default_work_mode
         self.select_parts_mode = gv.default_select_parts_mode
@@ -388,8 +394,12 @@ class FabianBoard(Board):
             self.board.delete(self.temp_line_mark)
             if self.new_line_edge[1] is None:
                 self.new_line_edge[1] = p
-                self.new_line_edge_mark[1] = self.draw_circle(p, gv.edge_line_mark_radius/self.scale)
-                self.new_line_mark = self.draw_line(self.new_line_edge[0], self.new_line_edge[1])
+                if self.work_mode == 'dxf':
+                    self.new_line_edge_mark[1] = self.draw_circle(p, gv.edge_line_mark_radius/self.scale)
+                    self.new_line_mark = self.draw_line(self.new_line_edge[0], self.new_line_edge[1])
+                # work mode = inp
+                else:
+                    self.add_line()
             else:
                 self.board.delete(self.new_line_edge_mark[1])
                 self.new_line_edge_mark[1] = None
@@ -510,6 +520,13 @@ class FabianBoard(Board):
         show_node_number_menu = tk.Menu(menu, tearoff=0)
         show_node_number_menu.add_command(label="Show", command=lambda: self.set_node_number_state('show'))
         show_node_number_menu.add_command(label="Hide", command=lambda: self.set_node_number_state('hide'))
+        net_menu = tk.Menu(menu, tearoff=0)
+        net_menu.add_command(label="show", command=lambda: self.change_show_net_mode('show'))
+        net_menu.add_command(label="hide", command=lambda: self.change_show_net_mode('hide'))
+        net_menu.add_command(label="clear", command=lambda: self.change_show_net_mode('clear'))
+        show_elements_menu = tk.Menu(menu, tearoff=0)
+        show_elements_menu.add_command(label="show", command=self.show_all_elements)
+        show_elements_menu.add_command(label="hide", command=self.hide_all_elements)
         menu.add_command(label="Undo", command=self.resume_state)
         menu.add_separator()
         menu.add_cascade(label='Select mode', menu=select_part_menu)
@@ -522,7 +539,7 @@ class FabianBoard(Board):
         # menu.add_separator()
         if self.new_line_edge[1] is not None:
             menu.add_command(label="add line", command=self.add_line)
-        if self.new_line_edge[0] is not None:
+        if self.new_line_edge[0] is not None and self.work_mode == 'dxf':
             self.board.delete(self.temp_line_mark)
             menu.add_command(label="remove line", command=self.remove_temp_line)
             menu.add_separator()
@@ -545,17 +562,35 @@ class FabianBoard(Board):
                 menu.add_command(label="delete NON marked entities", command=self.remove_non_marked_entities_from_list)
                 menu.add_separator()
         elif self.work_mode == 'inp':
-            mark_list = self.get_marked_parts('net_lines')
             menu.add_cascade(label='Nodes number', menu=show_node_number_menu)
-            menu.add_command(label="Show net", command=self.show_net_lines)
-            menu.add_command(label="Hide net", command=self.hide_net_lines)
-            menu.add_command(label="Clear net", command=lambda: self.reset_net(True))
-            menu.add_cascade(label='Show entities', menu=show_entities_menu)
+            menu.add_cascade(label='Net', menu=net_menu)
+            menu.add_cascade(label='Elements', menu=show_elements_menu)
+            menu.add_cascade(label='Show Entities', menu=show_entities_menu)
             menu.add_separator()
             menu.add_command(label="Set net", command=self.set_net)
             menu.add_separator()
         menu.add_command(label="Quit")
         menu.post(key.x_root, key.y_root)
+
+    def change_show_net_mode(self, mode):
+        self.keep_state()
+        changed = False
+        if mode == 'show':
+            if not self.show_net:
+                self.show_net = True
+                changed = True
+        elif mode == 'hide':
+            if self.show_net:
+                self.show_net = False
+                changed = True
+        elif mode == 'clear':
+            if len(self.net_line_list) > 0:
+                self.reset_net(True)
+                changed = True
+        if changed:
+            self.update_view()
+        else:
+            self.state.pop(-1)
 
     def change_work_mode(self, mode):
         self.work_mode = mode
@@ -1167,7 +1202,7 @@ class FabianBoard(Board):
         print('elements:')
         for i in range(len(self.element_list)):
             e = self.element_list[i]
-            print(f'{i+1}: {e}')
+            print(f'{i+1}: {e.nodes}')
 
     # debug
     def print_nodes_line_list(self, n_list):
@@ -1178,7 +1213,7 @@ class FabianBoard(Board):
 
     def set_net(self):
         self.create_net_element_list()
-        self.show_net_lines()
+        self.show_all_net_lines()
 
     # net_line = NetLine   node_1 = index in self.nodes_list
     def get_second_net_line_node(self, net_line, node_1):
@@ -1205,12 +1240,12 @@ class FabianBoard(Board):
             # iterate all nodes attached_lines
             for j in node_lines_list[i]:
                 prev_node_index = i
-                new_element = [i]
+                new_element_nodes = [i]
                 line = self.net_line_list[j]
                 node_index = self.get_second_net_line_node(line, prev_node_index)
                 # try to set a new element starting from node[i] to next_node
                 while node_index is not None:
-                    new_element.append(node_index)
+                    new_element_nodes.append(node_index)
                     next_node_index, line = self.get_next_relevant_node(node_index, node_lines_list[node_index], prev_node_index)
                     if line is not None:
                         node_lines_list[node_index].remove(line)
@@ -1218,8 +1253,10 @@ class FabianBoard(Board):
                         break
                     prev_node_index = node_index
                     node_index = next_node_index
-                if next_node_index == i and len(new_element) > 2:
-                    element_list.append(new_element)
+                if next_node_index == i and len(new_element_nodes) > 2:
+                    element = Element()
+                    element.nodes = new_element_nodes
+                    element_list.append(element)
             node_lines_list[i] = []
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
@@ -1228,6 +1265,7 @@ class FabianBoard(Board):
         self.element_list = element_list
         # debug
         self.print_elements()
+        self.show_all_elements()
         print(f'net created with {len(element_list)} elements')
 
     def save_inp(self):
@@ -1656,14 +1694,14 @@ class FabianBoard(Board):
                 return i
         return None
 
-    def hide_node(self, i):
-        n = self.node_list[i]
+    def hide_node(self, part):
+        n = self.node_list[part]
         if n.board_part is not None:
             self.board.delete(n.board_part)
-            self.node_list[i].board_part = None
+            self.node_list[part].board_part = None
         if n.board_text is not None:
             self.board.delete(n.board_text)
-            self.node_list[i].board_text = None
+            self.node_list[part].board_text = None
 
     def hide_all_nodes(self):
         for i in range(len(self.node_list)):
@@ -1697,6 +1735,29 @@ class FabianBoard(Board):
                                    self.entity_list[i].arc_end_angle, self.entity_list[i].color)
         self.entity_list[i].board_part = part
 
+    def show_element(self, e):
+        element = self.element_list[e]
+        nodes = element.nodes
+        if element.board_part is None:
+            poly = []
+            for n in nodes:
+                poly.append(self.node_list[n].p)
+            self.element_list[e].board_part = self.draw_polygon(poly)
+
+    def hide_element(self, e):
+        part = self.element_list[e].board_part
+        if part is not None:
+            self.board.delete(part)
+            self.element_list[e].board_part = None
+
+    def show_all_elements(self):
+        for i in range(len(self.element_list)):
+            self.show_element(i)
+
+    def hide_all_elements(self):
+        for i in range(len(self.element_list)):
+            self.hide_element(i)
+
     def show_net_line(self, i):
         line = self.net_line_list[i]
         p1 = self.node_list[line.start_node].p
@@ -1710,11 +1771,11 @@ class FabianBoard(Board):
             self.board.delete(line.board_part)
             line.board_part = None
 
-    def show_net_lines(self):
+    def show_all_net_lines(self):
         for i in range(len(self.net_line_list)):
             self.show_net_line(i)
 
-    def hide_net_lines(self):
+    def hide_all_net_lines(self):
         for i in range(len(self.net_line_list)):
             self.hide_net_line(i)
 
@@ -1740,7 +1801,7 @@ class FabianBoard(Board):
     def reset_net(self, keep_state=False):
         if keep_state:
             self.keep_state()
-        self.hide_net_lines()
+        self.hide_all_net_lines()
         self.net_line_list = []
 
     def set_all_dxf_entities_color(self, color):
@@ -1846,14 +1907,14 @@ class FabianBoard(Board):
 
     def update_view(self):
         self.hide_dxf_entities()
-        self.hide_net_lines()
+        self.hide_all_net_lines()
         self.hide_all_nodes()
         if self.show_entities:
             self.show_dxf_entities()
         if self.show_nodes:
             self.show_all_nodes()
         if self.show_net:
-            self.show_net_lines()            
+            self.show_all_net_lines()            
         self.window_main.update()
 
             

@@ -31,6 +31,7 @@ invalid_node_color = 'green'
 net_line_color = 'red'
 marked_net_line_color = 'orange'
 text_color = 'green'
+element_color = 'white'
 
 
 

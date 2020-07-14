@@ -113,6 +113,15 @@ class Board:
         return self.board.create_arc(xLeft, yTop, xRight, yBottom, start=start_angle, extent=(end_angle-start_angle),
                               style=tk.ARC, outline=outline_color)
 
+    #create polygon out of Point(x, y) list
+    def draw_polygon(self, point_list, fill_color=gv.element_color):
+        xy_list = []
+        for p in point_list:
+            x, y = self.convert_xy_to_screen(p.x, p.y)
+            xy_list.append(x)
+            xy_list.append(y)
+        return self.board.create_polygon(xy_list, fill=fill_color)
+
     def show_center(self):
         p1 = Point(-15, 0)
         p2 = Point(15, 0)
