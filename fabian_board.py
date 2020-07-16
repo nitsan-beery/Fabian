@@ -196,6 +196,15 @@ class Element(Part):
     def __init__(self, color=gv.element_color):
         super().__init__(color)
         self.nodes = []
+    def convert_into_tuple(self):
+        t = (self.nodes, self.color)
+        return t
+
+    def get_data_from_tuple(self, t):
+        if len(t) < 2:
+            print(f"tuple doesn't match Element type: {t}")
+        self.nodes = t[0]
+        self.color = t[1]
 
 
 class AttachedLine:
@@ -212,11 +221,13 @@ class FabianState:
         self.entity_list = None
         self.node_list = None
         self.net_line_list = None
+        self.element_list = None
         self.select_mode = None
         self.work_mode = None
         self.select_parts_mode = None
         self.show_entities = True
         self.show_nodes = True
+        self.show_elements = False
         self.show_node_number = gv.default_show_node_number
         self.show_net = True
         self.scale = None
@@ -257,6 +268,7 @@ class FabianBoard(Board):
         self.temp_rect_mark = None
         self.show_entities = True
         self.show_nodes = True
+        self.show_elements = False
         self.show_node_number = gv.default_show_node_number
         self.show_net = True
         self.progress_bar = None
@@ -310,11 +322,16 @@ class FabianBoard(Board):
             line = NetLine()
             line.get_data_from_tuple(t)
             self.net_line_list.append(line)
+        for t in state.element_list:
+            element = Element()
+            element.get_data_from_tuple(t)
+            self.element_list.append(element)
         self.select_mode = state.select_mode
         self.work_mode = state.work_mode
         self.select_parts_mode = state.select_parts_mode
         self.show_entities = state.show_entities
         self.show_nodes = state.show_nodes
+        self.show_elements = state.show_elements
         self.show_node_number = state.show_node_number
         self.show_net = state.show_net
         self.scale = state.scale
@@ -337,14 +354,20 @@ class FabianBoard(Board):
         for e in self.net_line_list:
             t = e.convert_into_tuple()
             net_list.append(t)
+        element_list = []
+        for e in self.element_list:
+            t = e.convert_into_tuple()
+            element_list.append(t)
         state.entity_list = entity_list
         state.node_list = node_list
         state.net_line_list = net_list
+        state.element_list = element_list
         state.select_mode = self.select_mode
         state.work_mode = self.work_mode
         state.select_parts_mode = self.select_parts_mode
         state.show_entities = self.show_entities
         state.show_nodes = self.show_nodes
+        state.show_elements = self.show_elements
         state.show_node_number = self.show_node_number
         state.show_net = self.show_net
         state.scale = self.scale
@@ -615,6 +638,7 @@ class FabianBoard(Board):
         if mode.lower() == 'dxf':
             self.show_nodes = False
             self.show_net = False
+            self.show_elements = False
             self.change_select_parts_mode('entity')
             self.choose_mark_option('mark')
             self.set_all_dxf_entities_color(gv.default_color)
@@ -1336,7 +1360,9 @@ class FabianBoard(Board):
 
     def set_net(self):
         self.create_net_element_list()
-        self.show_all_elements()
+        self.show_elements = True
+        self.show_net = True
+        self.update_view()
 
     # return the index of the attached line from end_node to start node
     def get_reversed_attached_line(self, start_node, end_node):
@@ -1416,12 +1442,12 @@ class FabianBoard(Board):
             self.print_nodes_exceptions(exception_nodes)
             messagebox.showwarning("Warning", m)
         if len(exception_element_list) > 0:
-            m = f'{len(exception_element_list)} exception elements'
+            m = f'{len(exception_element_list)} elements with more than {gv.max_nodes_to_create_element} nodes'
             print(m)
             self.print_elements(exception_element_list)
             messagebox.showwarning("Warning", m)
         if m is None:
-            print(f'SUCCESS: net created with {len(element_list)} elements')
+            print(f'SUCCESS: net created with {len(element_list)} elements\n')
         # debug
         #self.print_nodes_expected_elements()
         self.print_elements(self.element_list)
@@ -1443,10 +1469,10 @@ class FabianBoard(Board):
         element_4_list = []
         for i in range(len(self.element_list)):
             e = self.element_list[i]
-            if len(e) == 3:
-                element_3_list.append(e)
+            if len(e.nodes) == 3:
+                element_3_list.append(e.nodes)
             else:
-                element_4_list.append(e)
+                element_4_list.append(e.nodes)
         element_index = 1
         if len(element_3_list) > 0:
             f.write('*Element, type=R3D3\n')
@@ -1487,10 +1513,12 @@ class FabianBoard(Board):
             "entity_list": state.entity_list,
             "node_list": state.node_list,
             "net_line_list": state.net_line_list,
+            "element_list": state.element_list,
             "work_mode": state.work_mode,
             "select_parts_mode": state.select_parts_mode,
             "show_entities": state.show_entities,
             "show_nodes": state.show_nodes,
+            "show_elements": state.show_elements,
             "show_node_number": state.show_node_number,
             "show_net": state.show_net,
             "scale": state.scale
@@ -1551,6 +1579,7 @@ class FabianBoard(Board):
             entity_list = data.get("entity_list")
             node_list = data.get("node_list")
             net_line_list = data.get("net_line_list")
+            element_list = data.get("element_list")
             for t in entity_list:
                 e = Entity()
                 e.get_data_from_tuple(t)
@@ -1563,10 +1592,14 @@ class FabianBoard(Board):
                 line = NetLine()
                 line.get_data_from_tuple(t)
                 self.net_line_list.append(line)
-            self.work_mode = data.get('work_mode')
+            for t in element_list:
+                element = Element()
+                element.get_data_from_tuple(t)
+                self.element_list.append(element)
             self.select_parts_mode = data.get('select_parts_mode')
             self.show_entities = data.get('show_entities')
             self.show_nodes = data.get('show_nodes')
+            self.show_elements = data.get('show_elements')
             self.show_node_number = data.get('show_node_number')
             self.show_net = data.get('show_net')
             self.scale = data.get('scale')
@@ -2079,6 +2112,9 @@ class FabianBoard(Board):
         self.hide_dxf_entities()
         self.hide_all_net_lines()
         self.hide_all_nodes()
+        self.hide_all_elements()
+        if self.show_elements:
+            self.show_all_elements()
         if self.show_entities:
             self.show_dxf_entities()
         if self.show_nodes:
