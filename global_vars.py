@@ -9,7 +9,7 @@ max_nodes_to_create_element = 4
 
 accuracy = 3
 angle_diff_accuracy = 1
-min_angle_to_create_element = 25
+min_angle_to_create_element = 30
 max_angle_to_create_element = 160
 max_state_stack = 100
 
