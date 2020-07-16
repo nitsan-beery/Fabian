@@ -199,11 +199,12 @@ class Element(Part):
 
 
 class AttachedLine:
-    def __init__(self, line_index=None, second_node=0, angle_to_second_node=0, is_outer_line=False):
+    def __init__(self, line_index=None, second_node=0, angle_to_second_node=0, is_outer_line=False, is_available=True):
         self.line_index = line_index
         self.second_node = second_node
         self.angle_to_second_node = angle_to_second_node
         self.is_outer_line = is_outer_line
+        self.is_available = is_available
         
 
 class FabianState:
@@ -1089,7 +1090,10 @@ class FabianBoard(Board):
                     return
                 # skeep angle between 2 outer lines
                 start_line = i
-            angle = node.attached_lines[start_line].angle_to_second_node
+                second_outer_line = node.attached_lines[(i-1) % num_lines]
+                second_outer_line.is_available = False
+            prev_line = node.attached_lines[start_line]
+            angle = prev_line.angle_to_second_node
             for i in range(lines_to_check):
                 prev_angle = angle
                 line = node.attached_lines[(i+start_line+1) % num_lines]
@@ -1098,9 +1102,12 @@ class FabianBoard(Board):
                     angle += 360
                 diff_angle = angle - prev_angle
                 if diff_angle < gv.min_angle_to_create_element:
+                    prev_line.is_available = False
                     node.exceptions.append(gv.too_steep_angle)
                 elif diff_angle > gv.max_angle_to_create_element:
+                    prev_line.is_available = False
                     node.exceptions.append(gv.too_wide_angle)
+                prev_line = line
 
     def define_new_entity_color(self, entity):
         if self.work_mode == 'inp':
@@ -1117,8 +1124,8 @@ class FabianBoard(Board):
 
     # return index of the node that can make an element counter clockwise (default) or clockwise
     def get_next_relevant_node(self, current_node_index, prev_node_index, limit_angle=True, prev_angle=None, clockwise=False):
-        line_list = self.node_list[current_node_index].attached_lines
-        if len(line_list) == 0:
+        attached_line_list = self.node_list[current_node_index].attached_lines
+        if len(attached_line_list) == 0:
             return None, None
         current_node = self.node_list[current_node_index]
         prev_node = self.node_list[prev_node_index]
@@ -1135,7 +1142,9 @@ class FabianBoard(Board):
         if clockwise:
             min_angle_to_create_elelment, max_angle_to_create_elelment = (360 - max_angle_to_create_elelment), (360 - min_angle_to_create_elelment)
             best_angle = min_angle_to_create_elelment
-        for l in line_list:
+        for l in attached_line_list:
+            if not l.is_available:
+                continue
             node_index = l.second_node
             if node_index == prev_node_index:
                 continue
@@ -1329,14 +1338,14 @@ class FabianBoard(Board):
         self.create_net_element_list()
         self.show_all_elements()
 
-    # net_line = NetLine   node_1 = index in self.nodes_list
-    def get_second_net_line_node(self, net_line, node_1):
-        if net_line.start_node == node_1:
-            return net_line.end_node
-        elif net_line.end_node == node_1:
-            return net_line.start_node
-        else:
-            return None
+    # return the index of the attached line from end_node to start node
+    def get_reversed_attached_line(self, start_node, end_node):
+        n = self.node_list[end_node]
+        al = n.attached_lines
+        for i in range(len(al)):
+            if al[i].second_node == start_node:
+                return i
+        return None
 
     def create_net_element_list(self):
         self.set_all_nodes_attached_line_list()
@@ -1359,23 +1368,30 @@ class FabianBoard(Board):
         # iterate all nodes
         for i in range(1, len(self.node_list)):
             node = self.node_list[i]
+            attached_lines = node.attached_lines
+            num_lines = len(attached_lines)
             # iterate all nodes attached_lines
-            for j in node.attached_lines:
-                prev_node_index = i
-                next_node_index = -1
-                new_element_nodes = [i]
-                node_index = j.second_node
+            for j in range(num_lines):
+                fist_node = i
+                attached_line = node.attached_lines[j]
+                if not attached_line.is_available:
+                    continue
+                node_index = attached_line.second_node
+                new_element_nodes = [fist_node]
+                prev_node_index = fist_node
                 # try to set a new element starting from node[i] to next_node
                 while node_index is not None:
                     new_element_nodes.append(node_index)
                     next_node_index, line = self.get_next_relevant_node(node_index, prev_node_index)
                     if line is not None:
-                        self.node_list[node_index].attached_lines.remove(line)
-                    if next_node_index == i:
+                        if not line.is_available:
+                            break
+                        line.is_available = False
+                    if next_node_index == fist_node:
                         break
                     prev_node_index = node_index
                     node_index = next_node_index
-                if next_node_index == i and len(new_element_nodes) > 2:
+                if next_node_index == fist_node and len(new_element_nodes) > 2:
                     element = Element()
                     element.nodes = new_element_nodes
                     if len(new_element_nodes) <= gv.max_nodes_to_create_element:
@@ -1396,8 +1412,8 @@ class FabianBoard(Board):
         m = None
         if len(exception_nodes) > 0:
             m = f'{len(exception_nodes)} exception nodes    '
-            self.print_nodes_exceptions(exception_nodes)
             print(m)
+            self.print_nodes_exceptions(exception_nodes)
             messagebox.showwarning("Warning", m)
         if len(exception_element_list) > 0:
             m = f'{len(exception_element_list)} exception elements'

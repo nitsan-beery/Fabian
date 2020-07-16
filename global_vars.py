@@ -9,8 +9,8 @@ max_nodes_to_create_element = 4
 
 accuracy = 3
 angle_diff_accuracy = 1
-min_angle_to_create_element = 35
-max_angle_to_create_element = 150
+min_angle_to_create_element = 20
+max_angle_to_create_element = 160
 max_state_stack = 100
 
 default_select_mode = 'edge'
