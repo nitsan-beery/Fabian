@@ -5,8 +5,12 @@ WINDWO_SIZE = str(WINDOW_WIDTH)+'x'+str(WINDOW_HEIGHT)
 BOARD_HEIGHT = 50000
 BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
+max_nodes_to_create_element = 4
+
 accuracy = 3
-min_diff_angle_to_create_element = 3
+angle_diff_accuracy = 1
+min_angle_to_create_element = 35
+max_angle_to_create_element = 150
 max_state_stack = 100
 
 default_select_mode = 'edge'
@@ -33,6 +37,10 @@ marked_net_line_color = 'orange'
 text_color = 'green'
 element_color = 'white'
 
+# node exceptions
+unattached = 'unattached'
+too_steep_angle = 'too steep angle'
+too_wide_angle = 'too wide angle'
 
 
 

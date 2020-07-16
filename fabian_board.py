@@ -130,6 +130,9 @@ class Node(Part):
             point = Point()
         self.p = point
         self.entity = entity
+        self.attached_lines = []
+        self.expected_elements = 0
+        self.exceptions = []
         self.board_text = None
 
     def is_equal(self, node):
@@ -155,11 +158,12 @@ class Node(Part):
 
 
 class NetLine(Part):
-    def __init__(self, start_node=None, end_node=None, entity=None, board_part=None, color=gv.net_line_color):
+    def __init__(self, start_node=None, end_node=None, entity=None, color=gv.net_line_color, is_outer_line=False):
         super().__init__(color)
         self.start_node = start_node
         self.end_node = end_node
         self.entity = entity
+        self.is_outer_line = is_outer_line
 
     def is_equal(self, line):
         t1 = self.start_node == line.start_node and self.end_node == line.end_node
@@ -173,11 +177,11 @@ class NetLine(Part):
         return False
 
     def convert_into_tuple(self):
-        t = (self.start_node, self.end_node, self.entity, self.color, self.is_marked)
+        t = (self.start_node, self.end_node, self.entity, self.color, self.is_marked, self.is_outer_line)
         return t
 
     def get_data_from_tuple(self, t):
-        if len(t) < 5:
+        if len(t) < 6:
             print(f"tuple doesn't match NetLine type: {t}")
             return
         self.start_node = t[0]
@@ -185,6 +189,7 @@ class NetLine(Part):
         self.entity = t[2]
         self.color = t[3]
         self.is_marked = t[4]
+        self.is_outer_line = t[5]
 
 
 class Element(Part):
@@ -192,6 +197,14 @@ class Element(Part):
         super().__init__(color)
         self.nodes = []
 
+
+class AttachedLine:
+    def __init__(self, line_index=None, second_node=0, angle_to_second_node=0, is_outer_line=False):
+        self.line_index = line_index
+        self.second_node = second_node
+        self.angle_to_second_node = angle_to_second_node
+        self.is_outer_line = is_outer_line
+        
 
 class FabianState:
     def __init__(self):
@@ -606,16 +619,10 @@ class FabianBoard(Board):
             self.set_all_dxf_entities_color(gv.default_color)
         elif mode.lower() == 'inp':
             self.set_initial_net()
-            tmp_list = self.get_unattached_nodes()
-            counter = len(tmp_list)
-            if counter > 0:
-                print(f'found {counter} unattached nodes')
-                messagebox.showwarning("Warning", f"{counter} unattached nodes")
-            else:
-                # debug
+            tmp_list = self.get_unattached_nodes(True)
+            if len(tmp_list) == 0:
                 print('no unattached nodes')
             self.set_all_dxf_entities_color(gv.weak_entity_color)
-            self.show_net = True
             self.show_nodes = True
             self.choose_mark_option('quit')
         self.update_view()
@@ -1027,15 +1034,73 @@ class FabianBoard(Board):
                 net_lines.append(i)
         return net_lines
 
-    def get_lines_attached_to_node(self, node):
-        net_lines = []
+    # set all lines attached to node, and sort them by angle_to_second_node
+    def set_lines_attached_to_node(self, n):
+        node = self.node_list[n]
+        node.attached_lines = []
         for i in range(len(self.net_line_list)):
             line = self.net_line_list[i]
             start_node = self.node_list[line.start_node]
             end_node = self.node_list[line.end_node]
-            if start_node.is_equal(node) or end_node.is_equal(node):
-                net_lines.append(i)
-        return net_lines
+            if n == line.start_node:
+                al = AttachedLine(i, line.end_node, start_node.p.get_alfa_to(end_node.p))
+                node.attached_lines.append(al)
+            elif n == line.end_node:
+                al = AttachedLine(i, line.start_node, end_node.p.get_alfa_to(start_node.p))
+                node.attached_lines.append(al)
+        node.attached_lines = sorted(node.attached_lines, key=attrgetter('angle_to_second_node'))
+
+    def set_all_nodes_expected_elements_and_exceptions(self):
+        for i in range(1, len(self.node_list)):
+            self.set_node_expected_elements_and_exceptions(i)
+    
+    # set expected elements
+    # set exeptions for unattached and exceeding angles
+    def set_node_expected_elements_and_exceptions(self, n):
+        node = self.node_list[n]
+        node.exceptions = []
+        num_lines = len(node.attached_lines)
+        lines_to_check = num_lines
+        start_line = 0
+        if num_lines < 2:
+            node.exceptions.append(gv.unattached)
+            node.expected_elements = 0
+        else:
+            num_outer_lines = 0
+            for al in node.attached_lines:
+                if self.net_line_list[al.line_index].is_outer_line:
+                    num_outer_lines += 1
+            if num_outer_lines == 0:
+                node.expected_elements = len(node.attached_lines)
+            elif num_outer_lines == 2:
+                node.expected_elements = len(node.attached_lines)-1
+                lines_to_check -= 1
+            else:
+                m = f'unexpected number of outer lines in node: {n}'
+                print(m)
+                return
+            if num_outer_lines == 2:
+                for i in range(len(node.attached_lines)):
+                    if node.attached_lines[i].is_outer_line:
+                        break
+                if not node.attached_lines[i].is_outer_line:
+                    m = f"can't find the outer line in node: {n}"
+                    print(m)
+                    return
+                # skeep angle between 2 outer lines
+                start_line = i
+            angle = node.attached_lines[start_line].angle_to_second_node
+            for i in range(lines_to_check):
+                prev_angle = angle
+                line = node.attached_lines[(i+start_line+1) % num_lines]
+                angle = line.angle_to_second_node
+                if angle < prev_angle:
+                    angle += 360
+                diff_angle = angle - prev_angle
+                if diff_angle < gv.min_angle_to_create_element:
+                    node.exceptions.append(gv.too_steep_angle)
+                elif diff_angle > gv.max_angle_to_create_element:
+                    node.exceptions.append(gv.too_wide_angle)
 
     def define_new_entity_color(self, entity):
         if self.work_mode == 'inp':
@@ -1043,29 +1108,53 @@ class FabianBoard(Board):
         else:
             self.entity_list[entity].color = gv.default_color
 
-    # return index of the node that can make an element counter clockwise
-    def get_next_relevant_node(self, current_node_index, line_list, prev_node_index):
+    def get_exception_nodes(self):
+        exception_list = []
+        for i in range(1, len(self.node_list)):
+            if len(self.node_list[i].exceptions) > 0:
+                exception_list.append(i)
+        return exception_list
+
+    # return index of the node that can make an element counter clockwise (default) or clockwise
+    def get_next_relevant_node(self, current_node_index, prev_node_index, limit_angle=True, prev_angle=None, clockwise=False):
+        line_list = self.node_list[current_node_index].attached_lines
         if len(line_list) == 0:
             return None, None
         current_node = self.node_list[current_node_index]
         prev_node = self.node_list[prev_node_index]
-        prev_angle = prev_node.p.get_alfa_to(current_node.p)
+        if prev_angle is None:
+            prev_angle = prev_node.p.get_alfa_to(current_node.p)
         next_node = None
         net_line = None
-        alfa = prev_angle + 180
-        min_angle = 180-gv.min_diff_angle_to_create_element
+        min_angle_to_create_elelment = gv.angle_diff_accuracy
+        max_angle_to_create_elelment = 360 - gv.angle_diff_accuracy
+        if limit_angle:
+            min_angle_to_create_elelment = gv.min_angle_to_create_element
+            max_angle_to_create_elelment = gv.max_angle_to_create_element
+        best_angle = max_angle_to_create_elelment
+        if clockwise:
+            min_angle_to_create_elelment, max_angle_to_create_elelment = (360 - max_angle_to_create_elelment), (360 - min_angle_to_create_elelment)
+            best_angle = min_angle_to_create_elelment
         for l in line_list:
-            line = self.net_line_list[l]
-            node_index = self.get_second_net_line_node(line, current_node_index)
+            node_index = l.second_node
             if node_index == prev_node_index:
                 continue
             n = self.node_list[node_index]
             angle = current_node.p.get_alfa_to(n.p)
             if angle < prev_angle:
                 angle += 360
-            diff_angle = alfa - angle
-            if gv.min_diff_angle_to_create_element < diff_angle < min_angle:
-                min_angle = diff_angle
+            angle -= prev_angle
+            if 0 <= angle <= 180:
+                diff_angle = 180 - angle
+            else:
+                diff_angle = 540 - angle
+            replace_best_angle = False
+            if clockwise and best_angle <= diff_angle <= max_angle_to_create_elelment:
+                replace_best_angle = True
+            elif not clockwise and min_angle_to_create_elelment <= diff_angle <= best_angle:
+                replace_best_angle = True
+            if replace_best_angle:
+                best_angle = diff_angle
                 next_node = node_index
                 net_line = l
         return next_node, net_line
@@ -1097,35 +1186,55 @@ class FabianBoard(Board):
         self.hide_progress_bar()
         return duplicate_entities_list
 
-    def get_all_nodes_attached_line_list(self):
-        final_list = [[]]
+    def set_all_nodes_attached_line_list(self):
         c = len(self.node_list)
         self.show_text_on_screen('matching lines to nodes')
         self.show_progress_bar(c)
         for i in range(1, len(self.node_list)):
-            n = self.node_list[i]
-            node_line_list = self.get_lines_attached_to_node(n)
-            final_list.append(node_line_list)
+            self.set_lines_attached_to_node(i)
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
         self.hide_text_on_screen()
         self.hide_progress_bar()
-        return final_list
 
-    def get_unattached_nodes(self):
+    def mark_outer_lines(self):
+        n = self.get_left_bottom_node()
+        nodes_outer_list = [n]
+        alfa = 0
+        line = AttachedLine()
+        line.second_node = n
+        next_node_index = 0
+        while next_node_index != n and len(nodes_outer_list) <= len(self.net_line_list):
+            next_node_index, line = self.get_next_relevant_node(line.second_node, 0, limit_angle=False, prev_angle=alfa,
+                                                                clockwise=True)
+            if line is None:
+                print(f"can't set outer lines")
+                return
+            line.is_outer_line = True
+            self.net_line_list[line.line_index].is_outer_line = True
+            alfa = line.angle_to_second_node
+            nodes_outer_list.append(next_node_index)
+        return nodes_outer_list
+
+    def get_unattached_nodes(self, set_nodes_lines=True):
         tmp_list = []
-        lines_list = self.get_all_nodes_attached_line_list()
-        c = len(lines_list)
+        if set_nodes_lines:
+            self.set_all_nodes_attached_line_list()
+        c = len(self.node_list)
         self.show_text_on_screen('checking unattached nodes')
         self.show_progress_bar(c)
-        for i in range(1, len(lines_list)):
-            if len(lines_list[i]) < 2:
+        for i in range(1, c):
+            node = self.node_list[i]
+            if gv.unattached in node.exceptions:
                 self.node_list[i].color = gv.invalid_node_color
                 tmp_list.append(i)
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
         self.hide_text_on_screen()
         self.hide_progress_bar()
+        if len(tmp_list) > 0:
+            print(f'found {len(tmp_list)} unattached nodes')
+            messagebox.showwarning("Warning", f"{len(tmp_list)} unattached nodes")
         return tmp_list
 
     # return index of node in node_list with same p, None if it's a new node
@@ -1198,22 +1307,27 @@ class FabianBoard(Board):
             print(f'{i}: start node: {line.start_node}   end node: {line.end_node}   entity: {line.entity}')
 
     # debug
-    def print_elements(self):
+    def print_elements(self, element_list):
         print('elements:')
-        for i in range(len(self.element_list)):
-            e = self.element_list[i]
+        for i in range(len(element_list)):
+            e = element_list[i]
             print(f'{i+1}: {e.nodes}')
 
     # debug
-    def print_nodes_line_list(self, n_list):
-        print('lines attached to each node:')
-        for i in range(1, len(n_list)):
-            line = n_list[i]
-            print(f'{i}: {line}')
+    def print_nodes_exceptions(self, node_list):
+        print('Exception nodes:')
+        for n in node_list:
+            print(f'{n}: {self.node_list[n].exceptions}')
+
+    # debug
+    def print_nodes_expected_elements(self):
+        print('Expected elements for each node:')
+        for i in range(1, len(self.node_list)):
+            print(f'{i}: {self.node_list[i].expected_elements}')
 
     def set_net(self):
         self.create_net_element_list()
-        self.show_all_net_lines()
+        self.show_all_elements()
 
     # net_line = NetLine   node_1 = index in self.nodes_list
     def get_second_net_line_node(self, net_line, node_1):
@@ -1225,30 +1339,38 @@ class FabianBoard(Board):
             return None
 
     def create_net_element_list(self):
-        node_lines_list = self.get_all_nodes_attached_line_list()
-        # debug
-        #self.print_nodes_line_list(node_lines_list)
+        self.set_all_nodes_attached_line_list()
+        unattaced_list = self.get_unattached_nodes(False)
+        if len(unattaced_list) > 0:
+            return
+        nodes_outer_list = self.mark_outer_lines()
+        #debug
+        #print(nodes_outer_list)
+        self.set_all_nodes_expected_elements_and_exceptions()
         c = len(self.node_list)
         self.show_text_on_screen('creating net elements')
         self.show_progress_bar(c)
         # debug
-        self.print_node_list()
-        self.print_line_list()
+        #self.print_node_list()
+        #self.print_line_list()
+        #self.print_nodes_expected_elements()
         element_list = []
+        exception_element_list = []
         # iterate all nodes
         for i in range(1, len(self.node_list)):
+            node = self.node_list[i]
             # iterate all nodes attached_lines
-            for j in node_lines_list[i]:
+            for j in node.attached_lines:
                 prev_node_index = i
+                next_node_index = -1
                 new_element_nodes = [i]
-                line = self.net_line_list[j]
-                node_index = self.get_second_net_line_node(line, prev_node_index)
+                node_index = j.second_node
                 # try to set a new element starting from node[i] to next_node
                 while node_index is not None:
                     new_element_nodes.append(node_index)
-                    next_node_index, line = self.get_next_relevant_node(node_index, node_lines_list[node_index], prev_node_index)
+                    next_node_index, line = self.get_next_relevant_node(node_index, prev_node_index)
                     if line is not None:
-                        node_lines_list[node_index].remove(line)
+                        self.node_list[node_index].attached_lines.remove(line)
                     if next_node_index == i:
                         break
                     prev_node_index = node_index
@@ -1256,17 +1378,37 @@ class FabianBoard(Board):
                 if next_node_index == i and len(new_element_nodes) > 2:
                     element = Element()
                     element.nodes = new_element_nodes
-                    element_list.append(element)
-            node_lines_list[i] = []
+                    if len(new_element_nodes) <= gv.max_nodes_to_create_element:
+                        element_list.append(element)
+                        for element_node in new_element_nodes:
+                            self.node_list[element_node].expected_elements -= 1
+                    else:
+                        exception_element_list.append(element)
+            self.node_list[i].attached_lines = []
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
         self.hide_text_on_screen()
         self.hide_progress_bar()
         self.element_list = element_list
         # debug
-        self.print_elements()
-        self.show_all_elements()
-        print(f'net created with {len(element_list)} elements')
+        #self.print_nodes_expected_elements()
+        exception_nodes = self.get_exception_nodes()
+        m = None
+        if len(exception_nodes) > 0:
+            m = f'{len(exception_nodes)} exception nodes    '
+            self.print_nodes_exceptions(exception_nodes)
+            print(m)
+            messagebox.showwarning("Warning", m)
+        if len(exception_element_list) > 0:
+            m = f'{len(exception_element_list)} exception elements'
+            print(m)
+            self.print_elements(exception_element_list)
+            messagebox.showwarning("Warning", m)
+        if m is None:
+            print(f'SUCCESS: net created with {len(element_list)} elements')
+        # debug
+        #self.print_nodes_expected_elements()
+        self.print_elements(self.element_list)
 
     def save_inp(self):
         self.create_net_element_list()
@@ -1378,8 +1520,8 @@ class FabianBoard(Board):
             d_list = self.get_duplicated_entities()
             self.hide_text_on_screen()
             if len(d_list) > 0:
-                print(f'found {len(d_list)} duplicated entities')
                 m = f'Removed {len(d_list)} duplicated entities'
+                print(m)
                 messagebox.showwarning("Warning", m)
                 for e in d_list:
                     self.entity_list.remove(e)
@@ -1446,6 +1588,18 @@ class FabianBoard(Board):
                 top = e.right_up.y
         x, y = self.convert_xy_to_screen((left+right)/2, (bottom+top)/2)
         return x, y
+
+    def get_left_bottom_node(self, by_x=False):
+        if len(self.node_list) < 2:
+            return 0
+        node = 1
+        p = self.node_list[node].p
+        for i in range(1, len(self.node_list)):
+            if self.node_list[i].p.is_smaller(p, by_x):
+                p = self.node_list[i].p
+                node = i
+        return node
+
 
     def mark_selected_entity(self):
         if self.selected_part_mark is None:
