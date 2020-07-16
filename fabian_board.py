@@ -582,10 +582,10 @@ class FabianBoard(Board):
             menu.add_separator()
         if self.selected_part_mark is not None:
             menu.add_command(label="split", command=lambda: self.split(self.selected_part))
+            menu.add_command(label="delete", command=self.remove_selected_part_from_list)
             if self.work_mode == 'dxf':
                 menu.add_command(label="unmark", command=self.unmark_selected_entity)
                 menu.add_command(label="mark", command=self.mark_selected_entity)
-                menu.add_command(label="delete", command=self.remove_selected_entity_from_list)
             menu.add_separator()
         if self.work_mode == 'dxf':
             if len(self.entity_list) > 0:
@@ -1101,7 +1101,7 @@ class FabianBoard(Board):
                 node.expected_elements = len(node.attached_lines)-1
                 lines_to_check -= 1
             else:
-                m = f'unexpected number of outer lines in node: {n}'
+                m = f'unexpected number of outer lines in set_node_expected_elements_and_exceptions'
                 print(m)
                 return
             if num_outer_lines == 2:
@@ -1252,7 +1252,7 @@ class FabianBoard(Board):
     def get_unattached_nodes(self, set_nodes_lines=True):
         tmp_list = []
         if set_nodes_lines:
-            self.set_all_nodes_attached_line_list()
+            self.set_nodes_attached_lines_and_exception()
         c = len(self.node_list)
         self.show_text_on_screen('checking unattached nodes')
         self.show_progress_bar(c)
@@ -1266,8 +1266,9 @@ class FabianBoard(Board):
         self.hide_text_on_screen()
         self.hide_progress_bar()
         if len(tmp_list) > 0:
-            print(f'found {len(tmp_list)} unattached nodes')
-            messagebox.showwarning("Warning", f"{len(tmp_list)} unattached nodes")
+            m = f"{len(tmp_list)} unattached nodes: {tmp_list}"
+            print(m)
+            messagebox.showwarning("Warning", m)
         return tmp_list
 
     # return index of node in node_list with same p, None if it's a new node
@@ -1364,24 +1365,18 @@ class FabianBoard(Board):
         self.show_net = True
         self.update_view()
 
-    # return the index of the attached line from end_node to start node
-    def get_reversed_attached_line(self, start_node, end_node):
-        n = self.node_list[end_node]
-        al = n.attached_lines
-        for i in range(len(al)):
-            if al[i].second_node == start_node:
-                return i
-        return None
-
-    def create_net_element_list(self):
+    def set_nodes_attached_lines_and_exception(self):
         self.set_all_nodes_attached_line_list()
-        unattaced_list = self.get_unattached_nodes(False)
-        if len(unattaced_list) > 0:
-            return
         nodes_outer_list = self.mark_outer_lines()
         #debug
         #print(nodes_outer_list)
         self.set_all_nodes_expected_elements_and_exceptions()
+
+    def create_net_element_list(self):
+        self.set_nodes_attached_lines_and_exception()
+        unattaced_list = self.get_unattached_nodes(False)
+        if len(unattaced_list) > 0:
+            return
         c = len(self.node_list)
         self.show_text_on_screen('creating net elements')
         self.show_progress_bar(c)
@@ -1596,6 +1591,7 @@ class FabianBoard(Board):
                 element = Element()
                 element.get_data_from_tuple(t)
                 self.element_list.append(element)
+            self.work_mode = data.get('work_mode')
             self.select_parts_mode = data.get('select_parts_mode')
             self.show_entities = data.get('show_entities')
             self.show_nodes = data.get('show_nodes')
@@ -1715,11 +1711,19 @@ class FabianBoard(Board):
         self.board.delete('all')
         self.show_dxf_entities()
 
-    def remove_selected_entity_from_list(self):
+    def remove_selected_part_from_list(self):
         if self.selected_part is None:
             return
         self.keep_state()
-        self.remove_parts_from_list([self.selected_part], 'entities')
+        changed = False
+        if self.select_parts_mode == 'entity' and self.work_mode == 'dxf':
+            changed = True
+            self.remove_parts_from_list([self.selected_part], 'entities')
+        elif self.select_parts_mode == 'net_line' and self.work_mode == 'inp':
+            changed = True
+            self.remove_parts_from_list([self.selected_part], 'net_lines')
+        if not changed:
+            self.state.pop(-1)
 
     def remove_temp_line(self):
         if self.new_line_edge[1] is not None:
