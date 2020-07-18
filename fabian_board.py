@@ -31,7 +31,6 @@ class FabianBoard(Board):
         self.select_parts_mode = gv.default_select_parts_mode
         self.mark_option = gv.default_mark_option
         self.selected_part = None
-        self.selected_part_mark = None
         self.new_line_edge = [None, None]
         self.new_line_edge_mark = [None, None]
         # line after selecting 2 points
@@ -71,7 +70,6 @@ class FabianBoard(Board):
         self.select_parts_mode = gv.default_select_parts_mode
         self.mark_option = gv.default_mark_option
         self.selected_part = None
-        self.selected_part_mark = None
         self.new_line_edge = [None, None]
         self.new_line_edge_mark = [None, None]
         self.new_line_mark = None
@@ -154,21 +152,22 @@ class FabianBoard(Board):
         if self.temp_rect_mark is not None:
             self.board.delete(self.temp_rect_mark)
         x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
-        if self.selected_part_mark is None:
+        if self.selected_part is None:
             self.temp_rect_start_point = Point(x, y)
             return
-        if self.select_parts_mode == 'entity' and self.selected_part is not None:
-            e = self.entity_list[self.selected_part]
-            p1 = e.left_bottom
-            p2 = e.right_up
-            d, p = self.get_distance_from_entity_and_nearest_point(Point(x, y), self.selected_part)
-        elif self.select_parts_mode == 'net_line' and self.selected_part is not None:
-            line = self.net_line_list[self.selected_part]
-            node_1 = self.node_list[line.start_node]
-            node_2 = self.node_list[line.end_node]
-            p1 = node_1.p
-            p2 = node_2.p
-            d, p = self.get_distance_from_line_and_nearest_point(Point(x, y), p1, p2)
+        if self.selected_part is not None:
+            if self.selected_part.part_type == 'entity':
+                e = self.entity_list[self.selected_part.index]
+                p1 = e.left_bottom
+                p2 = e.right_up
+                d, p = self.get_distance_from_entity_and_nearest_point(Point(x, y), self.selected_part.index)
+            elif self.selected_part.part_type == 'net_line':
+                line = self.net_line_list[self.selected_part.index]
+                node_1 = self.node_list[line.start_node]
+                node_2 = self.node_list[line.end_node]
+                p1 = node_1.p
+                p2 = node_2.p
+                d, p = self.get_distance_from_line_and_nearest_point(Point(x, y), p1, p2)
         if self.select_mode == 'edge':
             d1 = p1.get_distance_to_point(Point(x, y))
             d2 = p2.get_distance_to_point(Point(x, y))
@@ -357,8 +356,8 @@ class FabianBoard(Board):
             self.board.delete(self.temp_line_mark)
             menu.add_command(label="remove line", command=self.remove_temp_line)
             menu.add_separator()
-        if self.selected_part_mark is not None:
-            menu.add_command(label="split", command=lambda: self.split(self.selected_part))
+        if self.selected_part is not None:
+            menu.add_command(label="split", command=self.split)
             menu.add_command(label="delete", command=self.remove_selected_part_from_list)
             if self.work_mode == 'dxf':
                 menu.add_command(label="unmark", command=self.unmark_selected_entity)
@@ -408,10 +407,8 @@ class FabianBoard(Board):
 
     def change_work_mode(self, mode):
         self.work_mode = mode
-        if self.selected_part_mark is not None:
-            self.board.delete(self.selected_part_mark)
-            self.selected_part_mark = None
-        self.selected_part = None
+        if self.selected_part is not None:
+            self.remove_selected_part_mark()
         if mode.lower() == 'dxf':
             self.show_nodes = False
             self.show_net = False
@@ -433,17 +430,15 @@ class FabianBoard(Board):
         self.select_mode = mode
 
     def change_select_parts_mode(self, mode):
-        if self.selected_part_mark is not None:
-            self.board.delete(self.selected_part_mark)
-            self.selected_part_mark = None
-        self.selected_part = None
+        self.remove_selected_part_mark()
         self.select_parts_mode = mode
 
     def motion(self, key):
         x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
         p = Point(x, y)
-        selected_d = 100
+        part_type = self.select_parts_mode
         d = 100
+        i = None
         text = f'{round(x, gv.accuracy)}    {round(y, gv.accuracy)}'
         self.hide_text_on_screen()
         self.show_text_on_screen(text, 'lt')
@@ -453,33 +448,16 @@ class FabianBoard(Board):
         if self.select_parts_mode == 'entity':
             if len(self.entity_list) == 0:
                 return
-            if self.selected_part is not None:
-                selected_d, nearest_point = self.get_distance_from_entity_and_nearest_point(p, self.selected_part)
             i, d = self.find_nearest_entity(p, only_visible=True)
-            if i is None:
-                return
         elif self.select_parts_mode == 'net_line':
             if len(self.net_line_list) == 0:
                 return
-            if self.selected_part is not None:
-                start_node = self.net_line_list[self.selected_part].start_node
-                end_node = self.net_line_list[self.selected_part].end_node
-                p1 = self.node_list[start_node].p
-                p2 = self.node_list[end_node].p
-                if self.selected_part is not None:
-                    selected_d, nearest_point = self.get_distance_from_line_and_nearest_point(p, p1, p2)
             i, d = self.find_nearest_net_line(p, only_visible=True)
-            if i is None:
-                return
-        if selected_d*self.scale > 5:
-            self.remove_selected_part_mark()
+        if i is None:
+            return
+        self.remove_selected_part_mark()
         if d*self.scale < 5:
-            self.remove_selected_part_mark()
-            self.selected_part = i
-            if self.select_parts_mode == 'entity':
-                self.mark_entity(self.selected_part)
-            elif self.select_parts_mode == 'net_line':
-                self.mark_net_line(self.selected_part)
+            self.mark_part(i, part_type)
 
     def set_entity_edge_nodes(self, i):
         e = self.entity_list[i]
@@ -684,19 +662,24 @@ class FabianBoard(Board):
         '''
         return False
 
-    def split(self, part=0, n=gv.default_split_parts):
+    def split(self, n=gv.default_split_parts):
         self.keep_state()
-        if self.work_mode == 'dxf':
+        if self.selected_part is None:
+            return
+        part = self.selected_part.index
+        if self.selected_part.part_type == 'entity' and self.work_mode == 'dxf':
             changed = self.split_entity(part, n)
-        elif self.work_mode == 'inp':
+        else:
             changed = self.split_net_line(part, n)
         self.update_view()
-        if not changed:
+        if changed:
+            self.remove_selected_part_mark()
+        else:
             self.state.pop(-1)
 
     # split entity_list[i] into n parts
     def split_entity(self, part=0, n=gv.default_split_parts):
-        if self.work_mode != 'dxf':
+        if self.selected_part.part_type != 'entity':
             return False
         e = self.entity_list[part]
         new_part_list = []
@@ -733,7 +716,7 @@ class FabianBoard(Board):
         if self.work_mode != 'inp':
             return False
         # split net line not on entity
-        if self.select_parts_mode == 'net_line':
+        if self.selected_part.part_type == 'net_line':
             new_lines = []
             line = self.net_line_list[part]
             node1 = self.node_list[line.start_node]
@@ -748,7 +731,7 @@ class FabianBoard(Board):
             self.remove_parts_from_list([part], 'net_lines')
             for j in range(len(new_lines)):
                 self.net_line_list.append(new_lines[j])
-        elif self.select_parts_mode == 'entity':
+        elif self.selected_part.part_type == 'entity':
             net_lines = self.get_lines_attached_to_entity(part)
             if len(net_lines) < 1:
                 # fix me
@@ -826,7 +809,7 @@ class FabianBoard(Board):
                 return
             self.hide_part(part, list_name)
             original_list.pop(part)
-        self.selected_part = None
+        self.remove_selected_part_mark()
 
     def get_lines_attached_to_entity(self, entity):
         net_lines = []
@@ -1463,10 +1446,12 @@ class FabianBoard(Board):
         return node
 
     def mark_selected_entity(self):
-        if self.selected_part_mark is None:
+        if self.selected_part is None:
+            return
+        elif self.selected_part.part_type != 'entity':
             return
         self.keep_state()
-        i = self.selected_part
+        i = self.selected_part.index
         e = self.entity_list[i]
         e.is_marked = True
         self.set_entity_color(i, gv.marked_entity_color)
@@ -1490,10 +1475,12 @@ class FabianBoard(Board):
             i += 1
 
     def unmark_selected_entity(self):
-        if self.selected_part_mark is None:
+        if self.selected_part is None:
+            return
+        elif self.selected_part.part_type != 'entity':
             return
         self.keep_state()
-        i = self.selected_part
+        i = self.selected_part.index
         e = self.entity_list[i]
         e.is_marked = False
         self.set_entity_color(i, gv.default_color)
@@ -1507,7 +1494,7 @@ class FabianBoard(Board):
         for e in temp_list:
             e.board_part = None
         self.entity_list = temp_list
-        self.selected_part = None
+        self.remove_selected_part_mark()
         self.board.delete('all')
         self.show_dxf_entities()
 
@@ -1523,7 +1510,7 @@ class FabianBoard(Board):
             e.color = gv.default_color
         self.entity_list = temp_list
         self.remove_temp_line()
-        self.selected_part = None
+        self.remove_selected_part_mark()
         self.board.delete('all')
         self.show_dxf_entities()
 
@@ -1532,13 +1519,15 @@ class FabianBoard(Board):
             return
         self.keep_state()
         changed = False
-        if self.select_parts_mode == 'entity' and self.work_mode == 'dxf':
+        if self.selected_part.part_type == 'entity' and self.work_mode == 'dxf':
             changed = True
-            self.remove_parts_from_list([self.selected_part], 'entities')
-        elif self.select_parts_mode == 'net_line' and self.work_mode == 'inp':
+            self.remove_parts_from_list([self.selected_part.index], 'entities')
+        elif self.selected_part.part_type == 'net_line' and self.work_mode == 'inp':
             changed = True
-            self.remove_parts_from_list([self.selected_part], 'net_lines')
-        if not changed:
+            self.remove_parts_from_list([self.selected_part.index], 'net_lines')
+        if changed:
+            self.remove_selected_part_mark()
+        else:
             self.state.pop(-1)
 
     def remove_temp_line(self):
@@ -1832,20 +1821,23 @@ class FabianBoard(Board):
         for i in range(len(self.entity_list)):
             self.set_entity_color(i, color)
 
-    def mark_entity(self, i):
-        b = self.board.bbox(self.entity_list[i].board_part)
-        self.selected_part_mark = self.board.create_rectangle(b)
-
-    def mark_net_line(self, i):
-        b = self.board.bbox(self.net_line_list[i].board_part)
-        self.selected_part_mark = self.board.create_rectangle(b)
+    def mark_part(self, i, part_type, color=gv.mark_rect_color):
+        self.selected_part = SelectedPart(index=i, part_type=part_type)
+        if part_type == 'entity':
+            b = self.board.bbox(self.entity_list[i].board_part)
+        # part_type == 'net_line'
+        else:
+            b = self.board.bbox(self.net_line_list[i].board_part)
+        self.selected_part.board_part = self.board.create_rectangle(b, outline=color)
 
     def remove_selected_part_mark(self):
-        if self.selected_part_mark is None:
+        if self.selected_part is None:
             return
-        else:
-            self.board.delete(self.selected_part_mark)
-            self.selected_part_mark = None
+        elif self.selected_part.board_part is None:
+            self.selected_part = None
+            return
+        self.board.delete(self.selected_part.board_part)
+        self.selected_part = None
 
     def convert_doc_to_entity_list(self, doc=None):
         if doc is None:

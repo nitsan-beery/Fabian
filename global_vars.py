@@ -36,6 +36,7 @@ net_line_color = 'red'
 marked_net_line_color = 'orange'
 text_color = 'green'
 element_color = 'white'
+mark_rect_color = 'black'
 
 # node exceptions
 unattached = 'unattached'

@@ -213,6 +213,13 @@ class AttachedLine:
         self.is_available = is_available
 
 
+class SelectedPart(Part):
+    def __init__(self, part_type='entity', index=0, color=gv.mark_rect_color):
+        super().__init__(color)
+        self.part_type = part_type
+        self.index = index
+
+
 class FabianState:
     def __init__(self):
         self.entity_list = None
