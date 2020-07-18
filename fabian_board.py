@@ -207,12 +207,7 @@ class FabianBoard(Board):
             self.board.delete(self.temp_line_mark)
             if self.new_line_edge[1] is None:
                 self.new_line_edge[1] = p
-                if self.work_mode == 'dxf':
-                    self.new_line_edge_mark[1] = self.draw_circle(p, gv.edge_line_mark_radius/self.scale)
-                    self.new_line_mark = self.draw_line(self.new_line_edge[0], self.new_line_edge[1])
-                # work mode = inp
-                else:
-                    self.add_line()
+                self.add_line()
             else:
                 self.board.delete(self.new_line_edge_mark[1])
                 self.new_line_edge_mark[1] = None
@@ -256,7 +251,7 @@ class FabianBoard(Board):
             enclosed_parts = self.board.find_enclosed(left, upper, right, lower)
             t1 = len(enclosed_parts) > 0
             t2 = self.work_mode == 'dxf'
-            t3 = self.work_mode == 'inp' and self.select_parts_mode == 'net_line'
+            t3 = self.work_mode == 'inp' and (self.select_parts_mode == 'net_line' or self.select_parts_mode == 'all')
             if t1 and (t2 or t3):
                 mark_option = {
                     "mark": True,
@@ -267,7 +262,7 @@ class FabianBoard(Board):
                 non_marked_color = gv.default_color
                 part_list = self.entity_list
                 list_name = 'entities'
-                if self.select_parts_mode == 'net_line':
+                if t3:
                     part_list = self.net_line_list
                     marked_color = gv.marked_net_line_color
                     non_marked_color = gv.net_line_color
@@ -313,6 +308,7 @@ class FabianBoard(Board):
         select_part_menu = tk.Menu(menu, tearoff=0)
         select_part_menu.add_command(label="Entities", command=lambda: self.change_select_parts_mode('entity'))
         select_part_menu.add_command(label="Net lines", command=lambda: self.change_select_parts_mode('net_line'))
+        select_part_menu.add_command(label="all", command=lambda: self.change_select_parts_mode('all'))
         select_mode_menu = tk.Menu(menu, tearoff=0)
         select_mode_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode('edge'))
         select_mode_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode('point'))
@@ -423,6 +419,7 @@ class FabianBoard(Board):
                 print('no unattached nodes')
             self.set_all_dxf_entities_color(gv.weak_entity_color)
             self.show_nodes = True
+            self.show_net = True
             self.choose_mark_option('quit')
         self.update_view()
 
@@ -436,23 +433,29 @@ class FabianBoard(Board):
     def motion(self, key):
         x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
         p = Point(x, y)
-        part_type = self.select_parts_mode
-        d = 100
-        i = None
+        d_entity = d_net_line = 100
+        i_entity = i_net_line = None
         text = f'{round(x, gv.accuracy)}    {round(y, gv.accuracy)}'
         self.hide_text_on_screen()
         self.show_text_on_screen(text, 'lt')
         if self.new_line_edge[0] is not None:
             self.board.delete(self.temp_line_mark)
             self.temp_line_mark = self.draw_line(self.new_line_edge[0], p, gv.temp_line_color)
-        if self.select_parts_mode == 'entity':
+        if self.select_parts_mode == 'entity' or self.select_parts_mode == 'all':
             if len(self.entity_list) == 0:
                 return
-            i, d = self.find_nearest_entity(p, only_visible=True)
-        elif self.select_parts_mode == 'net_line':
+            i_entity, d_entity = self.find_nearest_entity(p, only_visible=True)
+        if self.select_parts_mode == 'net_line' or self.select_parts_mode == 'all':
             if len(self.net_line_list) == 0:
                 return
-            i, d = self.find_nearest_net_line(p, only_visible=True)
+            i_net_line, d_net_line = self.find_nearest_net_line(p, only_visible=True)
+        part_type = 'entity'
+        d = d_entity
+        i = i_entity
+        if i_net_line is not None and d_net_line < d:
+            d = d_net_line
+            i = i_net_line
+            part_type = 'net_line'
         if i is None:
             return
         self.remove_selected_part_mark()
