@@ -26,12 +26,13 @@ class FabianBoard(Board):
         self.net_line_list = []
         self.element_list = []
         self.longitude = None
-        self.select_mode = gv.default_select_mode
+        self.mouse_select_mode = gv.default_mouse_select_mode
         self.work_mode = gv.default_work_mode
         self.select_parts_mode = gv.default_select_parts_mode
         self.mark_option = gv.default_mark_option
         self.selected_part = None
         self.new_line_edge = [None, None]
+        self.new_line_original_part = [None, None]
         self.new_line_edge_mark = [None, None]
         # line after selecting 2 points
         self.new_line_mark = None
@@ -65,12 +66,13 @@ class FabianBoard(Board):
         self.net_line_list = []
         self.element_list = []
         self.longitude = None
-        self.select_mode = gv.default_select_mode
+        self.mouse_select_mode = gv.default_mouse_select_mode
         self.work_mode = gv.default_work_mode
         self.select_parts_mode = gv.default_select_parts_mode
         self.mark_option = gv.default_mark_option
         self.selected_part = None
         self.new_line_edge = [None, None]
+        self.new_line_original_part = [None, None]
         self.new_line_edge_mark = [None, None]
         self.new_line_mark = None
         self.temp_line_mark = None
@@ -99,7 +101,7 @@ class FabianBoard(Board):
             element = Element()
             element.get_data_from_tuple(t)
             self.element_list.append(element)
-        self.select_mode = state.select_mode
+        self.mouse_select_mode = state.mouse_select_mode
         self.work_mode = state.work_mode
         self.select_parts_mode = state.select_parts_mode
         self.show_entities = state.show_entities
@@ -136,7 +138,7 @@ class FabianBoard(Board):
         state.node_list = node_list
         state.net_line_list = net_list
         state.element_list = element_list
-        state.select_mode = self.select_mode
+        state.mouse_select_mode = self.mouse_select_mode
         state.work_mode = self.work_mode
         state.select_parts_mode = self.select_parts_mode
         state.show_entities = self.show_entities
@@ -168,7 +170,7 @@ class FabianBoard(Board):
                 p1 = node_1.p
                 p2 = node_2.p
                 d, p = self.get_distance_from_line_and_nearest_point(Point(x, y), p1, p2)
-        if self.select_mode == 'edge':
+        if self.mouse_select_mode == 'edge':
             d1 = p1.get_distance_to_point(Point(x, y))
             d2 = p2.get_distance_to_point(Point(x, y))
             p = p2
@@ -179,6 +181,7 @@ class FabianBoard(Board):
         if self.new_line_edge[0] is None:
             self.new_line_edge[0] = p
             self.new_line_edge_mark[0] = self.draw_circle(p, gv.edge_line_mark_radius/self.scale)
+            self.new_line_original_part[0] = self.selected_part
             return
         # remove selection of first point
         elif self.new_line_edge[0] == p:
@@ -188,18 +191,21 @@ class FabianBoard(Board):
             if self.new_line_edge[1] is None:
                 self.new_line_edge_mark[0] = None
                 self.new_line_edge[0] = None
+                self.new_line_original_part[0] = None
             # there is a second edge and a line between
             else:
                 self.board.delete(self.new_line_mark)
                 self.new_line_mark = None
                 self.new_line_edge_mark[0] = self.new_line_edge_mark[1]
                 self.new_line_edge[0] = self.new_line_edge[1]
+                self.new_line_original_part[0] = self.new_line_original_part[1]
                 self.new_line_edge_mark[1] = None
                 self.new_line_edge[1] = None
+                self.new_line_original_part[1] = None
             return
 
         # second point on the same entity or line
-        if self.new_line_edge[0].is_equal(p1) or self.new_line_edge[0].is_equal(p2):
+        if self.select_parts_mode == 'edge' and (self.new_line_edge[0].is_equal(p1) or self.new_line_edge[0].is_equal(p2)):
             return
 
         # second point
@@ -207,18 +213,21 @@ class FabianBoard(Board):
             self.board.delete(self.temp_line_mark)
             if self.new_line_edge[1] is None:
                 self.new_line_edge[1] = p
+                self.new_line_original_part[1] = self.selected_part
                 self.add_line()
             else:
                 self.board.delete(self.new_line_edge_mark[1])
                 self.new_line_edge_mark[1] = None
                 self.board.delete(self.new_line_mark)
                 self.new_line_mark = None
+                self.new_line_original_part = None
                 if self.new_line_edge[1] != p:
                     self.new_line_edge[1] = p
                     self.new_line_edge_mark[1] = self.draw_circle(p, gv.edge_line_mark_radius / self.scale)
                     self.new_line_mark = self.draw_line(self.new_line_edge[0], self.new_line_edge[1])
                 else:
                     self.new_line_edge[1] = None
+                    self.new_line_original_part[1] = None
 
     def mouse_1_motion(self, key):
         if self.temp_rect_start_point is None:
@@ -309,11 +318,12 @@ class FabianBoard(Board):
         select_part_menu.add_command(label="Entities", command=lambda: self.change_select_parts_mode('entity'))
         select_part_menu.add_command(label="Net lines", command=lambda: self.change_select_parts_mode('net_line'))
         select_part_menu.add_command(label="all", command=lambda: self.change_select_parts_mode('all'))
-        select_mode_menu = tk.Menu(menu, tearoff=0)
-        select_mode_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode('edge'))
-        select_mode_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode('point'))
-        select_mode_menu.add_separator()
-        select_mode_menu.add_command(label="Quit")
+        select_part_menu.add_separator()
+        if self.work_mode == 'dxf':
+            select_part_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode('edge'))
+            select_part_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode('point'))
+            select_part_menu.add_separator()
+        select_part_menu.add_command(label="Quit")
         mark_option_menu = tk.Menu(self.board, tearoff=0)
         mark_option_menu.add_command(label="mark", command=lambda: self.choose_mark_option("mark"))
         mark_option_menu.add_command(label="unmark", command=lambda: self.choose_mark_option("unmark"))
@@ -344,11 +354,7 @@ class FabianBoard(Board):
         menu.add_separator()
         menu.add_cascade(label='Mark mode', menu=mark_option_menu)
         menu.add_separator()
-        # menu.add_cascade(label='Select mode', menu=select_mode_menu)
-        # menu.add_separator()
-        if self.new_line_edge[1] is not None:
-            menu.add_command(label="add line", command=self.add_line)
-        if self.new_line_edge[0] is not None and self.work_mode == 'dxf':
+        if self.new_line_edge[0] is not None:
             self.board.delete(self.temp_line_mark)
             menu.add_command(label="remove line", command=self.remove_temp_line)
             menu.add_separator()
@@ -420,11 +426,12 @@ class FabianBoard(Board):
             self.set_all_dxf_entities_color(gv.weak_entity_color)
             self.show_nodes = True
             self.show_net = True
+            self.change_mouse_selection_mode('edge')
             self.choose_mark_option('quit')
         self.update_view()
 
     def change_mouse_selection_mode(self, mode):
-        self.select_mode = mode
+        self.mouse_select_mode = mode
 
     def change_select_parts_mode(self, mode):
         self.remove_selected_part_mark()
@@ -679,6 +686,28 @@ class FabianBoard(Board):
             self.remove_selected_part_mark()
         else:
             self.state.pop(-1)
+
+    def split_entity_by_point(self, s_part, p):
+        if s_part.part_type != 'entity':
+            # fix me? - split net line
+            return False
+        e = self.entity_list[s_part.index]
+        new_part_list = []
+        if e.shape == 'ARC':
+            angle_to_p = e.center.get_alfa_to(p)
+            new_part_list.append(Entity('ARC', center=e.center, radius=e.radius, start_angle=e.arc_start_angle, end_angle=angle_to_p))
+            new_part_list.append(Entity('ARC', center=e.center, radius=e.radius, start_angle=angle_to_p, end_angle=e.arc_end_angle))
+        elif e.shape == 'LINE':
+            new_part_list.append(Entity('LINE', start=e.start, end=p))
+            new_part_list.append(Entity('LINE', start=p, end=e.end))
+        elif e.shape == 'CIRCLE':
+            return False
+        for i in range(len(new_part_list)):
+            self.entity_list.append(new_part_list[i])
+            self.define_new_entity_color(-1)
+            self.show_entity(-1)
+        self.remove_parts_from_list([s_part.index], 'entities')
+        return True
 
     # split entity_list[i] into n parts
     def split_entity(self, part=0, n=gv.default_split_parts):
@@ -1537,10 +1566,12 @@ class FabianBoard(Board):
         if self.new_line_edge[1] is not None:
             self.board.delete(self.new_line_edge_mark[1])
             self.new_line_edge[1] = None
+            self.new_line_original_part[1] = None
             self.board.delete(self.new_line_mark)
         if self.new_line_edge[0] is not None:
             self.board.delete(self.new_line_edge_mark[0])
             self.new_line_edge[0] = None
+            self.new_line_original_part[0] = None
             self.board.delete(self.temp_line_mark)
 
     def add_line(self):
@@ -1548,16 +1579,27 @@ class FabianBoard(Board):
         p2 = self.new_line_edge[1]
         if p2 is None:
             return
+        s_part_1 = self.new_line_original_part[0]
+        s_part_2 = self.new_line_original_part[1]
+        entity_2 = self.entity_list[s_part_2.index]
         self.keep_state()
         if self.work_mode == 'dxf':
+            if self.mouse_select_mode == 'point':
+                self.split_entity_by_point(s_part_1, p1)
+                new_s_part_2_index = self.get_index_of_entity(entity_2)
+                s_part_2.index = new_s_part_2_index
+                self.split_entity_by_point(s_part_2, p2)
             self.add_line_to_entity_list(p1, p2)
         elif self.work_mode == 'inp':
             self.add_line_to_net_list(p1, p2)
-        self.board.delete(self.new_line_edge_mark[0])
-        self.board.delete(self.new_line_edge_mark[1])
-        self.board.delete(self.new_line_mark)
-        self.new_line_edge[0] = None
-        self.new_line_edge[1] = None
+        self.remove_temp_line()
+        
+    def get_index_of_entity(self, entity):
+        for i in range(len(self.entity_list)):
+            e = self.entity_list[i]
+            if e.is_equal(entity):
+                return i
+        return None
 
     def add_line_to_net_list(self, p1, p2):
         if self.work_mode != 'inp':
@@ -1565,8 +1607,8 @@ class FabianBoard(Board):
         start_node = self.get_index_of_node_with_point(p1)
         end_node = self.get_index_of_node_with_point(p2)
         if start_node is None or end_node is None:
-            # debug
-            print(f"in add line to net list, no mach node for points {p1.convert_into_tuple()}   {p2.convert_into_tuple()}")
+            self.remove_temp_line()
+            return
         line = NetLine(start_node, end_node)
         self.net_line_list.append(line)
         self.show_net_line(-1)
