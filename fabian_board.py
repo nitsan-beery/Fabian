@@ -1560,8 +1560,6 @@ class FabianBoard(Board):
             self.convert_doc_to_entity_list(doc)
             self.center_view()
             self.set_initial_net()
-            # remove me
-            self.set_longitude()
             print(f'{len(self.entity_list)} Entities in {filetype} file')
             d_list = self.get_duplicated_entities()
             self.hide_text_on_screen()
@@ -1628,7 +1626,7 @@ class FabianBoard(Board):
                 left = right = bottom = top = 0
             else:
                 left = right = self.node_list[1].p.x
-                bottom = top = self.node_list[1].p.x
+                bottom = top = self.node_list[1].p.y
                 for i in range(1, len(self.node_list)):
                     n = self.node_list[i]
                     if n.p.x < left:
@@ -1663,15 +1661,11 @@ class FabianBoard(Board):
         return x, y
 
     def set_longitude(self):
-        if len(self.node_list) < 2:
+        if len(self.entity_list) < 2:
             return None
         shape = None
         longest_line = 0
         longitude_line = None
-        x, y = self.get_center(canvas_coordinates=False, by_nodes=True)
-        c = Point(x, y)
-        left_top = bottom_left = right_bottom = top_right = 0
-        d_left_top = d_bottom_left = d_right_bottom = d_top_right = 0
         for e in self.entity_list:
             if e.shape == 'LINE' or e.shape == 'ARC':
                 d_line = e.start.get_distance_to_point(e.end)
@@ -1679,46 +1673,7 @@ class FabianBoard(Board):
                     longest_line = d_line
                     longitude_line = e.left_bottom.get_alfa_to(e.right_up)
                     shape = e.shape
-        for n in self.node_list:
-            angle = c.get_alfa_to(n.p)
-            d = c.get_distance_to_point(n.p)
-            if 0 < angle <= 90 and d > d_top_right:
-                d_top_right = d
-                top_right = n.p
-            elif 90 < angle <= 180 and d > d_left_top:
-                d_left_top = d
-                left_top = n.p
-            elif 180 < angle <= 270 and d > d_bottom_left:
-                d_bottom_left = d
-                bottom_left = n.p
-            elif (angle == 0 or 270 < angle <= 360) and d > d_right_bottom:
-                d_right_bottom = d
-                right_bottom = n.p
-        d_corners = 0
-        longitude_corners = 0
-        d = left_top.get_distance_to_point(bottom_left)
-        angle = left_top.get_alfa_to(bottom_left)
-        if d > d_corners:
-            d_corners = d
-            longitude_corners = angle
-        d = bottom_left.get_distance_to_point(right_bottom)
-        angle = bottom_left.get_alfa_to(right_bottom)
-        if d > d_corners:
-            d_corners = d
-            longitude_corners = angle
-        d = right_bottom.get_distance_to_point(top_right)
-        angle = right_bottom.get_alfa_to(top_right)
-        if d > d_corners:
-            d_corners = d
-            longitude_corners = angle
-        d = top_right.get_distance_to_point(left_top)
-        angle = top_right.get_alfa_to(left_top)
-        if d > d_corners:
-            d_corners = d
-            longitude_corners = angle
         # debug
-        print(f'longitude corners: {longitude_corners}   left_top: {left_top.convert_into_tuple()}   bottom_left: {bottom_left.convert_into_tuple()}   '
-              f'right_bottom: {right_bottom.convert_into_tuple()}   top_right: {top_right.convert_into_tuple()}')
         print(f'longest - {shape}   d: {longest_line}   longitude: {longitude_line}\n')
         return longitude_line
 
