@@ -13,7 +13,7 @@ class Point:
         return round(self.x, gv.accuracy) == round(p.x, gv.accuracy) and \
                round(self.y, gv.accuracy) == round(p.y, gv.accuracy)
 
-    def is_smaller(self, p, by_x=True):
+    def is_smaller_x_smaller_y(self, p, by_x=True):
         if by_x:
             if self.x < p.x:
                 return True
@@ -27,6 +27,20 @@ class Point:
                 return True
             return False
 
+    def is_smaller_x_bigger_y(self, p):
+        if self.x < p.x:
+            return True
+        elif self.x == p.x and self.y > p.y:
+            return True
+        return False
+
+    def is_smaller_y_bigger_x(self, p):
+        if self.y < p.y:
+            return True
+        elif self.y == p.y and self.x > p.x:
+            return True
+        return False
+
     def convert_into_tuple(self):
         t = (self.x, self.y)
         return t
@@ -38,7 +52,7 @@ class Point:
         self.x = t[0]
         self.y = t[1]
 
-    def get_distance_from_point(self, p):
+    def get_distance_to_point(self, p):
         return math.sqrt(pow(self.x-p.x, 2) + pow(self.y-p.y, 2))
 
     # return the angle vector to Point p (degrees), None if p == self
@@ -68,7 +82,7 @@ class Point:
 # return new coordinates of Point p relative to Point new00 with rotation_angle
 def get_shifted_point(p, new00, rotation_angle):
     shifted_p = Point(p.x - new00.x, p.y - new00.y)
-    r = shifted_p.get_distance_from_point(Point(0, 0))
+    r = shifted_p.get_distance_to_point(Point(0, 0))
     if r == 0:
         return shifted_p
     alfa = Point(0, 0).get_alfa_to(shifted_p) + rotation_angle
@@ -88,13 +102,18 @@ def get_sorted_points(p1, p2, sort_by_x=True):
         elif p1.x < p2.x:
             return p1, p2
         else:
-            return get_sorted_points(p1, p2, sort_by_x=False)
+            if p1.y < p2.y:
+                return p1, p2
+            else:
+                return p2, p1
     else:
         if p1.y > p2.y:
             return p2, p1
         elif p1.y < p2.y:
             return p1, p2
         else:
-            return get_sorted_points(p1, p2, sort_by_x=True)
-
+            if p1.x < p2.x:
+                return p1, p2
+            else:
+                return p2, p1
 

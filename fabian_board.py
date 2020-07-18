@@ -231,6 +231,7 @@ class FabianState:
         self.show_node_number = gv.default_show_node_number
         self.show_net = True
         self.scale = None
+        self.board = None
 
 
 class FabianBoard(Board):
@@ -252,6 +253,7 @@ class FabianBoard(Board):
         self.node_list = [Node()]
         self.net_line_list = []
         self.element_list = []
+        self.longitude = None
         self.select_mode = gv.default_select_mode
         self.work_mode = gv.default_work_mode
         self.select_parts_mode = gv.default_select_parts_mode
@@ -291,6 +293,7 @@ class FabianBoard(Board):
             self.node_list = [Node()]
         self.net_line_list = []
         self.element_list = []
+        self.longitude = None
         self.select_mode = gv.default_select_mode
         self.work_mode = gv.default_work_mode
         self.select_parts_mode = gv.default_select_parts_mode
@@ -335,6 +338,7 @@ class FabianBoard(Board):
         self.show_node_number = state.show_node_number
         self.show_net = state.show_net
         self.scale = state.scale
+        self.board = state.board
         self.state.pop(-1)
         self.update_view()
 
@@ -371,6 +375,7 @@ class FabianBoard(Board):
         state.show_node_number = self.show_node_number
         state.show_net = self.show_net
         state.scale = self.scale
+        state.board = self.board
         self.state.append(state)
 
     def mouse_1_pressed(self, key):
@@ -393,8 +398,8 @@ class FabianBoard(Board):
             p2 = node_2.p
             d, p = self.get_distance_from_line_and_nearest_point(Point(x, y), p1, p2)
         if self.select_mode == 'edge':
-            d1 = p1.get_distance_from_point(Point(x, y))
-            d2 = p2.get_distance_from_point(Point(x, y))
+            d1 = p1.get_distance_to_point(Point(x, y))
+            d2 = p2.get_distance_to_point(Point(x, y))
             p = p2
             if d1 < d2:
                 p = p1
@@ -717,7 +722,7 @@ class FabianBoard(Board):
     def get_split_line_points(self, p1, p2, n=gv.default_split_parts):
         point_list = [p1]
         alfa = p1.get_alfa_to(p2) * math.pi / 180
-        d = p1.get_distance_from_point(p2)
+        d = p1.get_distance_to_point(p2)
         step = d / n
         start = p1
         for m in range(n):
@@ -766,7 +771,7 @@ class FabianBoard(Board):
         # sort start and end points of all lines in list
         for i in part_list:
             line = self.net_line_list[i]
-            if self.node_list[line.end_node].p.is_smaller(self.node_list[line.start_node].p):
+            if self.node_list[line.end_node].p.is_smaller_x_smaller_y(self.node_list[line.start_node].p):
                 line.start_node, line.end_node = line.end_node, line.start_node
         first_part = part_list[0]
         line_0 = self.net_line_list[first_part]
@@ -775,7 +780,7 @@ class FabianBoard(Board):
         for i in part_list:
             line = self.net_line_list[i]
             p1 = self.node_list[line.start_node].p
-            if p1.is_smaller(p0):
+            if p1.is_smaller_x_smaller_y(p0):
                 first_part = i
                 line_0 = self.net_line_list[first_part]
         sorted_list.append(first_part)
@@ -834,7 +839,7 @@ class FabianBoard(Board):
                 ei = self.entity_list[i]
                 if ei.shape != e_0.shape:
                     return None
-                if ei.left_bottom.is_smaller(e_0.left_bottom):
+                if ei.left_bottom.is_smaller_x_smaller_y(e_0.left_bottom):
                     first_part = i
                     e_0 = self.entity_list[first_part]
             sorted_list.append(first_part)
@@ -933,7 +938,7 @@ class FabianBoard(Board):
                 start_angle = end_angle
         elif e.shape == 'LINE':
             alfa = e.start.get_alfa_to(e.end)*math.pi/180
-            d = e.start.get_distance_from_point(e.end)
+            d = e.start.get_distance_to_point(e.end)
             step = d/n
             start = e.start
             for m in range(n):
@@ -1231,7 +1236,7 @@ class FabianBoard(Board):
         self.hide_progress_bar()
 
     def mark_outer_lines(self):
-        n = self.get_left_bottom_node()
+        n = self.get_bottom_left_node()
         nodes_outer_list = [n]
         alfa = 0
         line = AttachedLine()
@@ -1555,6 +1560,8 @@ class FabianBoard(Board):
             self.convert_doc_to_entity_list(doc)
             self.center_view()
             self.set_initial_net()
+            # remove me
+            self.set_longitude()
             print(f'{len(self.entity_list)} Entities in {filetype} file')
             d_list = self.get_duplicated_entities()
             self.hide_text_on_screen()
@@ -1614,37 +1621,117 @@ class FabianBoard(Board):
         else:
             self.set_screen_position(x, y)
 
-    # return x, y of center in canvas coordinates
-    def get_center(self):
-        if len(self.entity_list) == 0:
-            return self.center.x, self.center.y
-        left = self.entity_list[0].left_bottom.x
-        right = self.entity_list[0].right_up.x
-        top = self.entity_list[0].right_up.y
-        bottom = self.entity_list[0].left_bottom.y
-        for e in self.entity_list:
-            if e.left_bottom.x < left:
-                left = e.left_bottom.x
-            if e.left_bottom.y < bottom:
-                bottom = e.left_bottom.y
-            if e.right_up.x > right:
-                right = e.right_up.x
-            if e.right_up.y > top:
-                top = e.right_up.y
-        x, y = self.convert_xy_to_screen((left+right)/2, (bottom+top)/2)
+    # return x, y of center in canvas coordinates (default), or dxf coordinates, by entities (default) or nodes
+    def get_center(self, canvas_coordinates=True, by_nodes=False):
+        if by_nodes:
+            if len(self.node_list) < 2:
+                left = right = bottom = top = 0
+            else:
+                left = right = self.node_list[1].p.x
+                bottom = top = self.node_list[1].p.x
+                for i in range(1, len(self.node_list)):
+                    n = self.node_list[i]
+                    if n.p.x < left:
+                        left = n.p.x
+                    elif n.p.x > right:
+                        right = n.p.x
+                    if n.p.y < bottom:
+                        bottom = n.p.y
+                    elif n.p.y > top:
+                        top = n.p.y
+        # by entities
+        else:
+            if len(self.entity_list) == 0:
+                left = right = bottom = top = 0
+            else:
+                left = self.entity_list[0].left_bottom.x
+                right = self.entity_list[0].right_up.x
+                top = self.entity_list[0].right_up.y
+                bottom = self.entity_list[0].left_bottom.y
+                for e in self.entity_list:
+                    if e.left_bottom.x < left:
+                        left = e.left_bottom.x
+                    if e.left_bottom.y < bottom:
+                        bottom = e.left_bottom.y
+                    if e.right_up.x > right:
+                        right = e.right_up.x
+                    if e.right_up.y > top:
+                        top = e.right_up.y
+        x, y = (left+right)/2, (bottom+top)/2
+        if canvas_coordinates:
+            x, y = self.convert_xy_to_screen(x, y)
         return x, y
 
-    def get_left_bottom_node(self, by_x=False):
+    def set_longitude(self):
+        if len(self.node_list) < 2:
+            return None
+        shape = None
+        longest_line = 0
+        longitude_line = None
+        x, y = self.get_center(canvas_coordinates=False, by_nodes=True)
+        c = Point(x, y)
+        left_top = bottom_left = right_bottom = top_right = 0
+        d_left_top = d_bottom_left = d_right_bottom = d_top_right = 0
+        for e in self.entity_list:
+            if e.shape == 'LINE' or e.shape == 'ARC':
+                d_line = e.start.get_distance_to_point(e.end)
+                if d_line > longest_line:
+                    longest_line = d_line
+                    longitude_line = e.left_bottom.get_alfa_to(e.right_up)
+                    shape = e.shape
+        for n in self.node_list:
+            angle = c.get_alfa_to(n.p)
+            d = c.get_distance_to_point(n.p)
+            if 0 < angle <= 90 and d > d_top_right:
+                d_top_right = d
+                top_right = n.p
+            elif 90 < angle <= 180 and d > d_left_top:
+                d_left_top = d
+                left_top = n.p
+            elif 180 < angle <= 270 and d > d_bottom_left:
+                d_bottom_left = d
+                bottom_left = n.p
+            elif (angle == 0 or 270 < angle <= 360) and d > d_right_bottom:
+                d_right_bottom = d
+                right_bottom = n.p
+        d_corners = 0
+        longitude_corners = 0
+        d = left_top.get_distance_to_point(bottom_left)
+        angle = left_top.get_alfa_to(bottom_left)
+        if d > d_corners:
+            d_corners = d
+            longitude_corners = angle
+        d = bottom_left.get_distance_to_point(right_bottom)
+        angle = bottom_left.get_alfa_to(right_bottom)
+        if d > d_corners:
+            d_corners = d
+            longitude_corners = angle
+        d = right_bottom.get_distance_to_point(top_right)
+        angle = right_bottom.get_alfa_to(top_right)
+        if d > d_corners:
+            d_corners = d
+            longitude_corners = angle
+        d = top_right.get_distance_to_point(left_top)
+        angle = top_right.get_alfa_to(left_top)
+        if d > d_corners:
+            d_corners = d
+            longitude_corners = angle
+        # debug
+        print(f'longitude corners: {longitude_corners}   left_top: {left_top.convert_into_tuple()}   bottom_left: {bottom_left.convert_into_tuple()}   '
+              f'right_bottom: {right_bottom.convert_into_tuple()}   top_right: {top_right.convert_into_tuple()}')
+        print(f'longest - {shape}   d: {longest_line}   longitude: {longitude_line}\n')
+        return longitude_line
+
+    def get_bottom_left_node(self):
         if len(self.node_list) < 2:
             return 0
         node = 1
         p = self.node_list[node].p
         for i in range(1, len(self.node_list)):
-            if self.node_list[i].p.is_smaller(p, by_x):
+            if self.node_list[i].p.is_smaller_x_smaller_y(p, by_x=False):
                 p = self.node_list[i].p
                 node = i
         return node
-
 
     def mark_selected_entity(self):
         if self.selected_part_mark is None:
@@ -1832,7 +1919,7 @@ class FabianBoard(Board):
         d = None
         nearest_point = None
         if e.shape == 'CIRCLE':
-            d = math.fabs(e.center.get_distance_from_point(p)-e.radius)
+            d = math.fabs(e.center.get_distance_to_point(p)-e.radius)
             alfa = e.center.get_alfa_to(p)*math.pi/180
             if alfa is None:
                 d = e.radius
@@ -1848,7 +1935,7 @@ class FabianBoard(Board):
             if e.arc_end_angle > 360 and alfa < e.arc_start_angle:
                 alfa += 360
             if e.arc_start_angle <= alfa <= e.arc_end_angle:
-                d = math.fabs(e.center.get_distance_from_point(p) - e.radius)
+                d = math.fabs(e.center.get_distance_to_point(p) - e.radius)
                 alfa = alfa*math.pi/180
                 px = e.center.x + math.cos(alfa) * e.radius
                 py = e.center.y + math.sin(alfa) * e.radius
@@ -1859,10 +1946,10 @@ class FabianBoard(Board):
                     mid_angle += 360
                 a1 = (mid_angle-180)
                 if a1 < alfa < mid_angle:
-                    d = e.start.get_distance_from_point(p)
+                    d = e.start.get_distance_to_point(p)
                     nearest_point = e.start
                 else:
-                    d = e.end.get_distance_from_point(p)
+                    d = e.end.get_distance_to_point(p)
                     nearest_point = e.end
         elif e.shape == 'LINE':
             d, nearest_point = self.get_distance_from_line_and_nearest_point(p, e.start, e.end)
@@ -1880,10 +1967,10 @@ class FabianBoard(Board):
             py = math.sin(alfa)*x+line_start.y
             nearest_point = Point(px, py)
         elif x < 0:
-            d = p.get_distance_from_point(Point(0, 0))
+            d = p.get_distance_to_point(Point(0, 0))
             nearest_point = line_start
         else:
-            d = p.get_distance_from_point(Point(endx, 0))
+            d = p.get_distance_to_point(Point(endx, 0))
             nearest_point = line_end
         return round(d, gv.accuracy), nearest_point
 
@@ -2009,6 +2096,7 @@ class FabianBoard(Board):
         if keep_state:
             self.keep_state()
         self.hide_all_net_lines()
+        self.hide_all_elements()
         self.net_line_list = []
 
     def set_all_dxf_entities_color(self, color):
