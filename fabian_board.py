@@ -1333,7 +1333,7 @@ class FabianBoard(Board):
             self.convert_doc_to_entity_list(doc)
             self.center_view()
             self.set_initial_net()
-            print(f'{len(self.entity_list)} Entities in {filetype} file')
+            print(f'\n{len(self.entity_list)} Entities in {filetype} file')
             d_list = self.get_duplicated_entities()
             self.hide_text_on_screen()
             if len(d_list) > 0:
@@ -1347,6 +1347,7 @@ class FabianBoard(Board):
                 print('no duplicated entities')
             self.change_work_mode('dxf')
         elif filetype == 'json':
+            print('\nnew data file')
             data = self.load_json(filename=filename)
             self.node_list = []
             entity_list = data.get("entity_list")
