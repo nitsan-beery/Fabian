@@ -359,7 +359,7 @@ class FabianBoard(Board):
             menu.add_command(label="remove line", command=self.remove_temp_line)
             menu.add_separator()
         if self.selected_part is not None:
-            menu.add_command(label="split", command=self.split)
+            menu.add_command(label="split", command=self.split_selected_part)
             menu.add_command(label="delete", command=self.remove_selected_part_from_list)
             if self.work_mode == gv.work_mode_dxf:
                 menu.add_command(label="unmark", command=self.unmark_selected_entity)
@@ -421,6 +421,7 @@ class FabianBoard(Board):
         elif mode.lower() == gv.work_mode_inp:
             self.split_all_circles_by_longitude()
             self.set_initial_net()
+            self.split_all_arcs_for_inp()
             tmp_list = self.get_unattached_nodes(True)
             if len(tmp_list) == 0:
                 print('no unattached nodes')
@@ -673,7 +674,7 @@ class FabianBoard(Board):
         '''
         return False
 
-    def split(self, n=gv.default_split_parts):
+    def split_selected_part(self, n=gv.default_split_parts):
         self.keep_state()
         if self.selected_part is None:
             return
@@ -681,7 +682,7 @@ class FabianBoard(Board):
         if self.selected_part.part_type == gv.part_type_entity and self.work_mode == gv.work_mode_dxf:
             changed = self.split_entity(part, n)
         else:
-            changed = self.split_net_line(part, n)
+            changed = self.split_net_line(self.selected_part, n)
         self.update_view()
         if changed:
             self.remove_selected_part_mark()
@@ -712,6 +713,8 @@ class FabianBoard(Board):
 
     # split entity_list[i] into n parts
     def split_entity(self, part=0, n=gv.default_split_parts):
+        if self.selected_part is None:
+            return False
         if self.selected_part.part_type != gv.part_type_entity:
             return False
         e = self.entity_list[part]
@@ -744,6 +747,35 @@ class FabianBoard(Board):
             self.show_entity(-1)
         return True
 
+    def split_all_arcs_for_inp(self):
+        bottom_left = self.get_bottom_left_node()
+        bottom_left = self.node_list[bottom_left].p
+        top_right = self.get_top_right_node()
+        top_right = self.node_list[top_right].p
+        d_dxf = bottom_left.get_distance_to_point(top_right)
+        i = len(self.entity_list) - 1
+        while i >= 0:
+            e = self.entity_list[i]
+            if e.shape == 'CIRCLE':
+                continue
+            n = n_length = 0
+            part = SelectedPart(gv.part_type_entity, i)
+            d = e.start.get_distance_to_point(e.end)
+            relative_length = d / d_dxf
+            if e.shape == 'ARC':
+                angle = e.arc_end_angle - e.arc_start_angle
+                n = round(angle/gv.max_arc_angle_for_net_line)
+                if relative_length > gv.max_arc_length_for_net_line:
+                    n_length = round(d / gv.max_arc_length_for_net_line)
+            elif e.shape == 'LINE':
+                if relative_length > gv.max_line_length_for_net_line:
+                    n_length = round(d / gv.max_line_length_for_net_line)
+            if n_length > n:
+                n = n_length
+            if n > 1:
+                self.split_net_line(part, n)
+            i -= 1
+
     def split_all_circles_by_longitude(self, n=gv.default_split_circle_parts):
         longitude = self.get_longitude()
         i = len(self.entity_list) - 1
@@ -769,15 +801,15 @@ class FabianBoard(Board):
             start_angle = end_angle
         self.remove_parts_from_list([part], gv.part_list_entities)
 
-    def split_net_line(self, part=0, n=gv.default_split_parts):
+    def split_net_line(self, part, n=gv.default_split_parts):
         # debug
         # print(f'selected part: {self.selected_part}   Entity: {part}')
         if self.work_mode != gv.work_mode_inp:
             return False
         # split net line not on entity
-        if self.selected_part.part_type == gv.part_type_net_line:
+        if part.part_type == gv.part_type_net_line:
             new_lines = []
-            line = self.net_line_list[part]
+            line = self.net_line_list[part.index]
             node1 = self.node_list[line.start_node]
             node2 = self.node_list[line.end_node]
             new_points = self.get_split_line_points(node1.p, node2.p, n)
@@ -787,17 +819,17 @@ class FabianBoard(Board):
                 end_node = self.add_node_to_node_list(new_node)
                 new_lines.append(NetLine(start_node, end_node, None))
                 start_node = end_node
-            self.remove_parts_from_list([part], gv.part_list_net_lines)
+            self.remove_parts_from_list([part.index], gv.part_list_net_lines)
             for j in range(len(new_lines)):
                 self.net_line_list.append(new_lines[j])
-        elif self.selected_part.part_type == gv.part_type_entity:
-            net_lines = self.get_lines_attached_to_entity(part)
+        elif part.part_type == gv.part_type_entity:
+            net_lines = self.get_lines_attached_to_entity(part.index)
             if len(net_lines) < 1:
                 # fix me
                 return False
             new_lines = []
             n = n * len(net_lines)
-            new_points = self.get_split_entity_points(part, n)
+            new_points = self.get_split_entity_points(part.index, n)
             line = self.net_line_list[net_lines[0]]
             entity = line.entity
             entity_nodes_list = self.entity_list[entity].nodes_list
@@ -1511,6 +1543,17 @@ class FabianBoard(Board):
                 node = i
         return node
 
+    def get_top_right_node(self):
+        if len(self.node_list) < 2:
+            return 0
+        node = 1
+        p = self.node_list[node].p
+        for i in range(1, len(self.node_list)):
+            if p.is_smaller_x_smaller_y(self.node_list[i].p, by_x=False):
+                p = self.node_list[i].p
+                node = i
+        return node
+
     def mark_selected_entity(self):
         if self.selected_part is None:
             return
@@ -1615,10 +1658,10 @@ class FabianBoard(Board):
             return
         s_part_1 = self.new_line_original_part[0]
         s_part_2 = self.new_line_original_part[1]
-        entity_2 = self.entity_list[s_part_2.index]
         self.keep_state()
         if self.work_mode == gv.work_mode_dxf:
             if self.mouse_select_mode == gv.mouse_select_mode_point:
+                entity_2 = self.entity_list[s_part_2.index]
                 self.split_entity_by_point(s_part_1, p1)
                 new_s_part_2_index = self.get_index_of_entity(entity_2)
                 s_part_2.index = new_s_part_2_index

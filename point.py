@@ -81,10 +81,10 @@ class Point:
 
 # return new coordinates of Point p relative to Point new00 with rotation_angle
 def get_shifted_point(p, new00, rotation_angle):
+    if p.is_equal(new00):
+        return p
     shifted_p = Point(p.x - new00.x, p.y - new00.y)
     r = shifted_p.get_distance_to_point(Point(0, 0))
-    if r == 0:
-        return shifted_p
     alfa = Point(0, 0).get_alfa_to(shifted_p) + rotation_angle
     alfa = alfa*math.pi/180
     shifted_p.x = math.cos(alfa)*r
