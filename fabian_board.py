@@ -419,6 +419,7 @@ class FabianBoard(Board):
             self.choose_mark_option(gv.mark_option_mark)
             self.set_all_dxf_entities_color(gv.default_color)
         elif mode.lower() == gv.work_mode_inp:
+            self.split_all_circles_by_longitude()
             self.set_initial_net()
             tmp_list = self.get_unattached_nodes(True)
             if len(tmp_list) == 0:
@@ -745,10 +746,12 @@ class FabianBoard(Board):
 
     def split_all_circles_by_longitude(self, n=gv.default_split_circle_parts):
         longitude = self.get_longitude()
-        for i in range(len(self.entity_list)):
+        i = len(self.entity_list) - 1
+        while i >= 0:
             e = self.entity_list[i]
             if e.shape == 'CIRCLE':
                 self.split_circle_by_longitude(i, longitude, n)
+            i -= 1
 
     def split_circle_by_longitude(self, part, longitude=None, n=gv.default_split_circle_parts):
         if len(self.entity_list) < (part + 1):
@@ -756,7 +759,8 @@ class FabianBoard(Board):
         e = self.entity_list[part]
         if e.shape != 'CIRCLE':
             return
-        if longitude is None:
+        start_angle = longitude
+        if start_angle is None:
             start_angle = self.get_longitude()
         for i in range(n):
             end_angle = start_angle + (360/n)

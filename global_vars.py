@@ -7,6 +7,9 @@ BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
 max_nodes_to_create_element = 4
 
+default_split_parts = 2
+default_split_circle_parts = 12
+
 accuracy = 3
 angle_diff_accuracy = 1
 min_angle_to_create_element = 20
@@ -34,9 +37,6 @@ default_work_mode = work_mode_dxf
 default_select_parts_mode = part_type_entity
 default_mark_option = mark_option_mark
 default_show_node_number = False
-
-default_split_parts = 2
-default_split_circle_parts = 4
 
 edge_line_mark_radius = 5
 node_mark_radius = 3
