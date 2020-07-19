@@ -54,7 +54,7 @@ class FabianBoard(Board):
         self.board.bind('<ButtonRelease-1>', self.mouse_1_released)
         self.board.bind('<Button-3>', self.mouse_3_pressed)
 
-    def reset_board(self, empty_node_list=False, center_screen_position=True):
+    def reset_board(self, empty_node_list=False, center_screen_position=True, reset_state=True):
         self.board.delete('all')
         if center_screen_position:
             self.set_screen_position(self.center.x, self.center.y)
@@ -79,12 +79,14 @@ class FabianBoard(Board):
         self.temp_rect_start_point = None
         self.temp_rect_mark = None
         self.progress_bar = None
+        if reset_state:
+            self.state = []
 
     def resume_state(self):
         if len(self.state) < 1:
             return
         state = self.state[-1]
-        self.reset_board(empty_node_list=True, center_screen_position=False)
+        self.reset_board(empty_node_list=True, center_screen_position=False, reset_state=False)
         for t in state.entity_list:
             e = Entity()
             e.get_data_from_tuple(t)
@@ -421,7 +423,7 @@ class FabianBoard(Board):
         elif mode.lower() == gv.work_mode_inp:
             self.split_all_circles_by_longitude()
             self.set_initial_net()
-            self.split_all_arcs_for_inp()
+            self.split_arcs_and_lines_for_inp()
             tmp_list = self.get_unattached_nodes(True)
             if len(tmp_list) == 0:
                 print('no unattached nodes')
@@ -747,7 +749,7 @@ class FabianBoard(Board):
             self.show_entity(-1)
         return True
 
-    def split_all_arcs_for_inp(self):
+    def split_arcs_and_lines_for_inp(self):
         bottom_left = self.get_bottom_left_node()
         bottom_left = self.node_list[bottom_left].p
         top_right = self.get_top_right_node()
@@ -766,10 +768,10 @@ class FabianBoard(Board):
                 angle = e.arc_end_angle - e.arc_start_angle
                 n = round(angle/gv.max_arc_angle_for_net_line)
                 if relative_length > gv.max_arc_length_for_net_line:
-                    n_length = round(d / gv.max_arc_length_for_net_line)
+                    n_length = round(relative_length / gv.max_arc_length_for_net_line)
             elif e.shape == 'LINE':
                 if relative_length > gv.max_line_length_for_net_line:
-                    n_length = round(d / gv.max_line_length_for_net_line)
+                    n_length = round(relative_length / gv.max_line_length_for_net_line)
             if n_length > n:
                 n = n_length
             if n > 1:
@@ -1651,13 +1653,19 @@ class FabianBoard(Board):
             self.new_line_original_part[0] = None
             self.board.delete(self.temp_line_mark)
 
-    def add_line(self):
-        p1 = self.new_line_edge[0]
-        p2 = self.new_line_edge[1]
+    # add line from p1 to p2. s_part_1 and 2 holds part type (entity or net_line) and index un list
+    # by default the line to add is the line created by user selected points
+    def add_line(self, p1=None, p2=None, s_part_1=None, s_part_2=None):
+        if p1 is None:
+            p1 = self.new_line_edge[0]
+        if p2 is None:
+            p2 = self.new_line_edge[1]
         if p2 is None:
             return
-        s_part_1 = self.new_line_original_part[0]
-        s_part_2 = self.new_line_original_part[1]
+        if s_part_1 is None:
+            s_part_1 = self.new_line_original_part[0]
+        if s_part_2 is None:
+            s_part_2 = self.new_line_original_part[1]
         self.keep_state()
         if self.work_mode == gv.work_mode_dxf:
             if self.mouse_select_mode == gv.mouse_select_mode_point:
