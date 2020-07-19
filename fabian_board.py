@@ -1346,8 +1346,6 @@ class FabianBoard(Board):
         if filetype == 'dxf':
             doc = ezdxf.readfile(filename)
             self.convert_doc_to_entity_list(doc)
-            self.center_view()
-            self.set_initial_net()
             print(f'\n{len(self.entity_list)} Entities in {filetype} file')
             d_list = self.get_duplicated_entities()
             self.hide_text_on_screen()
@@ -1360,6 +1358,7 @@ class FabianBoard(Board):
             else:
                 # debug
                 print('no duplicated entities')
+            self.center_view(True)
             self.change_work_mode('dxf')
         elif filetype == 'json':
             print('\nnew data file')
@@ -1400,16 +1399,22 @@ class FabianBoard(Board):
         #self.print_node_list()
         #self.print_line_list()
 
-    def center_view(self):
+    def set_scale(self, left, right):
+        object_width = right - left
+        window_width = self.window_main.winfo_width()
+        self.scale = window_width/(object_width*2.5)
+
+    def center_view(self, set_scale=False):
         self.hide_text_on_screen()
-        x, y = self.get_center()
+        x, y = self.get_center(set_scale=set_scale)
         if x is None:
             self.set_screen_position(self.center.x, self.center.y)
         else:
             self.set_screen_position(x, y)
 
     # return x, y of center in canvas coordinates (default), or dxf coordinates, by entities (default) or nodes
-    def get_center(self, canvas_coordinates=True, by_nodes=False):
+    # left and right edges in dxf (xy) coordinates
+    def get_center(self, canvas_coordinates=True, by_nodes=False, set_scale=False):
         if by_nodes:
             if len(self.node_list) < 2:
                 left = right = bottom = top = 0
@@ -1445,6 +1450,8 @@ class FabianBoard(Board):
                     if e.right_up.y > top:
                         top = e.right_up.y
         x, y = (left+right)/2, (bottom+top)/2
+        if set_scale:
+            self.set_scale(left, right)
         if canvas_coordinates:
             x, y = self.convert_xy_to_screen(x, y)
         return x, y
