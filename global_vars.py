@@ -13,13 +13,30 @@ min_angle_to_create_element = 20
 max_angle_to_create_element = 160
 max_state_stack = 100
 
-default_mouse_select_mode = 'edge'
-default_work_mode = 'dxf'
-default_select_parts_mode = 'entity'
-default_mark_option = 'mark'
+mouse_select_mode_edge = 'edge'
+mouse_select_mode_point = 'point'
+work_mode_dxf = 'dxf'
+work_mode_inp = 'inp'
+part_type_entity = 'entity'
+part_type_net_line = 'net_line'
+mark_option_mark = 'mark'
+mark_option_unmark = 'unmark'
+mark_option_invert = 'invert'
+part_list_entities = 'entities'
+part_list_net_lines = 'net_lines'
+part_list_nodes = 'nodes'
+show_mode = 'show'
+hide_mode = 'hide'
+clear_mode = 'clear'
+
+default_mouse_select_mode = mouse_select_mode_edge
+default_work_mode = work_mode_dxf
+default_select_parts_mode = part_type_entity
+default_mark_option = mark_option_mark
 default_show_node_number = False
 
 default_split_parts = 2
+default_split_circle_parts = 4
 
 edge_line_mark_radius = 5
 node_mark_radius = 3
