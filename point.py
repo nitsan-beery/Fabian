@@ -1,5 +1,6 @@
 import math
 import global_vars as gv
+from operator import itemgetter
 
 
 class Point:
@@ -82,7 +83,7 @@ class Point:
 # return new coordinates of Point p relative to Point new00 with rotation_angle
 def get_shifted_point(p, new00, rotation_angle):
     if p.is_equal(new00):
-        return p
+        return Point(0, 0)
     shifted_p = Point(p.x - new00.x, p.y - new00.y)
     r = shifted_p.get_distance_to_point(Point(0, 0))
     alfa = Point(0, 0).get_alfa_to(shifted_p) + rotation_angle
@@ -116,4 +117,15 @@ def get_sorted_points(p1, p2, sort_by_x=True):
                 return p1, p2
             else:
                 return p2, p1
+
+def sort_list_point_by_distance_from_p(point_list, p):
+    sorted_list = []
+    d_list = []
+    for point in point_list:
+        d = point.get_distance_to_point(p)
+        d_list.append((point, d))
+    d_list = sorted(d_list, key=itemgetter(1))
+    for item in d_list:
+        sorted_list.append(item[0])
+    return sorted_list
 

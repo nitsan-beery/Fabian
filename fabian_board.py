@@ -803,6 +803,15 @@ class FabianBoard(Board):
             start_angle = end_angle
         self.remove_parts_from_list([part], gv.part_list_entities)
 
+    def split_net_line_by_point(self, part, p):
+        new_lines = []
+        line = self.net_line_list[part]
+        new_node = Node(p, entity=None)
+        new_node_index = self.add_node_to_node_list(new_node)
+        new_lines.append(NetLine(line.start_node, new_node_index, None))
+        new_lines.append(NetLine(new_node_index, line.end_node, None))
+        self.remove_parts_from_list([part], gv.part_list_net_lines)
+
     def split_net_line(self, part, n=gv.default_split_parts):
         # debug
         # print(f'selected part: {self.selected_part}   Entity: {part}')
@@ -847,6 +856,42 @@ class FabianBoard(Board):
             for j in range(len(new_lines)):
                 self.net_line_list.append(new_lines[j])
         return True
+
+    # return all net lines crossed by line from p1 to p2
+    # each line is tupled with mutual cross point
+    def get_crossed_net_lines(self, p1, p2):
+        net_lines_list = []
+        if p1 is None or p2 is None:
+            return net_lines_list
+        for i in range(len(self.net_line_list)):
+            p = self.get_mutual_point_of_net_line_with_crossing_line(i, p1, p2)
+            if p is not None:
+                net_lines_list.append((i, p))
+        return net_lines_list
+
+    # return mutual point of self.net_line_list[net_line] with crossing line p1-p2, None if there isn't
+    def get_mutual_point_of_net_line_with_crossing_line(self, net_line, p1, p2):
+        net_line = self.net_line_list[net_line]
+        start_node = self.node_list[net_line.start_node]
+        end_node = self.node_list[net_line.end_node]
+        angle = -start_node.p.get_alfa_to(end_node.p)
+        line_end = get_shifted_point(end_node.p, start_node.p, angle)
+        p1 = get_shifted_point(p1, start_node.p, angle)
+        p2 = get_shifted_point(p2, start_node.p, angle)
+        if p1.y == p2.y:
+            return None
+        # x = where line p1-p2 crosses x axe
+        x = p2.x - p2.y * (p2.x - p1.x) / (p2.y - p1.y)
+        accuracy = math.pow(10, -gv.accuracy)
+        if x-accuracy <= 0 or x+accuracy >= line_end.x:
+            return None
+        if p1.y * p2.y > 0:
+            return None
+        mutual_point = Point(x, 0)
+        mutual_point = get_shifted_point(mutual_point, Point(0, 0), -angle)
+        mutual_point.x += start_node.p.x
+        mutual_point.y += start_node.p.y
+        return mutual_point
 
     # return list of marked parts is list
     def get_marked_parts(self, list_name):
@@ -1676,8 +1721,24 @@ class FabianBoard(Board):
                 self.split_entity_by_point(s_part_2, p2)
             self.add_line_to_entity_list(p1, p2)
         elif self.work_mode == gv.work_mode_inp:
-            self.add_line_to_net_list(p1, p2)
+            crossing_lines = self.get_crossed_net_lines(p1, p2)
+            new_points = [p1, p2]
+            i = len(crossing_lines) - 1
+            while i >= 0:
+                pair = crossing_lines[i]
+                line = pair[0]
+                s_part = SelectedPart(gv.part_type_net_line, line)
+                self.split_net_line(s_part, 2)
+                new_points.append(self.node_list[-1].p)
+                i -= 1
+            new_points = sort_list_point_by_distance_from_p(new_points, p1)
+            start_point = new_points[0]
+            for i in range(1, len(new_points)):
+                end_point = new_points[i]
+                self.add_line_to_net_list(start_point, end_point)
+                start_point = end_point
         self.remove_temp_line()
+        self.update_view()
         
     def get_index_of_entity(self, entity):
         for i in range(len(self.entity_list)):
