@@ -362,6 +362,7 @@ class FabianBoard(Board):
             menu.add_separator()
         if self.selected_part is not None:
             menu.add_command(label="split", command=self.split_selected_part)
+            menu.add_command(label="merge", command=self.merge)
             menu.add_command(label="delete", command=self.remove_selected_part_from_list)
             if self.work_mode == gv.work_mode_dxf:
                 menu.add_command(label="unmark", command=self.unmark_selected_entity)
@@ -516,9 +517,9 @@ class FabianBoard(Board):
 
     def merge(self):
         self.keep_state()
-        if self.work_mode == gv.work_mode_dxf:
+        if self.select_parts_mode == gv.part_type_entity:
             changed = self.merge_entities()
-        elif self.work_mode == gv.work_mode_inp:
+        elif self.select_parts_mode == gv.part_type_net_line:
             changed = self.merge_net_lines()
         if not changed:
             self.state.pop(-1)
@@ -627,24 +628,48 @@ class FabianBoard(Board):
         return sorted_list
 
     def merge_entities(self):
-        if self.work_mode != gv.work_mode_dxf:
-            return False
-        e_list = self.get_marked_parts(gv.part_list_entities)
-        if len(e_list) < 2:
-            return False
-        e_list = self.sort_entity_parts(e_list)
-        if e_list is None:
-            m = "can't merge strange entities"
-            messagebox.showwarning(m)
-            return False
-        e_start = self.entity_list[e_list[0]]
-        e_end = self.entity_list[e_list[-1]]
-        new_entity = Entity(shape=e_start.shape, center=e_start.center, radius=e_start.radius, start=e_start.start,
-                            end=e_end.end, start_angle=e_start.arc_start_angle, end_angle=e_end.arc_end_angle)
-        self.remove_parts_from_list(e_list, gv.part_list_entities)
-        self.entity_list.append(new_entity)
-        self.show_entity(-1)
-        return True
+        if self.work_mode == gv.work_mode_dxf:
+            e_list = self.get_marked_parts(gv.part_list_entities)
+            if len(e_list) < 2:
+                return False
+            e_list = self.sort_entity_parts(e_list)
+            if e_list is None:
+                m = "can't merge strange entities"
+                messagebox.showwarning(m)
+                return False
+            e_start = self.entity_list[e_list[0]]
+            e_end = self.entity_list[e_list[-1]]
+            new_entity = Entity(shape=e_start.shape, center=e_start.center, radius=e_start.radius, start=e_start.start,
+                                end=e_end.end, start_angle=e_start.arc_start_angle, end_angle=e_end.arc_end_angle)
+            self.remove_parts_from_list(e_list, gv.part_list_entities)
+            self.entity_list.append(new_entity)
+            self.show_entity(-1)
+            return True
+        # work mode inp
+        else:
+            if self.selected_part is None or self.selected_part.part_type != gv.part_type_entity:
+                return False
+            entity = self.entity_list[self.selected_part.index]
+            if len(entity.nodes_list) < 3:
+                return False
+            removed_nodes = []
+            removed_net_lines = []
+            for i in range(1, len(entity.nodes_list) - 1):
+                n = entity.nodes_list[i]
+                node = self.node_list[n]
+                removed_nodes.append(n)
+                self.set_lines_attached_to_node(n)
+                for al in node.attached_lines:
+                    removed_net_lines.append(al.line_index)
+            start_node = entity.nodes_list[0]
+            end_node = entity.nodes_list[-1]
+            entity.nodes_list = [start_node, end_node]
+            p1 = self.node_list[start_node].p
+            p2 = self.node_list[end_node].p
+            self.add_line_to_net_list(p1, p2)
+            self.net_line_list[-1].entity = self.selected_part.index
+            self.remove_parts_from_list(removed_net_lines, gv.part_list_net_lines)
+            self.remove_parts_from_list(removed_nodes, gv.part_list_nodes)
 
     def merge_net_lines(self):
         if self.work_mode != gv.work_mode_inp:
@@ -941,6 +966,8 @@ class FabianBoard(Board):
             original_list = self.net_line_list
         elif list_name == gv.part_list_nodes:
             original_list = self.node_list
+        # remove duplicate parts from list
+        part_list = list(dict.fromkeys(part_list))
         part_list = sorted(part_list, reverse=True)
         for part in part_list:
             if part is None:
