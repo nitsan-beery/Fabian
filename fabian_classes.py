@@ -1,5 +1,6 @@
 from point import *
-
+import tkinter as tk
+from tkinter import ttk
 
 shapes = {'CIRCLE', 'LINE', 'ARC'}
 
@@ -236,5 +237,105 @@ class FabianState:
         self.show_net = True
         self.scale = None
         self.board = None
+
+
+split_choices_list = ['n parts evenly', '2 different parts', '3 parts different middle part']
+
+split_mode_dictionary = {
+    split_choices_list[0]: gv.split_mode_evenly_n_parts,
+    split_choices_list[1]: gv.split_mode_2_parts_percentage_left,
+    split_choices_list[2]: gv.split_mode_3_parts_percentage_middle
+}
+
+class SplitDialog(object):
+    def __init__(self, parent):
+        self.window = tk.Toplevel(parent)
+        self.window.title(' Choose')
+        self.window.geometry('250x160')
+        self.window.resizable(0, 0)
+
+        self.frame_1 = tk.Frame(self.window)
+        self.frame_1.pack(side=tk.TOP, fill=tk.BOTH, pady=5)
+        self.frame_2 = tk.Frame(self.window)
+        self.frame_2.pack(side=tk.TOP, fill=tk.BOTH, ipady=6)
+        self.frame_3 = tk.Frame(self.window)
+        self.frame_3.pack(side=tk.BOTTOM, fill=tk.BOTH, ipady=0)
+
+        self.label_mode = tk.Label(self.frame_2, text='Split mode', padx=10)
+        self.label_arg = tk.Label(self.frame_2, width=5, text='n', padx=7)
+
+        self.label_mode.grid(row=0, column=0, sticky='w')
+        self.label_arg.grid(row=0, column=1)
+
+        self.split_choice_menu = ttk.Combobox(self.frame_2, width=25, values=split_choices_list)
+        self.entry_arg = tk.Entry(self.frame_2, width=3)
+        self.split_choice_menu.grid(row=1, column=0, padx=10, pady=5)
+        self.entry_arg.grid(row=1, column=1)
+
+        button_ok = tk.Button(self.frame_3, text="OK", width=5, command=self.get_choice)
+        button_cancel = tk.Button(self.frame_3, text="Cancel", width=5, command=self.window.destroy)
+        button_ok.pack(side=tk.RIGHT, padx=5, pady=5)
+        button_cancel.pack(side=tk.LEFT, padx=5)
+
+        self.window.bind('<Key>', self.key)
+        self.window.lift()
+
+        # set default values
+        self.split_choice_menu.current(0)
+        self.split_choice_menu.bind("<<ComboboxSelected>>", self.mode_selected)
+        self.entry_arg.insert(0, '2')
+        self.choice = None
+
+    def mode_selected(self, key):
+        split_mode = self.split_choice_menu.get()
+        if split_mode_dictionary.get(split_mode) == gv.split_mode_evenly_n_parts:
+            self.label_arg.config(text='n')
+            self.entry_arg.delete(0, tk.END)
+            self.entry_arg.insert(0, '2')
+        elif split_mode_dictionary.get(split_mode) == gv.split_mode_2_parts_percentage_left:
+            self.label_arg.config(text='% left')
+            self.entry_arg.delete(0, tk.END)
+            self.entry_arg.insert(0, '33')
+        # 3 parts
+        else:
+            self.label_arg.config(text='% middle')
+            self.entry_arg.delete(0, tk.END)
+            self.entry_arg.insert(0, '70')
+        self.entry_arg.focus_set()
+
+    def get_choice(self):
+        split_mode = split_mode_dictionary.get(self.split_choice_menu.get())
+        split_arg = self.entry_arg.get()
+        # validity check
+        min_arg = 2
+        max_arg = gv.max_split_parts
+        try:
+            split_arg = int(split_arg)
+        except ValueError:
+            print('choose a number')
+            return
+        if split_mode == gv.split_mode_2_parts_percentage_left:
+            min_arg = gv.min_split_percentage
+            max_arg = gv.max_split_side_percentage
+        elif split_mode == gv.split_mode_3_parts_percentage_middle:
+            min_arg = gv.min_split_percentage
+            max_arg = gv.max_split_middle_percentage
+        if min_arg <= split_arg <= max_arg:
+            self.choice = {
+                'split_mode': split_mode,
+                'arg': split_arg
+            }
+            self.window.destroy()
+        else:
+            print(f'Please select a valid number {min_arg}-{max_arg}')
+
+    def show(self):
+        self.window.deiconify()
+        self.window.wait_window()
+        return self.choice
+
+    def key(self, event):
+        if event.keycode == 13:
+            self.get_choice()
 
 

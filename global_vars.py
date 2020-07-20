@@ -19,6 +19,10 @@ angle_diff_accuracy = 1
 min_angle_to_create_element = 20
 max_angle_to_create_element = 160
 max_state_stack = 100
+max_split_parts = 16
+min_split_percentage = 2
+max_split_side_percentage = 100-min_split_percentage
+max_split_middle_percentage = 100-2*min_split_percentage
 
 mouse_select_mode_edge = 'edge'
 mouse_select_mode_point = 'point'
@@ -38,8 +42,7 @@ clear_mode = 'clear'
 split_mode_evenly_n_parts = 'evenly_n_parts'
 split_mode_2_parts_by_point = '2_parts_by_point'
 split_mode_2_parts_percentage_left = '2_parts_percentage_left'
-split_mode_2_parts_percentage_right = '2_parts_percentage_right'
-split_mode_3_parts_percentage_side = '3_parts_percentage_side'
+split_mode_3_parts_percentage_middle = '3_parts_percentage_middle'
 
 default_mouse_select_mode = mouse_select_mode_edge
 default_work_mode = work_mode_dxf

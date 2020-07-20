@@ -16,9 +16,11 @@ class FabianBoard(Board):
         self.button_zoom_in = tk.Button(self.frame_2, text='Zoom In', command=lambda: self.zoom(4/3))
         self.button_zoom_out = tk.Button(self.frame_2, text='Zoom Out', command=lambda: self.zoom(3/4))
         self.button_center = tk.Button(self.frame_2, text='Center view', command=lambda: self.center_view())
+        self.button_split = tk.Button(self.frame_2, text='Split window', command=lambda: self.get_split_mode_dialog())
         self.button_zoom_in.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_zoom_out.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_center.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
+        self.button_split.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.board.config(bg=gv.board_bg_color)
 
         self.entity_list = []
@@ -151,6 +153,12 @@ class FabianBoard(Board):
         state.scale = self.scale
         state.board = self.board
         self.state.append(state)
+
+    def get_split_mode_dialog(self):
+        result = SplitDialog(self.window_main).show()
+        if result is not None:
+            s = f"{result.get('split_mode')}   {result.get('arg')}"
+            print(s)
 
     def mouse_1_pressed(self, key):
         if self.temp_rect_mark is not None:
@@ -1743,7 +1751,8 @@ class FabianBoard(Board):
 
     # add line from p1 to p2. s_part_1 and s_part_2 holds part type (entity or net_line) and index in list
     # by default the line to add is the line created by user selected points
-    def add_line(self, p1=None, p2=None, s_part_1=None, s_part_2=None, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=2):
+    def add_line(self, p1=None, p2=None, s_part_1=None, s_part_2=None,
+                 split_middle_lines_mode=gv.split_mode_evenly_n_parts, split_additional_arg=2):
         if p1 is None:
             p1 = self.new_line_edge[0]
         if p2 is None:
@@ -1771,7 +1780,7 @@ class FabianBoard(Board):
                 pair = crossing_lines[i]
                 line = pair[0]
                 s_part = SelectedPart(gv.part_type_net_line, line)
-                self.split_net_line(s_part, split_mode, split_additional_arg)
+                self.split_net_line(s_part, split_middle_lines_mode, split_additional_arg)
                 new_points.append(self.node_list[-1].p)
                 i -= 1
             new_points = sort_list_point_by_distance_from_p(new_points, p1)
