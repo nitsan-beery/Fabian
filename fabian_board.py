@@ -16,11 +16,9 @@ class FabianBoard(Board):
         self.button_zoom_in = tk.Button(self.frame_2, text='Zoom In', command=lambda: self.zoom(4/3))
         self.button_zoom_out = tk.Button(self.frame_2, text='Zoom Out', command=lambda: self.zoom(3/4))
         self.button_center = tk.Button(self.frame_2, text='Center view', command=lambda: self.center_view())
-        self.button_split = tk.Button(self.frame_2, text='Split window', command=lambda: self.get_split_mode_dialog())
         self.button_zoom_in.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_zoom_out.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_center.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
-        self.button_split.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.board.config(bg=gv.board_bg_color)
 
         self.entity_list = []
@@ -153,12 +151,6 @@ class FabianBoard(Board):
         state.scale = self.scale
         state.board = self.board
         self.state.append(state)
-
-    def get_split_mode_dialog(self):
-        result = SplitDialog(self.window_main).show()
-        if result is not None:
-            s = f"{result.get('split_mode')}   {result.get('arg')}"
-            print(s)
 
     def mouse_1_pressed(self, key):
         if self.temp_rect_mark is not None:
@@ -369,7 +361,8 @@ class FabianBoard(Board):
             menu.add_command(label="remove line", command=self.remove_temp_line)
             menu.add_separator()
         if self.selected_part is not None:
-            menu.add_command(label="split", command=self.split_selected_part)
+            menu.add_command(label="split", command=lambda: self.split_selected_part(gv.split_mode_evenly_n_parts))
+            menu.add_command(label="split...", command=lambda: self.split_selected_part())
             menu.add_command(label="merge", command=self.merge)
             menu.add_command(label="delete", command=self.remove_selected_part_from_list)
             if self.work_mode == gv.work_mode_dxf:
@@ -393,6 +386,7 @@ class FabianBoard(Board):
             menu.add_cascade(label='Elements', menu=show_elements_menu)
             menu.add_cascade(label='Entities', menu=show_entities_menu)
             menu.add_separator()
+            menu.add_command(label="Split arcs and lines", command=self.split_arcs_and_lines_for_inp)
             menu.add_command(label="Set net", command=self.set_net)
             menu.add_separator()
         menu.add_command(label="Quit")
@@ -432,7 +426,6 @@ class FabianBoard(Board):
         elif mode.lower() == gv.work_mode_inp:
             self.split_all_circles_by_longitude()
             self.set_initial_net()
-            self.split_arcs_and_lines_for_inp()
             tmp_list = self.get_unattached_nodes(True)
             if len(tmp_list) == 0:
                 print('no unattached nodes')
@@ -729,10 +722,17 @@ class FabianBoard(Board):
         else:
             self.state.pop(-1)
 
-    def split_selected_part(self, n=gv.default_split_parts):
+    def split_selected_part(self, split_mode=None, split_arg=gv.default_split_parts):
         if self.selected_part is None:
             return
-        self.split_part(self.selected_part)
+        s_part = self.selected_part
+        if split_mode is None:
+            split_mode = gv.split_mode_evenly_n_parts
+            choice = SplitDialog(self.window_main).show()
+            if choice is not None:
+                split_mode = choice.get('split_mode')
+                split_arg = choice.get('arg')
+        self.split_part(s_part, split_mode, split_arg)
 
     def split_entity_by_point(self, s_part, p):
         if s_part.part_type != gv.part_type_entity:
@@ -796,6 +796,7 @@ class FabianBoard(Board):
         return True
 
     def split_arcs_and_lines_for_inp(self):
+        self.keep_state()
         bottom_left = self.get_bottom_left_node()
         bottom_left = self.node_list[bottom_left].p
         top_right = self.get_top_right_node()
@@ -822,6 +823,7 @@ class FabianBoard(Board):
             if n > 1:
                 self.split_net_line_by_entity(i, gv.split_mode_evenly_n_parts, n)
             i -= 1
+        self.update_view()
 
     def split_all_circles_by_longitude(self, n=gv.default_split_circle_parts):
         longitude = self.get_longitude()
@@ -866,7 +868,7 @@ class FabianBoard(Board):
             return False
         new_lines = []
         # fix me - currently only split_mode_evenly_n_parts supported
-        n = split_additional_arg * len(net_lines)
+        n = split_additional_arg# * len(net_lines)
         new_points = self.get_split_entity_points(part, n)
         line = self.net_line_list[net_lines[0]]
         entity = line.entity
@@ -983,16 +985,17 @@ class FabianBoard(Board):
         self.show_part(part, list_name)
 
     def remove_parts_from_list(self, part_list, list_name):
+        # remove duplicate parts from list
+        part_list = list(dict.fromkeys(part_list))
+        part_list = sorted(part_list, reverse=True)
         original_list = None
         if list_name == gv.part_list_entities:
             original_list = self.entity_list
         elif list_name == gv.part_list_net_lines:
             original_list = self.net_line_list
+        # from node list - not removing nodes, just turning them to None
         elif list_name == gv.part_list_nodes:
             original_list = self.node_list
-        # remove duplicate parts from list
-        part_list = list(dict.fromkeys(part_list))
-        part_list = sorted(part_list, reverse=True)
         for part in part_list:
             if part is None:
                 return
