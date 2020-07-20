@@ -23,6 +23,8 @@ class FabianBoard(Board):
 
         self.entity_list = []
         self.node_list = [Node()]
+        self.next_node_hash_index = 1
+        self.nodes_hash = {'0': 0}
         self.net_line_list = []
         self.element_list = []
         self.longitude = None
@@ -63,6 +65,8 @@ class FabianBoard(Board):
             self.node_list = []
         else:
             self.node_list = [Node()]
+            self.next_node_hash_index = 1
+            self.nodes_hash = {'0': 0}
         self.net_line_list = []
         self.element_list = []
         self.longitude = None
@@ -95,6 +99,8 @@ class FabianBoard(Board):
             n = Node()
             n.get_data_from_tuple(t)
             self.node_list.append(n)
+        self.next_node_hash_index = state.next_node_hash_index
+        self.nodes_hash = state.nodes_hash
         for t in state.net_line_list:
             line = NetLine()
             line.get_data_from_tuple(t)
@@ -112,7 +118,6 @@ class FabianBoard(Board):
         self.show_node_number = state.show_node_number
         self.show_net = state.show_net
         self.scale = state.scale
-        self.board = state.board
         self.state.pop(-1)
         self.update_view()
 
@@ -128,6 +133,8 @@ class FabianBoard(Board):
         for e in self.node_list:
             t = e.convert_into_tuple()
             node_list.append(t)
+        state.next_node_hash_index = self.next_node_hash_index
+        state.nodes_hash = self.nodes_hash
         net_list = []
         for e in self.net_line_list:
             t = e.convert_into_tuple()
@@ -149,7 +156,6 @@ class FabianBoard(Board):
         state.show_node_number = self.show_node_number
         state.show_net = self.show_net
         state.scale = self.scale
-        state.board = self.board
         self.state.append(state)
 
     def mouse_1_pressed(self, key):
@@ -1460,8 +1466,11 @@ class FabianBoard(Board):
         data = {
             "entity_list": state.entity_list,
             "node_list": state.node_list,
+            "next_node_hash_index": state.next_node_hash_index,
+            "nodes_hash": state.nodes_hash,
             "net_line_list": state.net_line_list,
             "element_list": state.element_list,
+            "mouse_select_mode": state.mouse_select_mode,
             "work_mode": state.work_mode,
             "select_parts_mode": state.select_parts_mode,
             "show_entities": state.show_entities,
@@ -1523,35 +1532,24 @@ class FabianBoard(Board):
         elif filetype == 'json':
             print('\nnew data file')
             data = self.load_json(filename=filename)
-            self.node_list = []
-            entity_list = data.get("entity_list")
-            node_list = data.get("node_list")
-            net_line_list = data.get("net_line_list")
-            element_list = data.get("element_list")
-            for t in entity_list:
-                e = Entity()
-                e.get_data_from_tuple(t)
-                self.entity_list.append(e)
-            for t in node_list:
-                n = Node()
-                n.get_data_from_tuple(t)
-                self.node_list.append(n)
-            for t in net_line_list:
-                line = NetLine()
-                line.get_data_from_tuple(t)
-                self.net_line_list.append(line)
-            for t in element_list:
-                element = Element()
-                element.get_data_from_tuple(t)
-                self.element_list.append(element)
-            self.work_mode = data.get('work_mode')
-            self.select_parts_mode = data.get('select_parts_mode')
-            self.show_entities = data.get('show_entities')
-            self.show_nodes = data.get('show_nodes')
-            self.show_elements = data.get('show_elements')
-            self.show_node_number = data.get('show_node_number')
-            self.show_net = data.get('show_net')
-            self.scale = data.get('scale')
+            state = FabianState()
+            state.entity_list = data.get("entity_list")
+            state.node_list = data.get("node_list")
+            state.next_node_hash_index = data.get("next_node_hash_index")
+            state.nodes_hash = data.get("nodes_hash")
+            state.net_line_list = data.get("net_line_list")
+            state.element_list = data.get("element_list")
+            state.mouse_select_mode = data.get("mouse_select_mode")
+            state.work_mode = data.get("work_mode")
+            state.select_parts_mode = data.get("select_parts_mode")
+            state.show_entities = data.get("show_entities")
+            state.show_nodes = data.get("show_nodes")
+            state.show_elements = data.get("show_elements")
+            state.show_node_number = data.get("show_node_number")
+            state.show_net = data.get("show_net")
+            state.scale = data.get("scale")
+            self.state.append(state)
+            self.resume_state()
         self.set_accuracy()
         self.center_view()
         self.update_view()

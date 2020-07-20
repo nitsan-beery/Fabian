@@ -127,7 +127,7 @@ class Node(Part):
         if point is None:
             point = Point()
         self.p = point
-        self.entity = entity
+        self.hash_index = '0'
         self.attached_lines = []
         self.expected_elements = 0
         self.exceptions = []
@@ -144,7 +144,7 @@ class Node(Part):
         return None
 
     def convert_into_tuple(self):
-        t = (self.p.convert_into_tuple(), self.entity)
+        t = (self.p.convert_into_tuple(), self.hash_index)
         return t
 
     def get_data_from_tuple(self, t):
@@ -152,7 +152,7 @@ class Node(Part):
             print(f"tuple doesn't match Node type: {t}")
             return
         self.p.get_data_from_tuple(t[0])
-        self.entity = t[1]
+        self.hash_index = t[1]
 
 
 class NetLine(Part):
@@ -225,9 +225,11 @@ class FabianState:
     def __init__(self):
         self.entity_list = None
         self.node_list = None
+        self.next_node_hash_index = 1
+        self.nodes_hash = {'0': 0}
         self.net_line_list = None
         self.element_list = None
-        self.select_mode = None
+        self.mouse_select_mode = None
         self.work_mode = None
         self.select_parts_mode = None
         self.show_entities = True
