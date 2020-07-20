@@ -35,6 +35,11 @@ part_list_nodes = 'nodes'
 show_mode = 'show'
 hide_mode = 'hide'
 clear_mode = 'clear'
+split_mode_evenly_n_parts = 'evenly_n_parts'
+split_mode_2_parts_by_point = '2_parts_by_point'
+split_mode_2_parts_percentage_left = '2_parts_percentage_left'
+split_mode_2_parts_percentage_right = '2_parts_percentage_right'
+split_mode_3_parts_percentage_side = '3_parts_percentage_side'
 
 default_mouse_select_mode = mouse_select_mode_edge
 default_work_mode = work_mode_dxf

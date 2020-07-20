@@ -587,6 +587,7 @@ class FabianBoard(Board):
                     e_0 = self.entity_list[first_part]
             sorted_list.append(first_part)
             part_list.remove(first_part)
+            found_part = False
             # iterate list to find connected parts, add to list or return None if can't find
             while len(part_list) > 0:
                 start = self.entity_list[sorted_list[-1]].arc_end_angle
@@ -609,6 +610,7 @@ class FabianBoard(Board):
                     e_0 = self.entity_list[first_part]
             sorted_list.append(first_part)
             part_list.remove(first_part)
+            found_part = False
             # iterate list to find connected parts, add to list or return None if can't find
             while len(part_list) > 0:
                 start = self.entity_list[sorted_list[-1]].right_up
@@ -701,20 +703,28 @@ class FabianBoard(Board):
         '''
         return False
 
-    def split_selected_part(self, n=gv.default_split_parts):
-        self.keep_state()
-        if self.selected_part is None:
+    def split_part(self, s_part=None, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=gv.default_split_parts):
+        if s_part is None:
             return
-        part = self.selected_part.index
-        if self.selected_part.part_type == gv.part_type_entity and self.work_mode == gv.work_mode_dxf:
-            changed = self.split_entity(part, n)
+        self.keep_state()
+        part = s_part.index
+        if s_part.part_type == gv.part_type_entity and self.work_mode == gv.work_mode_dxf:
+            changed = self.split_entity(part, split_mode, split_additional_arg)
+        elif s_part.part_type == gv.part_type_entity and self.work_mode == gv.work_mode_inp:
+            changed = self.split_net_line_by_entity(part, split_mode, split_additional_arg)
+        # split net line
         else:
-            changed = self.split_net_line(self.selected_part, n)
+            changed = self.split_net_line(part, split_mode, split_additional_arg)
         self.update_view()
         if changed:
             self.remove_selected_part_mark()
         else:
             self.state.pop(-1)
+
+    def split_selected_part(self, n=gv.default_split_parts):
+        if self.selected_part is None:
+            return
+        self.split_part(self.selected_part)
 
     def split_entity_by_point(self, s_part, p):
         if s_part.part_type != gv.part_type_entity:
@@ -739,11 +749,14 @@ class FabianBoard(Board):
         return True
 
     # split entity_list[i] into n parts
-    def split_entity(self, part=0, n=gv.default_split_parts):
+    def split_entity(self, part=0, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=gv.default_split_parts):
         if self.selected_part is None:
             return False
         if self.selected_part.part_type != gv.part_type_entity:
             return False
+        # fix me
+        # currently only split_mode_evenly_n_parts is supported
+        n = split_additional_arg
         e = self.entity_list[part]
         new_part_list = []
         if e.shape == 'ARC':
@@ -786,7 +799,6 @@ class FabianBoard(Board):
             if e.shape == 'CIRCLE':
                 continue
             n = n_length = 0
-            part = SelectedPart(gv.part_type_entity, i)
             d = e.start.get_distance_to_point(e.end)
             relative_length = d / d_dxf
             if e.shape == 'ARC':
@@ -800,7 +812,7 @@ class FabianBoard(Board):
             if n_length > n:
                 n = n_length
             if n > 1:
-                self.split_net_line(part, n)
+                self.split_net_line_by_entity(i, gv.split_mode_evenly_n_parts, n)
             i -= 1
 
     def split_all_circles_by_longitude(self, n=gv.default_split_circle_parts):
@@ -837,49 +849,53 @@ class FabianBoard(Board):
         new_lines.append(NetLine(new_node_index, line.end_node, None))
         self.remove_parts_from_list([part], gv.part_list_net_lines)
 
-    def split_net_line(self, part, n=gv.default_split_parts):
-        # debug
-        # print(f'selected part: {self.selected_part}   Entity: {part}')
+    def split_net_line_by_entity(self, part, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=gv.default_split_parts):
         if self.work_mode != gv.work_mode_inp:
             return False
-        # split net line not on entity
-        if part.part_type == gv.part_type_net_line:
-            new_lines = []
-            line = self.net_line_list[part.index]
-            node1 = self.node_list[line.start_node]
-            node2 = self.node_list[line.end_node]
-            new_points = self.get_split_line_points(node1.p, node2.p, n)
-            start_node = line.start_node
-            for j in range(len(new_points) - 1):
-                new_node = Node(new_points[j+1], entity=None)
-                end_node = self.add_node_to_node_list(new_node)
-                new_lines.append(NetLine(start_node, end_node, None))
-                start_node = end_node
-            self.remove_parts_from_list([part.index], gv.part_list_net_lines)
-            for j in range(len(new_lines)):
-                self.net_line_list.append(new_lines[j])
-        elif part.part_type == gv.part_type_entity:
-            net_lines = self.get_lines_attached_to_entity(part.index)
-            if len(net_lines) < 1:
-                # fix me
-                return False
-            new_lines = []
-            n = n * len(net_lines)
-            new_points = self.get_split_entity_points(part.index, n)
-            line = self.net_line_list[net_lines[0]]
-            entity = line.entity
-            entity_nodes_list = self.entity_list[entity].nodes_list
-            self.entity_list[entity].nodes_list = [entity_nodes_list[0], entity_nodes_list[-1]]
-            start_node = line.start_node
-            for j in range(len(new_points) - 1):
-                new_node = Node(new_points[j+1], entity=entity)
-                end_node = self.add_node_to_node_list(new_node)
-                self.entity_list[entity].add_node_to_entity_nodes_list(end_node)
-                new_lines.append(NetLine(start_node, end_node, line.entity))
-                start_node = end_node
-            self.remove_parts_from_list(net_lines, gv.part_list_net_lines)
-            for j in range(len(new_lines)):
-                self.net_line_list.append(new_lines[j])
+        net_lines = self.get_lines_attached_to_entity(part)
+        if len(net_lines) < 1:
+            # fix me
+            return False
+        new_lines = []
+        # fix me - currently only split_mode_evenly_n_parts supported
+        n = split_additional_arg * len(net_lines)
+        new_points = self.get_split_entity_points(part, n)
+        line = self.net_line_list[net_lines[0]]
+        entity = line.entity
+        entity_nodes_list = self.entity_list[entity].nodes_list
+        self.entity_list[entity].nodes_list = [entity_nodes_list[0], entity_nodes_list[-1]]
+        start_node = line.start_node
+        for j in range(len(new_points) - 1):
+            new_node = Node(new_points[j+1], entity=entity)
+            end_node = self.add_node_to_node_list(new_node)
+            self.entity_list[entity].add_node_to_entity_nodes_list(end_node)
+            new_lines.append(NetLine(start_node, end_node, line.entity))
+            start_node = end_node
+        self.remove_parts_from_list(net_lines, gv.part_list_net_lines)
+        for j in range(len(new_lines)):
+            self.net_line_list.append(new_lines[j])
+        return True
+
+    # split net line not on entity
+    def split_net_line(self, part, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=gv.default_split_parts):
+        if self.work_mode != gv.work_mode_inp:
+            return False
+        new_lines = []
+        line = self.net_line_list[part]
+        node1 = self.node_list[line.start_node]
+        node2 = self.node_list[line.end_node]
+        # fix me - currently only split_mode_evenly_n_parts supported
+        n = split_additional_arg
+        new_points = self.get_split_line_points(node1.p, node2.p, n)
+        start_node = line.start_node
+        for j in range(len(new_points) - 1):
+            new_node = Node(new_points[j+1], entity=None)
+            end_node = self.add_node_to_node_list(new_node)
+            new_lines.append(NetLine(start_node, end_node, None))
+            start_node = end_node
+        self.remove_parts_from_list([part], gv.part_list_net_lines)
+        for j in range(len(new_lines)):
+            self.net_line_list.append(new_lines[j])
         return True
 
     # return all net lines crossed by line from p1 to p2
@@ -1725,9 +1741,9 @@ class FabianBoard(Board):
             self.new_line_original_part[0] = None
             self.board.delete(self.temp_line_mark)
 
-    # add line from p1 to p2. s_part_1 and 2 holds part type (entity or net_line) and index un list
+    # add line from p1 to p2. s_part_1 and s_part_2 holds part type (entity or net_line) and index in list
     # by default the line to add is the line created by user selected points
-    def add_line(self, p1=None, p2=None, s_part_1=None, s_part_2=None):
+    def add_line(self, p1=None, p2=None, s_part_1=None, s_part_2=None, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=2):
         if p1 is None:
             p1 = self.new_line_edge[0]
         if p2 is None:
@@ -1755,7 +1771,7 @@ class FabianBoard(Board):
                 pair = crossing_lines[i]
                 line = pair[0]
                 s_part = SelectedPart(gv.part_type_net_line, line)
-                self.split_net_line(s_part, 2)
+                self.split_net_line(s_part, split_mode, split_additional_arg)
                 new_points.append(self.node_list[-1].p)
                 i -= 1
             new_points = sort_list_point_by_distance_from_p(new_points, p1)
