@@ -67,15 +67,15 @@ class Entity(Part):
             t3 = self.start.is_equal(e.end) and self.end.is_equal(e.start)
             return t1 and (t2 or t3)
 
-    # node[0] = start node,   node[-1] = end node
-    def add_node_to_entity_nodes_list(self, i):
+    # node[0] = start node,   node[-1] = end node    i = node hash index
+    def add_node_to_entity_nodes_list(self, node_hash):
         for j in self.nodes_list:
-            if j == i:
+            if j == node_hash:
                 return
         if len(self.nodes_list) < 2:
-            self.nodes_list.append(i)
+            self.nodes_list.append(node_hash)
         else:
-            self.nodes_list.insert(1, i)
+            self.nodes_list.insert(1, node_hash)
 
     def convert_into_tuple(self):
         center = self.center
@@ -127,7 +127,7 @@ class Node(Part):
         if point is None:
             point = Point()
         self.p = point
-        self.hash_index = '0'
+        self.hash_index = 0
         self.attached_lines = []
         self.expected_elements = 0
         self.exceptions = []
@@ -194,6 +194,7 @@ class Element(Part):
     def __init__(self, color=gv.element_color):
         super().__init__(color)
         self.nodes = []
+
     def convert_into_tuple(self):
         t = (self.nodes, self.color)
         return t

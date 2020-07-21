@@ -24,7 +24,7 @@ class FabianBoard(Board):
         self.entity_list = []
         self.node_list = [Node()]
         self.next_node_hash_index = 1
-        self.nodes_hash = {'0': 0}
+        self.nodes_hash = {"0": 0}
         self.net_line_list = []
         self.element_list = []
         self.longitude = None
@@ -66,7 +66,7 @@ class FabianBoard(Board):
         else:
             self.node_list = [Node()]
             self.next_node_hash_index = 1
-            self.nodes_hash = {'0': 0}
+            self.nodes_hash = {"0": 0}
         self.net_line_list = []
         self.element_list = []
         self.longitude = None
@@ -173,8 +173,10 @@ class FabianBoard(Board):
                 d, p = self.get_distance_from_entity_and_nearest_point(Point(x, y), self.selected_part.index)
             elif self.selected_part.part_type == gv.part_type_net_line:
                 line = self.net_line_list[self.selected_part.index]
-                node_1 = self.node_list[line.start_node]
-                node_2 = self.node_list[line.end_node]
+                node_index = self.get_node_index_from_hash(line.start_node)
+                node_1 = self.node_list[node_index]
+                node_index = self.get_node_index_from_hash(line.end_node)
+                node_2 = self.node_list[node_index]
                 p1 = node_1.p
                 p2 = node_2.p
                 d, p = self.get_distance_from_line_and_nearest_point(Point(x, y), p1, p2)
@@ -485,11 +487,11 @@ class FabianBoard(Board):
         e = self.entity_list[i]
         e.nodes_list = []
         start_node = Node(e.start, entity=i)
-        node_index = self.add_node_to_node_list(start_node)
-        e.add_node_to_entity_nodes_list(node_index)
+        node_hash_index = self.add_node_to_node_list(start_node)
+        e.add_node_to_entity_nodes_list(node_hash_index)
         end_node = Node(e.end, entity=i)
-        node_index = self.add_node_to_node_list(end_node)
-        e.add_node_to_entity_nodes_list(node_index)
+        node_hash_index = self.add_node_to_node_list(end_node)
+        e.add_node_to_entity_nodes_list(node_hash_index)
 
     def get_split_line_points(self, p1, p2, n=gv.default_split_parts):
         point_list = [p1]
@@ -543,20 +545,25 @@ class FabianBoard(Board):
         # sort start and end points of all lines in list
         for i in part_list:
             line = self.net_line_list[i]
-            if self.node_list[line.end_node].p.is_smaller_x_smaller_y(self.node_list[line.start_node].p):
+            start_node_index = self.get_node_index_from_hash(line.start_node)
+            end_node_index = self.get_node_index_from_hash(line.end_node)
+            if self.node_list[end_node_index].p.is_smaller_x_smaller_y(self.node_list[start_node_index].p):
                 line.start_node, line.end_node = line.end_node, line.start_node
         first_part = part_list[0]
         line_0 = self.net_line_list[first_part]
-        p0 = self.node_list[line_0.start_node].p
+        node_index = self.get_node_index_from_hash(line_0.start_node)
+        p0 = self.node_list[node_index].p
         # find most left-bottom edge
         for i in part_list:
             line = self.net_line_list[i]
-            p1 = self.node_list[line.start_node].p
+            node_index = self.get_node_index_from_hash(line.start_node)
+            p1 = self.node_list[node_index].p
             if p1.is_smaller_x_smaller_y(p0):
                 first_part = i
-                line_0 = self.net_line_list[first_part]
+                p0 = p1
         sorted_list.append(first_part)
         part_list.remove(first_part)
+        found_part = False
         # iterate list to find connected parts, add to list or return None if can't find
         while len(part_list) > 0:
             start = self.net_line_list[sorted_list[-1]].end_node
@@ -664,15 +671,18 @@ class FabianBoard(Board):
             removed_nodes = []
             removed_net_lines = []
             for i in range(1, len(entity.nodes_list) - 1):
-                n = entity.nodes_list[i]
+                hash_index = entity.nodes_list[i]
+                n = self.get_node_index_from_hash(hash_index)
                 node = self.node_list[n]
-                removed_nodes.append(n)
-                self.set_lines_attached_to_node(n)
+                removed_nodes.append(hash_index)
+                self.set_lines_attached_to_node(hash_index)
                 for al in node.attached_lines:
                     removed_net_lines.append(al.line_index)
             start_node = entity.nodes_list[0]
             end_node = entity.nodes_list[-1]
             entity.nodes_list = [start_node, end_node]
+            start_node = self.get_node_index_from_hash(start_node)
+            end_node = self.get_node_index_from_hash(end_node)
             p1 = self.node_list[start_node].p
             p2 = self.node_list[end_node].p
             self.add_line_to_net_list(p1, p2)
@@ -803,10 +813,12 @@ class FabianBoard(Board):
 
     def split_arcs_and_lines_for_inp(self):
         self.keep_state()
-        bottom_left = self.get_bottom_left_node()
-        bottom_left = self.node_list[bottom_left].p
-        top_right = self.get_top_right_node()
-        top_right = self.node_list[top_right].p
+        hash_bottom_left = self.get_bottom_left_node()
+        index_bottom_left = self.get_node_index_from_hash(hash_bottom_left)
+        bottom_left = self.node_list[index_bottom_left].p
+        hash_top_right = self.get_top_right_node()
+        index_top_right = self.get_node_index_from_hash(hash_top_right)
+        top_right = self.node_list[index_top_right].p
         d_dxf = bottom_left.get_distance_to_point(top_right)
         i = len(self.entity_list) - 1
         while i >= 0:
@@ -874,12 +886,11 @@ class FabianBoard(Board):
             return False
         new_lines = []
         # fix me - currently only split_mode_evenly_n_parts supported
-        n = split_additional_arg# * len(net_lines)
+        n = split_additional_arg
         new_points = self.get_split_entity_points(part, n)
         line = self.net_line_list[net_lines[0]]
         entity = line.entity
-        entity_nodes_list = self.entity_list[entity].nodes_list
-        self.entity_list[entity].nodes_list = [entity_nodes_list[0], entity_nodes_list[-1]]
+        self.clear_entity_middle_nodes(entity)
         start_node = line.start_node
         for j in range(len(new_points) - 1):
             new_node = Node(new_points[j+1], entity=entity)
@@ -898,8 +909,10 @@ class FabianBoard(Board):
             return False
         new_lines = []
         line = self.net_line_list[part]
-        node1 = self.node_list[line.start_node]
-        node2 = self.node_list[line.end_node]
+        start_node_index = self.get_node_index_from_hash(line.start_node)
+        end_node_index = self.get_node_index_from_hash(line.end_node)
+        node1 = self.node_list[start_node_index]
+        node2 = self.node_list[end_node_index]
         # fix me - currently only split_mode_evenly_n_parts supported
         n = split_additional_arg
         new_points = self.get_split_line_points(node1.p, node2.p, n)
@@ -929,8 +942,10 @@ class FabianBoard(Board):
     # return mutual point of self.net_line_list[net_line] with crossing line p1-p2, None if there isn't
     def get_mutual_point_of_net_line_with_crossing_line(self, net_line, p1, p2):
         net_line = self.net_line_list[net_line]
-        start_node = self.node_list[net_line.start_node]
-        end_node = self.node_list[net_line.end_node]
+        start_node_index = self.get_node_index_from_hash(net_line.start_node)
+        end_node_index = self.get_node_index_from_hash(net_line.end_node)
+        start_node = self.node_list[start_node_index]
+        end_node = self.node_list[end_node_index]
         angle = -start_node.p.get_alfa_to(end_node.p)
         line_end = get_shifted_point(end_node.p, start_node.p, angle)
         p1 = get_shifted_point(p1, start_node.p, angle)
@@ -953,6 +968,7 @@ class FabianBoard(Board):
     # return list of marked parts is list
     def get_marked_parts(self, list_name):
         mark_list = []
+        part_list = []
         if list_name == gv.part_list_entities:
             part_list = self.entity_list
         elif list_name == gv.part_list_net_lines:
@@ -987,26 +1003,37 @@ class FabianBoard(Board):
         elif list_name == gv.part_list_net_lines:
             self.net_line_list[part].color = color
         elif list_name == gv.part_list_nodes:
+            part = self.get_node_index_from_hash(part)
             self.node_list[part].color = color
         self.show_part(part, list_name)
+
+    def clear_entity_middle_nodes(self, part):
+        entity = self.entity_list[part]
+        if len(entity.nodes_list) < 3:
+            return
+        for i in range(1, len(entity.nodes_list) - 1):
+            node_hash = entity.nodes_list[i]
+            self.remove_node_from_node_list(node_hash)
+        entity.nodes_list = [entity.nodes_list[0], entity.nodes_list[-1]]
 
     def remove_parts_from_list(self, part_list, list_name):
         # remove duplicate parts from list
         part_list = list(dict.fromkeys(part_list))
         part_list = sorted(part_list, reverse=True)
         original_list = None
-        if list_name == gv.part_list_entities:
-            original_list = self.entity_list
-        elif list_name == gv.part_list_net_lines:
-            original_list = self.net_line_list
-        # from node list - not removing nodes, just turning them to None
-        elif list_name == gv.part_list_nodes:
-            original_list = self.node_list
-        for part in part_list:
-            if part is None:
-                return
-            self.hide_part(part, list_name)
-            original_list.pop(part)
+        if list_name == gv.part_list_nodes:
+            for part in part_list:
+                self.remove_node_from_node_list(part)
+        else:
+            if list_name == gv.part_list_entities:
+                original_list = self.entity_list
+            elif list_name == gv.part_list_net_lines:
+                original_list = self.net_line_list
+            for part in part_list:
+                if part is None:
+                    return
+                self.hide_part(part, list_name)
+                original_list.pop(part)
         self.remove_selected_part_mark()
 
     def get_lines_attached_to_entity(self, entity):
@@ -1018,13 +1045,16 @@ class FabianBoard(Board):
         return net_lines
 
     # set all lines attached to node, and sort them by angle_to_second_node
-    def set_lines_attached_to_node(self, n):
+    def set_lines_attached_to_node(self, node_hash_index):
+        n = self.get_node_index_from_hash(node_hash_index)
         node = self.node_list[n]
         node.attached_lines = []
         for i in range(len(self.net_line_list)):
             line = self.net_line_list[i]
-            start_node = self.node_list[line.start_node]
-            end_node = self.node_list[line.end_node]
+            start_node_index = self.get_node_index_from_hash(line.start_node)
+            end_node_index = self.get_node_index_from_hash(line.end_node)
+            start_node = self.node_list[start_node_index]
+            end_node = self.node_list[end_node_index]
             if n == line.start_node:
                 al = AttachedLine(i, line.end_node, start_node.p.get_alfa_to(end_node.p))
                 node.attached_lines.append(al)
@@ -1098,15 +1128,18 @@ class FabianBoard(Board):
         else:
             self.entity_list[entity].color = gv.default_color
 
+    # return the hash key of the exception nodes
     def get_exception_nodes(self):
         exception_list = []
         for i in range(1, len(self.node_list)):
             if len(self.node_list[i].exceptions) > 0:
-                exception_list.append(i)
+                exception_list.append(self.node_list[i].hash_index)
         return exception_list
 
-    # return index of the node that can make an element counter clockwise (default) or clockwise
-    def get_next_relevant_node(self, current_node_index, prev_node_index, limit_angle=True, prev_angle=None, clockwise=False):
+    # return hash index of the node that can make an element counter clockwise (default) or clockwise
+    def get_next_relevant_node(self, current_node_hash_index, prev_node_hash_index, limit_angle=True, prev_angle=None, clockwise=False):
+        current_node_index = self.get_node_index_from_hash(current_node_hash_index)
+        prev_node_index = self.get_node_index_from_hash(prev_node_hash_index)
         attached_line_list = self.node_list[current_node_index].attached_lines
         if len(attached_line_list) == 0:
             return None, None
@@ -1114,7 +1147,7 @@ class FabianBoard(Board):
         prev_node = self.node_list[prev_node_index]
         if prev_angle is None:
             prev_angle = prev_node.p.get_alfa_to(current_node.p)
-        next_node = None
+        next_node_hash_indx = None
         net_line = None
         min_angle_to_create_elelment = gv.angle_diff_accuracy
         max_angle_to_create_elelment = 360 - gv.angle_diff_accuracy
@@ -1128,9 +1161,10 @@ class FabianBoard(Board):
         for l in attached_line_list:
             if not l.is_available:
                 continue
-            node_index = l.second_node
-            if node_index == prev_node_index:
+            node_hash_index = l.second_node
+            if node_hash_index == prev_node_hash_index:
                 continue
+            node_index = self.get_node_index_from_hash(node_hash_index)
             n = self.node_list[node_index]
             angle = current_node.p.get_alfa_to(n.p)
             if angle < prev_angle:
@@ -1147,9 +1181,9 @@ class FabianBoard(Board):
                 replace_best_angle = True
             if replace_best_angle:
                 best_angle = diff_angle
-                next_node = node_index
+                next_node_hash_indx = node_hash_index
                 net_line = l
-        return next_node, net_line
+        return next_node_hash_indx, net_line
 
     def show_progress_bar(self, max_counter=100):
         self.progress_bar = ttk.Progressbar(self.frame_1, orient=tk.HORIZONTAL, length=300, mode='determinate', maximum=max_counter)
@@ -1183,7 +1217,8 @@ class FabianBoard(Board):
         self.show_text_on_screen('matching lines to nodes')
         self.show_progress_bar(c)
         for i in range(1, len(self.node_list)):
-            self.set_lines_attached_to_node(i)
+            node_hash_index = self.node_list[i].hash_index
+            self.set_lines_attached_to_node(node_hash_index)
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
         self.hide_text_on_screen()
@@ -1208,6 +1243,7 @@ class FabianBoard(Board):
             nodes_outer_list.append(next_node_index)
         return nodes_outer_list
 
+    # return list of unattached nodes with real index in list (not hash_index)
     def get_unattached_nodes(self, set_nodes_lines=True):
         tmp_list = []
         if set_nodes_lines:
@@ -1230,20 +1266,44 @@ class FabianBoard(Board):
             messagebox.showwarning("Warning", m)
         return tmp_list
 
-    # return index of node in node_list with same p, None if it's a new node
-    def get_index_of_node_with_point(self, p):
+    # return index of node in node_list with same p, None if can't find
+    def get_hash_index_of_node_with_point(self, p):
         for i in range(len(self.node_list)):
             node = self.node_list[i]
             if node.p.is_equal(p):
-                return i
+                return node.hash_index
         return None
 
+    # return index of node in node_list with same hash_index
+    def get_node_index_from_hash(self, hash_index):
+        return self.nodes_hash.get(str(hash_index))
+
+    # add the node if it's not in the list
+    # return hash index of the node
     def add_node_to_node_list(self, n):
-        i = self.get_index_of_node_with_point(n.p)
-        if i is None:
+        hash_index = self.get_hash_index_of_node_with_point(n.p)
+        n.hash_index = hash_index
+        if hash_index is None:
+            n.hash_index = self.next_node_hash_index
             self.node_list.append(n)
             i = len(self.node_list) - 1
-        return i
+            self.nodes_hash[str(self.next_node_hash_index)] = i
+            self.next_node_hash_index += 1
+        return n.hash_index
+
+    # remove the node if it's in the list
+    # update hash table
+    def remove_node_from_node_list(self, hash_index):
+        node_list_index = self.nodes_hash.get(str(hash_index))
+        if node_list_index is None:
+            return
+        # update hash
+        for i in range(node_list_index+1, len(self.node_list)):
+            node_hash_index = self.node_list[i].hash_index
+            self.nodes_hash[str(node_hash_index)] = i-1
+        self.nodes_hash.pop(str(hash_index))
+        self.hide_node(node_list_index)
+        self.node_list.pop(node_list_index)
 
     # set nodes out of entities edges
     def set_nodes_list_from_dxf(self):
@@ -1331,6 +1391,7 @@ class FabianBoard(Board):
         #print(nodes_outer_list)
         self.set_all_nodes_expected_elements_and_exceptions()
 
+    # element list with index of node_list (not hash)
     def create_net_element_list(self):
         self.set_nodes_attached_lines_and_exception()
         unattaced_list = self.get_unattached_nodes(False)
@@ -1356,21 +1417,23 @@ class FabianBoard(Board):
                 attached_line = node.attached_lines[j]
                 if not attached_line.is_available:
                     continue
-                node_index = attached_line.second_node
+                node_hash_index = attached_line.second_node
                 new_element_nodes = [fist_node]
-                prev_node_index = fist_node
+                prev_node_hash_index = self.node_list[fist_node].hash_index
                 # try to set a new element starting from node[i] to next_node
-                while node_index is not None:
+                while node_hash_index is not None:
+                    node_index = self.get_node_index_from_hash(node_hash_index)
                     new_element_nodes.append(node_index)
-                    next_node_index, line = self.get_next_relevant_node(node_index, prev_node_index)
+                    next_node_hash_index, line = self.get_next_relevant_node(node_hash_index, prev_node_hash_index)
                     if line is not None:
                         if not line.is_available:
                             break
                         line.is_available = False
+                    next_node_index = self.get_node_index_from_hash(next_node_hash_index)
                     if next_node_index == fist_node:
                         break
-                    prev_node_index = node_index
-                    node_index = next_node_index
+                    prev_node_hash_index = node_hash_index
+                    node_hash_index = next_node_hash_index
                 if next_node_index == fist_node and len(new_element_nodes) > 2:
                     element = Element()
                     element.nodes = new_element_nodes
@@ -1631,27 +1694,29 @@ class FabianBoard(Board):
         #print(f'longest - {shape}   d: {longest_line}   longitude: {longitude}\n')
         return longitude
 
+    # return the hash index of the node
     def get_bottom_left_node(self):
         if len(self.node_list) < 2:
             return 0
-        node = 1
-        p = self.node_list[node].p
+        index = 1
+        p = self.node_list[index].p
         for i in range(1, len(self.node_list)):
             if self.node_list[i].p.is_smaller_x_smaller_y(p, by_x=False):
                 p = self.node_list[i].p
-                node = i
-        return node
+                index = i
+        return self.node_list[index].hash_index
 
+    # return the hash index of the node
     def get_top_right_node(self):
         if len(self.node_list) < 2:
             return 0
-        node = 1
-        p = self.node_list[node].p
+        index = 1
+        p = self.node_list[index].p
         for i in range(1, len(self.node_list)):
             if p.is_smaller_x_smaller_y(self.node_list[i].p, by_x=False):
                 p = self.node_list[i].p
-                node = i
-        return node
+                index = i
+        return self.node_list[index].hash_index
 
     def mark_selected_entity(self):
         if self.selected_part is None:
@@ -1780,8 +1845,7 @@ class FabianBoard(Board):
             while i >= 0:
                 pair = crossing_lines[i]
                 line = pair[0]
-                s_part = SelectedPart(gv.part_type_net_line, line)
-                self.split_net_line(s_part, split_middle_lines_mode, split_additional_arg)
+                self.split_net_line(line, split_middle_lines_mode, split_additional_arg)
                 new_points.append(self.node_list[-1].p)
                 i -= 1
             new_points = sort_list_point_by_distance_from_p(new_points, p1)
@@ -1803,8 +1867,8 @@ class FabianBoard(Board):
     def add_line_to_net_list(self, p1, p2):
         if self.work_mode != gv.work_mode_inp:
             return
-        start_node = self.get_index_of_node_with_point(p1)
-        end_node = self.get_index_of_node_with_point(p2)
+        start_node = self.get_hash_index_of_node_with_point(p1)
+        end_node = self.get_hash_index_of_node_with_point(p2)
         if start_node is None or end_node is None:
             self.remove_temp_line()
             return
@@ -1855,18 +1919,22 @@ class FabianBoard(Board):
             min_d_index = self.get_first_visible_net_line()
         if len(self.net_line_list) == 0 or min_d_index is None:
             return None, None
-        start_node = self.net_line_list[min_d_index].start_node
-        end_node = self.net_line_list[min_d_index].end_node
-        p1 = self.node_list[start_node].p
-        p2 = self.node_list[end_node].p
+        start_node_hash = self.net_line_list[min_d_index].start_node
+        end_node_hash = self.net_line_list[min_d_index].end_node
+        start_node_index = self.get_node_index_from_hash(start_node_hash)
+        end_node_index = self.get_node_index_from_hash(end_node_hash)
+        p1 = self.node_list[start_node_index].p
+        p2 = self.node_list[end_node_index].p
         min_d, nearest_point = self.get_distance_from_line_and_nearest_point(p, p1, p2)
         for i in range(len(self.net_line_list)):
             if only_visible and self.net_line_list[i].board_part is None:
                 continue
-            start_node = self.net_line_list[i].start_node
-            end_node = self.net_line_list[i].end_node
-            p1 = self.node_list[start_node].p
-            p2 = self.node_list[end_node].p
+            start_node_hash = self.net_line_list[i].start_node
+            end_node_hash = self.net_line_list[i].end_node
+            start_node_index = self.get_node_index_from_hash(start_node_hash)
+            end_node_index = self.get_node_index_from_hash(end_node_hash)
+            p1 = self.node_list[start_node_index].p
+            p2 = self.node_list[end_node_index].p
             d, nearest_point = self.get_distance_from_line_and_nearest_point(p, p1, p2)
             if d < min_d:
                 min_d_index = i
@@ -1950,6 +2018,7 @@ class FabianBoard(Board):
                 return i
         return None
 
+    # part = index in node_list (not hash)
     def hide_node(self, part):
         n = self.node_list[part]
         if n.board_part is not None:
@@ -1962,7 +2031,7 @@ class FabianBoard(Board):
     def hide_all_nodes(self):
         for i in range(len(self.node_list)):
             self.hide_node(i)
-
+    # i = index in node_list (not hash)
     def show_node(self, i, with_number=False):
         n = self.node_list[i]
         if n.board_part is None:
@@ -1997,7 +2066,8 @@ class FabianBoard(Board):
         if element.board_part is None:
             poly = []
             for n in nodes:
-                poly.append(self.node_list[n].p)
+                node_index = self.get_node_index_from_hash(n)
+                poly.append(self.node_list[node_index].p)
             self.element_list[e].board_part = self.draw_polygon(poly)
 
     def hide_element(self, e):
@@ -2016,8 +2086,10 @@ class FabianBoard(Board):
 
     def show_net_line(self, i):
         line = self.net_line_list[i]
-        p1 = self.node_list[line.start_node].p
-        p2 = self.node_list[line.end_node].p
+        start_node = self.get_node_index_from_hash(line.start_node)
+        end_node = self.get_node_index_from_hash(line.end_node)
+        p1 = self.node_list[start_node].p
+        p2 = self.node_list[end_node].p
         if line.board_part is None:
             line.board_part = self.draw_line(p1, p2, line.color)
 
