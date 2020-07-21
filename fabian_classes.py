@@ -145,7 +145,10 @@ class Node(Part):
         return None
 
     def convert_into_tuple(self):
-        t = (self.p.convert_into_tuple(), self.hash_index, self.attached_entities, self.attached_lines)
+        attached_lines = []
+        for al in self.attached_lines:
+            attached_lines.append(al.convert_into_tuple())
+        t = (self.p.convert_into_tuple(), self.hash_index, self.attached_entities, attached_lines)
         return t
 
     def get_data_from_tuple(self, t):
@@ -155,7 +158,12 @@ class Node(Part):
         self.p.get_data_from_tuple(t[0])
         self.hash_index = t[1]
         self.attached_entities = t[2]
-        self.attached_lines = t[3]
+        attached_lines = t[3]
+        self.attached_lines = []
+        for t in attached_lines:
+            al = AttachedLine()
+            al.get_data_from_tuple(t)
+            self.attached_lines.append(al)
 
 
 class NetLine(Part):
@@ -216,6 +224,19 @@ class AttachedLine:
         self.angle_to_second_node = angle_to_second_node
         self.is_outer_line = is_outer_line
         self.is_available = is_available
+
+    def convert_into_tuple(self):
+        t = (self.line_index, self.second_node, self.angle_to_second_node, self.is_outer_line, self.is_available)
+        return t
+
+    def get_data_from_tuple(self, t):
+        if len(t) < 5:
+            print(f"tuple doesn't match AttachedLine type: {t}")
+        self.line_index = t[0]
+        self.second_node = t[1]
+        self.angle_to_second_node = t[2]
+        self.is_outer_line = t[3]
+        self.is_available = t[4]
 
 
 class SelectedPart(Part):
