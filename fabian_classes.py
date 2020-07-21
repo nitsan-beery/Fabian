@@ -128,6 +128,7 @@ class Node(Part):
             point = Point()
         self.p = point
         self.hash_index = 0
+        self.attached_entities = []
         self.attached_lines = []
         self.expected_elements = 0
         self.exceptions = []
@@ -144,15 +145,17 @@ class Node(Part):
         return None
 
     def convert_into_tuple(self):
-        t = (self.p.convert_into_tuple(), self.hash_index)
+        t = (self.p.convert_into_tuple(), self.hash_index, self.attached_entities, self.attached_lines)
         return t
 
     def get_data_from_tuple(self, t):
-        if len(t) < 2:
+        if len(t) < 4:
             print(f"tuple doesn't match Node type: {t}")
             return
         self.p.get_data_from_tuple(t[0])
         self.hash_index = t[1]
+        self.attached_entities = t[2]
+        self.attached_lines = t[3]
 
 
 class NetLine(Part):
@@ -239,7 +242,6 @@ class FabianState:
         self.show_node_number = gv.default_show_node_number
         self.show_net = True
         self.scale = None
-        self.board = None
 
 
 split_choices_list = ['n parts evenly', '2 different parts', '3 parts different middle part']

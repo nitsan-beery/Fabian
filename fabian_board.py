@@ -371,24 +371,29 @@ class FabianBoard(Board):
         if self.selected_part is not None:
             menu.add_command(label="split", command=lambda: self.split_selected_part(gv.split_mode_evenly_n_parts))
             menu.add_command(label="split...", command=lambda: self.split_selected_part())
-            menu.add_command(label="merge", command=self.merge)
-            menu.add_command(label="delete", command=self.remove_selected_part_from_list)
-            if self.work_mode == gv.work_mode_dxf:
-                menu.add_command(label="unmark", command=self.unmark_selected_entity)
-                menu.add_command(label="mark", command=self.mark_selected_entity)
+            if self.work_mode == gv.work_mode_inp and self.selected_part.part_type == gv.part_type_entity:
+                menu.add_command(label="merge", command=self.merge)
+            if self.work_mode == gv.work_mode_dxf or (self.work_mode == gv.work_mode_inp and self.selected_part.part_type == gv.part_type_net_line):
+                menu.add_command(label="delete", command=self.remove_selected_part_from_list)
+                menu.add_command(label="mark", command=self.mark_selected_part)
+                menu.add_command(label="unmark", command=self.unmark_selected_part)
             menu.add_separator()
         if self.work_mode == gv.work_mode_dxf:
             if len(self.entity_list) > 0:
                 mark_list = self.get_marked_parts(gv.part_list_entities)
-                if len(mark_list) > 1:
-                    menu.add_command(label="merge marked entities", command=self.merge)
-                    menu.add_separator()
                 menu.add_command(label="mark all entities", command=self.mark_all_entities)
                 menu.add_command(label="unmark all entities", command=self.unmark_all_entities)
-                menu.add_command(label="delete marked entities", command=self.remove_marked_entities_from_list)
-                menu.add_command(label="delete NON marked entities", command=self.remove_non_marked_entities_from_list)
+                if len(mark_list) > 1:
+                    menu.add_command(label="merge marked entities", command=self.merge)
+                    menu.add_command(label="delete marked entities", command=self.remove_marked_entities_from_list)
+                    menu.add_command(label="delete NON marked entities", command=self.remove_non_marked_entities_from_list)
                 menu.add_separator()
         elif self.work_mode == gv.work_mode_inp:
+            mark_list = self.get_marked_parts(gv.part_list_net_lines)
+            if len(mark_list) > 1:
+                menu.add_command(label="merge marked net lines", command=self.merge)
+                menu.add_command(label="delete marked net lines", command=self.remove_marked_net_lines_from_list)
+                menu.add_separator()
             menu.add_cascade(label='Nodes number', menu=show_node_number_menu)
             menu.add_cascade(label='Net lines', menu=net_menu)
             menu.add_cascade(label='Elements', menu=show_elements_menu)
@@ -489,9 +494,13 @@ class FabianBoard(Board):
         start_node = Node(e.start, entity=i)
         node_hash_index = self.add_node_to_node_list(start_node)
         e.add_node_to_entity_nodes_list(node_hash_index)
+        node = self.node_list[self.get_node_index_from_hash(node_hash_index)]
+        node.attached_entities.append(i)
         end_node = Node(e.end, entity=i)
         node_hash_index = self.add_node_to_node_list(end_node)
         e.add_node_to_entity_nodes_list(node_hash_index)
+        node = self.node_list[self.get_node_index_from_hash(node_hash_index)]
+        node.attached_entities.append(i)
 
     def get_split_line_points(self, p1, p2, n=gv.default_split_parts):
         point_list = [p1]
@@ -544,36 +553,50 @@ class FabianBoard(Board):
         elif len(part_list) == 1:
             return part_list
         sorted_list = []
-        # sort start and end points of all lines in list
-        for i in part_list:
-            line = self.net_line_list[i]
-            start_node_index = self.get_node_index_from_hash(line.start_node)
-            end_node_index = self.get_node_index_from_hash(line.end_node)
-            if self.node_list[end_node_index].p.is_smaller_x_smaller_y(self.node_list[start_node_index].p):
-                line.start_node, line.end_node = line.end_node, line.start_node
-        first_part = part_list[0]
-        line_0 = self.net_line_list[first_part]
-        node_index = self.get_node_index_from_hash(line_0.start_node)
-        p0 = self.node_list[node_index].p
-        # find most left-bottom edge
-        for i in part_list:
-            line = self.net_line_list[i]
-            node_index = self.get_node_index_from_hash(line.start_node)
-            p1 = self.node_list[node_index].p
-            if p1.is_smaller_x_smaller_y(p0):
-                first_part = i
-                p0 = p1
-        sorted_list.append(first_part)
-        part_list.remove(first_part)
+        first_line = None
+        # find first unattached line and node
+        for i in range(len(part_list)):
+            line_i = self.net_line_list[part_list[i]]
+            is_line_i_start_node_connected = False
+            is_line_i_end_node_connected = False
+            for j in range(len(part_list)):
+                if j == i:
+                    continue
+                line_j = self.net_line_list[part_list[j]]
+                if line_i.start_node == line_j.start_node or line_i.start_node == line_j.end_node:
+                    is_line_i_start_node_connected = True
+                if line_i.end_node == line_j.start_node or line_i.end_node == line_j.end_node:
+                    is_line_i_end_node_connected = True
+                if is_line_i_start_node_connected and is_line_i_end_node_connected:
+                    break
+            if not is_line_i_start_node_connected:
+                first_line = part_list[i]
+                break
+            elif not is_line_i_end_node_connected:
+                first_line = part_list[i]
+                line_i.start_node, line_i.end_node = line_i.end_node, line_i.start_node
+                break
+        if first_line is None:
+            #debug
+            print("can't find unattached line in sort_net_line_parts")
+            return None
+        next_node = self.net_line_list[first_line].end_node
+        sorted_list.append(first_line)
+        part_list.remove(first_line)
         found_part = False
         # iterate list to find connected parts, add to list or return None if can't find
         while len(part_list) > 0:
-            start = self.net_line_list[sorted_list[-1]].end_node
             for j in part_list:
                 found_part = False
-                if self.net_line_list[j].start_node == start:
-                    sorted_list.append(j)
+                line = self.net_line_list[j]
+                if line.start_node == next_node:
                     found_part = True
+                elif line.end_node == next_node:
+                    line.start_node, line.end_node = line.end_node, line.start_node
+                    found_part = True
+                if found_part:
+                    sorted_list.append(j)
+                    next_node = line.end_node
                     part_list.remove(j)
                     break
             if not found_part:
@@ -695,8 +718,6 @@ class FabianBoard(Board):
     def merge_net_lines(self):
         if self.work_mode != gv.work_mode_inp:
             return False
-        '''
-        # problem to get out nodes after merging
         p_list = self.get_marked_parts(gv.part_list_net_lines)
         if len(p_list) < 2:
             return False
@@ -707,20 +728,24 @@ class FabianBoard(Board):
             return False
         start_node = self.net_line_list[p_list[0]].start_node
         end_node = self.net_line_list[p_list[-1]].end_node
-        entity = self.net_line_list[p_list[0]].entity
-        new_line = NetLine(start_node, end_node, entity)
-        # intermediate nodes
+        new_line = NetLine(start_node, end_node, None)
+        # get intermediate nodes
         n_list = []
         for i in range(len(p_list)-1):
             line = self.net_line_list[p_list[i]]
             n_list.append(line.end_node)
         self.remove_parts_from_list(p_list, gv.part_list_net_lines)
-        self.remove_parts_from_list(n_list, gv.part_list_nodes)
+        # get lonely nodes
+        lonely_nodes_list = []
+        for n in n_list:
+            # modify attached lines
+            self.set_lines_attached_to_node(n)
+            if len(self.node_list[self.get_node_index_from_hash(n)].attached_lines) == 0:
+                lonely_nodes_list.append(n)
+        self.remove_parts_from_list(lonely_nodes_list, gv.part_list_nodes)
         self.net_line_list.append(new_line)
         self.show_net_line(-1)
         return True
-        '''
-        return False
 
     def split_part(self, s_part=None, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=gv.default_split_parts):
         if s_part is None:
@@ -882,25 +907,25 @@ class FabianBoard(Board):
     def split_net_line_by_entity(self, part, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=gv.default_split_parts):
         if self.work_mode != gv.work_mode_inp:
             return False
-        net_lines = self.get_lines_attached_to_entity(part)
-        if len(net_lines) < 1:
+        old_lines = self.get_lines_attached_to_entity(part)
+        if len(old_lines) < 1:
             # fix me
             return False
         new_lines = []
         # fix me - currently only split_mode_evenly_n_parts supported
         n = split_additional_arg
         new_points = self.get_split_entity_points(part, n)
-        line = self.net_line_list[net_lines[0]]
-        entity = line.entity
-        self.clear_entity_middle_nodes(entity)
-        start_node = line.start_node
+        self.clear_entity_middle_nodes(part)
+        start_node_hash_index = self.entity_list[part].nodes_list[0]
         for j in range(len(new_points) - 1):
-            new_node = Node(new_points[j+1], entity=entity)
-            end_node = self.add_node_to_node_list(new_node)
-            self.entity_list[entity].add_node_to_entity_nodes_list(end_node)
-            new_lines.append(NetLine(start_node, end_node, line.entity))
-            start_node = end_node
-        self.remove_parts_from_list(net_lines, gv.part_list_net_lines)
+            new_node = Node(new_points[j+1], entity=part)
+            end_node_hash_index = self.add_node_to_node_list(new_node)
+            self.entity_list[part].add_node_to_entity_nodes_list(end_node_hash_index)
+            end_node = self.node_list[self.get_node_index_from_hash(end_node_hash_index)]
+            end_node.attached_entities.append(part)
+            new_lines.append(NetLine(start_node_hash_index, end_node_hash_index, part))
+            start_node_hash_index = end_node_hash_index
+        self.remove_parts_from_list(old_lines, gv.part_list_net_lines)
         for j in range(len(new_lines)):
             self.net_line_list.append(new_lines[j])
         return True
@@ -1100,8 +1125,8 @@ class FabianBoard(Board):
                     if node.attached_lines[i].is_outer_line:
                         break
                 if not node.attached_lines[i].is_outer_line:
-                    m = f"can't find the outer line in node: {n}"
-                    print(m)
+                    #m = f"can't find the outer line in node: {n}"
+                    #print(m)
                     return
                 # skeep angle between 2 outer lines
                 start_line = i
@@ -1722,16 +1747,33 @@ class FabianBoard(Board):
                 index = i
         return self.node_list[index].hash_index
 
-    def mark_selected_entity(self):
+    def mark_selected_part(self):
         if self.selected_part is None:
-            return
-        elif self.selected_part.part_type != gv.part_type_entity:
             return
         self.keep_state()
         i = self.selected_part.index
-        e = self.entity_list[i]
-        e.is_marked = True
-        self.set_entity_color(i, gv.marked_entity_color)
+        if self.selected_part.part_type == gv.part_type_entity:
+            e = self.entity_list[i]
+            e.is_marked = True
+            self.set_entity_color(i, gv.marked_entity_color)
+        elif self.selected_part.part_type == gv.part_type_net_line:
+            n = self.net_line_list[i]
+            n.is_marked = True
+            self.set_net_line_color(i, gv.marked_net_line_color)
+
+    def unmark_selected_part(self):
+        if self.selected_part is None:
+            return
+        self.keep_state()
+        i = self.selected_part.index
+        if self.selected_part.part_type == gv.part_type_entity:
+            e = self.entity_list[i]
+            e.is_marked = False
+            self.set_entity_color(i, gv.default_color)
+        elif self.selected_part.part_type == gv.part_type_net_line:
+            n = self.net_line_list[i]
+            n.is_marked = False
+            self.set_net_line_color(i, gv.net_line_color)
 
     def mark_all_entities(self):
         self.keep_state()
@@ -1751,16 +1793,26 @@ class FabianBoard(Board):
                 self.set_entity_color(i, gv.default_color)
             i += 1
 
-    def unmark_selected_entity(self):
-        if self.selected_part is None:
-            return
-        elif self.selected_part.part_type != gv.part_type_entity:
-            return
+    def remove_marked_net_lines_from_list(self):
         self.keep_state()
-        i = self.selected_part.index
-        e = self.entity_list[i]
-        e.is_marked = False
-        self.set_entity_color(i, gv.default_color)
+        temp_list = []
+        for i in range(len(self.net_line_list)):
+            line = self.net_line_list[i]
+            if line.is_marked:
+                temp_list.append(i)
+        if len(temp_list) > 0:
+            self.remove_parts_from_list(temp_list, gv.part_list_net_lines)
+            unattached_nodes = self.get_unattached_nodes(True)
+            if len(unattached_nodes) > 0:
+                hash_list = []
+                for n in unattached_nodes:
+                    node = self.node_list[n]
+                    if len(node.attached_lines) == 0:
+                        hash_list.append(node.hash_index)
+                self.remove_parts_from_list(hash_list, gv.part_list_nodes)
+            self.update_view()
+        else:
+            self.state.pop(-1)
 
     def remove_marked_entities_from_list(self):
         self.keep_state()
@@ -2124,6 +2176,11 @@ class FabianBoard(Board):
     def hide_dxf_entities(self):
         for i in range(len(self.entity_list)):
             self.hide_entity(i)
+
+    def set_net_line_color(self, part, color):
+        self.hide_net_line(part)
+        self.net_line_list[part].color = color
+        self.show_net_line(part)
 
     def set_entity_color(self, part, color):
         self.hide_entity(part)
