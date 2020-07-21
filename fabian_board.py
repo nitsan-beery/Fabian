@@ -530,7 +530,9 @@ class FabianBoard(Board):
             changed = self.merge_entities()
         elif self.select_parts_mode == gv.part_type_net_line:
             changed = self.merge_net_lines()
-        if not changed:
+        if changed:
+            self.update_view()
+        else:
             self.state.pop(-1)
 
     # return continues list of lines, None if the list is broken
@@ -660,7 +662,6 @@ class FabianBoard(Board):
             self.remove_parts_from_list(e_list, gv.part_list_entities)
             self.entity_list.append(new_entity)
             self.show_entity(-1)
-            return True
         # work mode inp
         else:
             if self.selected_part is None or self.selected_part.part_type != gv.part_type_entity:
@@ -668,19 +669,17 @@ class FabianBoard(Board):
             entity = self.entity_list[self.selected_part.index]
             if len(entity.nodes_list) < 3:
                 return False
-            removed_nodes = []
             removed_net_lines = []
             for i in range(1, len(entity.nodes_list) - 1):
                 hash_index = entity.nodes_list[i]
                 n = self.get_node_index_from_hash(hash_index)
                 node = self.node_list[n]
-                removed_nodes.append(hash_index)
                 self.set_lines_attached_to_node(hash_index)
                 for al in node.attached_lines:
                     removed_net_lines.append(al.line_index)
+            self.clear_entity_middle_nodes(self.selected_part.index)
             start_node = entity.nodes_list[0]
             end_node = entity.nodes_list[-1]
-            entity.nodes_list = [start_node, end_node]
             start_node = self.get_node_index_from_hash(start_node)
             end_node = self.get_node_index_from_hash(end_node)
             p1 = self.node_list[start_node].p
@@ -688,7 +687,10 @@ class FabianBoard(Board):
             self.add_line_to_net_list(p1, p2)
             self.net_line_list[-1].entity = self.selected_part.index
             self.remove_parts_from_list(removed_net_lines, gv.part_list_net_lines)
-            self.remove_parts_from_list(removed_nodes, gv.part_list_nodes)
+            #debug
+            #print('after merge')
+            #self.print_line_list()
+        return True
 
     def merge_net_lines(self):
         if self.work_mode != gv.work_mode_inp:
@@ -1055,10 +1057,10 @@ class FabianBoard(Board):
             end_node_index = self.get_node_index_from_hash(line.end_node)
             start_node = self.node_list[start_node_index]
             end_node = self.node_list[end_node_index]
-            if n == line.start_node:
+            if node_hash_index == line.start_node:
                 al = AttachedLine(i, line.end_node, start_node.p.get_alfa_to(end_node.p))
                 node.attached_lines.append(al)
-            elif n == line.end_node:
+            elif node_hash_index == line.end_node:
                 al = AttachedLine(i, line.start_node, end_node.p.get_alfa_to(start_node.p))
                 node.attached_lines.append(al)
         node.attached_lines = sorted(node.attached_lines, key=attrgetter('angle_to_second_node'))
@@ -1357,7 +1359,9 @@ class FabianBoard(Board):
         print('lines:')
         for i in range(len(self.net_line_list)):
             line = self.net_line_list[i]
-            print(f'{i}: start node: {line.start_node}   end node: {line.end_node}   entity: {line.entity}')
+            start_node = self.get_node_index_from_hash(line.start_node)
+            end_node = self.get_node_index_from_hash(line.end_node)
+            print(f'{i}: start node: {start_node}   end node: {end_node}   entity: {line.entity}')
 
     # debug
     def print_elements(self, element_list):
