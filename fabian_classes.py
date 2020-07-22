@@ -309,7 +309,7 @@ class SplitDialog(object):
         # set default values
         self.split_choice_menu.current(0)
         self.split_choice_menu.bind("<<ComboboxSelected>>", self.mode_selected)
-        self.entry_arg.insert(0, '2')
+        self.entry_arg.insert(0, '3')
         self.choice = None
 
     def mode_selected(self, key):

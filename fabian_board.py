@@ -384,14 +384,14 @@ class FabianBoard(Board):
                 menu.add_command(label="mark all entities", command=self.mark_all_entities)
                 menu.add_command(label="unmark all entities", command=self.unmark_all_entities)
                 if len(mark_list) > 1:
-                    menu.add_command(label="merge marked entities", command=self.merge)
+                    menu.add_command(label="merge marked entities", command=lambda: self.merge(True))
                     menu.add_command(label="delete marked entities", command=self.remove_marked_entities_from_list)
                     menu.add_command(label="delete NON marked entities", command=self.remove_non_marked_entities_from_list)
                 menu.add_separator()
         elif self.work_mode == gv.work_mode_inp:
             mark_list = self.get_marked_parts(gv.part_list_net_lines)
             if len(mark_list) > 1:
-                menu.add_command(label="merge marked net lines", command=self.merge)
+                menu.add_command(label="merge marked net lines", command=lambda: self.merge(True))
                 menu.add_command(label="delete marked net lines", command=self.remove_marked_net_lines_from_list)
                 menu.add_separator()
             menu.add_cascade(label='Nodes number', menu=show_node_number_menu)
@@ -531,18 +531,20 @@ class FabianBoard(Board):
             start_angle = end_angle
         return point_list
 
-    def merge(self):
+    def merge(self, marked_parts=False):
         self.keep_state()
         changed = False
-        if self.select_parts_mode == gv.part_type_entity:
-            changed = self.merge_entities()
-        elif self.select_parts_mode == gv.part_type_net_line:
-            changed = self.merge_net_lines()
-        elif self.select_parts_mode == 'all' and self.selected_part is not None:
+        if marked_parts:
+            if self.work_mode == gv.work_mode_dxf:
+                changed = self.merge_entities()
+            elif self.work_mode == gv.work_mode_inp:
+                changed = self.merge_net_lines()
+        # merge selected part
+        elif self.selected_part is not None:
             if self.selected_part.part_type == gv.part_type_entity:
                 changed = self.merge_entities()
-            else:
-                self.merge_net_lines()
+            elif self.selected_part.part_type == gv.part_type_net_line:
+                    changed = self.merge_net_lines()
         if changed:
             self.update_view()
         else:
@@ -584,6 +586,7 @@ class FabianBoard(Board):
             #debug
             print("can't find unattached line in sort_net_line_parts")
             return None
+        entity = self.net_line_list[first_line].entity
         next_node = self.net_line_list[first_line].end_node
         sorted_list.append(first_line)
         part_list.remove(first_line)
@@ -593,6 +596,8 @@ class FabianBoard(Board):
             for j in part_list:
                 found_part = False
                 line = self.net_line_list[j]
+                if line.entity != entity:
+                    return None
                 if line.start_node == next_node:
                     found_part = True
                 elif line.end_node == next_node:
@@ -726,9 +731,10 @@ class FabianBoard(Board):
             m = "can't merge strange lines"
             messagebox.showwarning(m)
             return False
+        entity = self.net_line_list[p_list[0]].entity
         start_node = self.net_line_list[p_list[0]].start_node
         end_node = self.net_line_list[p_list[-1]].end_node
-        new_line = NetLine(start_node, end_node, None)
+        new_line = NetLine(start_node, end_node, entity)
         # get intermediate nodes
         n_list = []
         for i in range(len(p_list)-1):
@@ -752,11 +758,12 @@ class FabianBoard(Board):
         # split net line
         else:
             changed = self.split_net_line(part, split_mode, split_additional_arg)
-        self.update_view()
         if changed:
             self.remove_selected_part_mark()
+            self.update_view()
         else:
             self.state.pop(-1)
+
 
     def split_selected_part(self, split_mode=None, split_arg=gv.default_split_parts):
         if self.selected_part is None:
@@ -794,10 +801,6 @@ class FabianBoard(Board):
 
     # split entity_list[i] into n parts
     def split_entity(self, part=0, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=gv.default_split_parts):
-        if self.selected_part is None:
-            return False
-        if self.selected_part.part_type != gv.part_type_entity:
-            return False
         # fix me
         # currently only split_mode_evenly_n_parts is supported
         n = split_additional_arg
@@ -1863,11 +1866,12 @@ class FabianBoard(Board):
             self.state.pop(-1)
 
     def remove_marked_entities_from_list(self):
-        self.keep_state()
         temp_list = []
         for e in self.entity_list:
             if not e.is_marked:
                 temp_list.append(e)
+        if len(temp_list) > 0:
+            self.keep_state()
         for e in temp_list:
             e.board_part = None
         self.entity_list = temp_list
@@ -1876,11 +1880,12 @@ class FabianBoard(Board):
         self.show_dxf_entities()
 
     def remove_non_marked_entities_from_list(self):
-        self.keep_state()
         temp_list = []
         for e in self.entity_list:
             if e.is_marked:
                 temp_list.append(e)
+        if len(temp_list) > 0:
+            self.keep_state()
         for e in temp_list:
             e.is_marked = False
             e.board_part = None
