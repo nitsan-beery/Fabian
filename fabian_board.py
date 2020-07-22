@@ -447,6 +447,7 @@ class FabianBoard(Board):
             self.show_nodes = True
             self.show_net = True
             self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
+            self.change_select_parts_mode('all')
             self.choose_mark_option('quit')
         self.update_view()
 
@@ -504,32 +505,54 @@ class FabianBoard(Board):
         node.attached_entities.append(i)
 
     def get_split_line_points(self, p1, p2, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):
-        # fix me - currently only split_mode_evenly_n_parts supported
-        n = split_arg
         point_list = [p1]
         alfa = p1.get_alfa_to(p2) * math.pi / 180
         d = p1.get_distance_to_point(p2)
-        step = d / n
         start = p1
-        for m in range(n):
-            end = Point(start.x + step * math.cos(alfa), start.y + step * math.sin(alfa))
-            point_list.append(end)
-            start = end
+        if split_mode == gv.split_mode_evenly_n_parts:
+            n = split_arg
+            step = d / n
+            for m in range(n):
+                end = Point(start.x + step * math.cos(alfa), start.y + step * math.sin(alfa))
+                point_list.append(end)
+                start = end
+        elif split_mode == gv.split_mode_2_parts_percentage_left:
+            percentage_left = split_arg
+            if p2.is_smaller_x_smaller_y(p1):
+                percentage_left = 100-percentage_left
+            d = d * percentage_left / 100
+            new_point = Point(start.x + d * math.cos(alfa), start.y + d * math.sin(alfa))
+            point_list.append(new_point)
+            point_list.append(p2)
+        elif split_mode == gv.split_mode_3_parts_percentage_middle:
+            percentage_middle = split_arg
+            percentage_side = (100 - percentage_middle) / 2
+            d1 = d * percentage_side / 100
+            d2 = d * (percentage_middle + percentage_side) / 100
+            new_point_1 = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
+            new_point_2 = Point(start.x + d2 * math.cos(alfa), start.y + d2 * math.sin(alfa))
+            point_list.append(new_point_1)
+            point_list.append(new_point_2)
+            point_list.append(p2)
         return point_list
 
     def get_split_arc_points(self, arc, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):
-        point_list = []
-        #fix me - only split_mode_evenly_n_parts supported
-        n = split_arg
-        angle = (arc.arc_end_angle-arc.arc_start_angle) / n
+        point_list = [arc.start]
         start_angle = arc.arc_start_angle
-        point_list.append(arc.start)
-        for m in range(n):
-            end_angle = start_angle + angle
-            arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                         end_angle=end_angle)
-            point_list.append(arc.end)
-            start_angle = end_angle
+        if split_mode == gv.split_mode_evenly_n_parts:
+            n = split_arg
+            angle = (arc.arc_end_angle - arc.arc_start_angle) / n
+            for m in range(n):
+                end_angle = start_angle + angle
+                arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
+                             end_angle=end_angle)
+                point_list.append(arc.end)
+                start_angle = end_angle
+        # fix me - currently only split_mode_evenly_n_parts supported
+        elif split_mode == gv.split_mode_2_parts_percentage_left:
+            pass
+        elif split_mode == gv.split_mode_3_parts_percentage_middle:
+            pass
         return point_list
 
     def merge(self, marked_parts=False):
@@ -934,7 +957,6 @@ class FabianBoard(Board):
         for j in range(len(new_points) - 1):
             new_node = Node(new_points[j+1], entity=part)
             end_hash_node = self.add_node_to_node_list(new_node)
-            self.entity_list[part].add_node_to_entity_nodes_list(end_hash_node)
             end_node = self.node_list[self.get_node_index_from_hash(end_hash_node)]
             end_node.attached_entities.append(part)
             self.net_line_list.append(NetLine(start_hash_node, end_hash_node, part))
@@ -1082,15 +1104,6 @@ class FabianBoard(Board):
                 if len(self.node_list[node_index].attached_lines) == 0:
                     lonely_nodes_list.append(n)
         self.remove_parts_from_list(lonely_nodes_list, gv.part_list_nodes)
-
-    def clear_entity_middle_nodes(self, part):
-        entity = self.entity_list[part]
-        if len(entity.nodes_list) < 3:
-            return
-        for i in range(1, len(entity.nodes_list) - 1):
-            node_hash = entity.nodes_list[i]
-            self.remove_node_from_node_list(node_hash)
-        entity.nodes_list = [entity.nodes_list[0], entity.nodes_list[-1]]
 
     def remove_parts_from_list(self, part_list, list_name):
         # remove duplicate parts from list
