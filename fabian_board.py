@@ -100,7 +100,7 @@ class FabianBoard(Board):
             n.get_data_from_tuple(t)
             self.node_list.append(n)
         self.next_node_hash_index = state.next_node_hash_index
-        self.nodes_hash = state.nodes_hash
+        self.nodes_hash = state.nodes_hash.copy()
         for t in state.net_line_list:
             line = NetLine()
             line.get_data_from_tuple(t)
@@ -134,7 +134,7 @@ class FabianBoard(Board):
             t = e.convert_into_tuple()
             node_list.append(t)
         state.next_node_hash_index = self.next_node_hash_index
-        state.nodes_hash = self.nodes_hash
+        state.nodes_hash = self.nodes_hash.copy()
         net_list = []
         for e in self.net_line_list:
             t = e.convert_into_tuple()
@@ -157,6 +157,7 @@ class FabianBoard(Board):
         state.show_net = self.show_net
         state.scale = self.scale
         self.state.append(state)
+
 
     def mouse_1_pressed(self, key):
         if self.temp_rect_mark is not None:
