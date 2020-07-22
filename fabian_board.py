@@ -1132,6 +1132,7 @@ class FabianBoard(Board):
         part_list = list(dict.fromkeys(part_list))
         part_list = sorted(part_list, reverse=True)
         original_list = None
+        attached_nodes = []
         if list_name == gv.part_list_nodes:
             for part in part_list:
                 self.remove_node_from_node_list(part)
@@ -1140,11 +1141,14 @@ class FabianBoard(Board):
                 original_list = self.entity_list
             elif list_name == gv.part_list_net_lines:
                 original_list = self.net_line_list
+                attached_nodes = self.get_nodes_attached_to_lines(part_list)
             for part in part_list:
                 if part is None:
                     return
                 self.hide_part(part, list_name)
                 original_list.pop(part)
+        if len(attached_nodes) > 0:
+            self.clear_lonely_nodes(attached_nodes)
         self.remove_selected_part_mark()
 
     def get_lines_attached_to_entity(self, entity):
@@ -1485,7 +1489,8 @@ class FabianBoard(Board):
     # debug
     def print_nodes_exceptions(self, node_list):
         print('Exception nodes:')
-        for n in node_list:
+        for hash_index in node_list:
+            n = self.get_node_index_from_hash(hash_index)
             print(f'{n}: {self.node_list[n].exceptions}')
 
     # debug
@@ -1662,7 +1667,10 @@ class FabianBoard(Board):
         # debug
         #self.print_node_list()
         #self.print_line_list()
-        self.save_json(data)
+        filename = self.save_json(data)
+        i = filename.rfind('/')
+        title = filename[i+1:]
+        self.window_main.title(title)
 
     def save_dxf(self):
         doc = ezdxf.new('R2010')
@@ -1680,6 +1688,9 @@ class FabianBoard(Board):
                                                 filetypes=(("dxf files", "*.dxf"), ("all files", "*.*")))
         if filename == '':
             return
+        i = filename.rfind('/')
+        title = filename[i+1:]
+        self.window_main.title(title)
         doc.saveas(filename)
 
     def load(self):
@@ -1689,8 +1700,11 @@ class FabianBoard(Board):
         if filename == '':
             return
         self.reset_board()
-        i = filename.find('.')
+        i = filename.rfind('.')
         filetype = filename[i+1:].lower()
+        i = filename.rfind('/')
+        title = filename[i+1:]
+        self.window_main.title(title)
         if filetype == 'dxf':
             doc = ezdxf.readfile(filename)
             self.convert_doc_to_entity_list(doc)
@@ -2218,8 +2232,7 @@ class FabianBoard(Board):
         nodes = element.nodes
         if element.board_part is None:
             poly = []
-            for n in nodes:
-                node_index = self.get_node_index_from_hash(n)
+            for node_index in nodes:
                 poly.append(self.node_list[node_index].p)
             self.element_list[e].board_part = self.draw_polygon(poly)
 

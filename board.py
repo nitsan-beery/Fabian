@@ -154,7 +154,8 @@ class Board:
                                                 initialfile=default_file_name, defaultextension=".json",
                                                 filetypes=(("json files", "*.json"), ("all files", "*.*")))
         if filename == '' or data is None:
-            return
+            return None
         with open(filename, "w") as json_file:
             json.dump(data, json_file)
+        return filename
 
