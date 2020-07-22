@@ -539,20 +539,40 @@ class FabianBoard(Board):
     def get_split_arc_points(self, arc, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):
         point_list = [arc.start]
         start_angle = arc.arc_start_angle
+        diff_angle = arc.arc_end_angle - arc.arc_start_angle
         if split_mode == gv.split_mode_evenly_n_parts:
             n = split_arg
             angle = (arc.arc_end_angle - arc.arc_start_angle) / n
             for m in range(n):
                 end_angle = start_angle + angle
-                arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
+                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
                              end_angle=end_angle)
-                point_list.append(arc.end)
+                point_list.append(new_arc.end)
                 start_angle = end_angle
-        # fix me - currently only split_mode_evenly_n_parts supported
         elif split_mode == gv.split_mode_2_parts_percentage_left:
-            pass
+            percentage_left = split_arg
+            if arc.end.is_smaller_x_smaller_y(arc.start):
+                percentage_left = 100 - percentage_left
+            angle = diff_angle * percentage_left / 100
+            end_angle = start_angle + angle
+            new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
+                         end_angle=end_angle)
+            point_list.append(new_arc.end)
+            point_list.append(arc.end)
         elif split_mode == gv.split_mode_3_parts_percentage_middle:
-            pass
+            percentage_middle = split_arg
+            percentage_side = (100 - percentage_middle) / 2
+            angle = diff_angle * percentage_side / 100
+            end_angle = start_angle + angle
+            new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
+                             end_angle=end_angle)
+            point_list.append(new_arc.end)
+            angle = diff_angle * (percentage_middle + percentage_side) / 100
+            end_angle = start_angle + angle
+            new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
+                             end_angle=end_angle)
+            point_list.append(new_arc.end)
+            point_list.append(arc.end)
         return point_list
 
     def merge(self, marked_parts=False):
@@ -799,6 +819,8 @@ class FabianBoard(Board):
             if choice is not None:
                 split_mode = choice.get('split_mode')
                 split_arg = choice.get('arg')
+            else:
+                return
         self.split_part(s_part, split_mode, split_arg)
 
     def split_entity_by_point(self, s_part, p):
