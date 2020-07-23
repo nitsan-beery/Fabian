@@ -400,7 +400,7 @@ class FabianBoard(Board):
             menu.add_cascade(label='Elements', menu=show_elements_menu)
             menu.add_cascade(label='Entities', menu=show_entities_menu)
             menu.add_separator()
-            menu.add_command(label="Split arcs and lines", command=self.split_arcs_and_lines_for_inp)
+            menu.add_command(label="Split arcs and lines...", command=self.split_arcs_and_lines_for_inp)
             menu.add_command(label="Set net", command=self.set_net)
             menu.add_separator()
         menu.add_command(label="Quit")
@@ -882,6 +882,12 @@ class FabianBoard(Board):
 
     def split_arcs_and_lines_for_inp(self):
         self.keep_state()
+        choice = SetInitialNetDialog(self.window_main).show()
+        if choice is not None:
+            arc_max_angle = choice.get('arc_max_angle')
+            line_max_length = choice.get('line_max_length')
+        else:
+            return
         hash_bottom_left = self.get_bottom_left_node()
         index_bottom_left = self.get_node_index_from_hash(hash_bottom_left)
         bottom_left = self.node_list[index_bottom_left].p
@@ -899,12 +905,12 @@ class FabianBoard(Board):
             relative_length = d / d_dxf
             if e.shape == 'ARC':
                 angle = e.arc_end_angle - e.arc_start_angle
-                n = round(angle/gv.max_arc_angle_for_net_line)
-                if relative_length > gv.max_arc_length_for_net_line:
-                    n_length = round(relative_length / gv.max_arc_length_for_net_line)
+                n = round(angle/arc_max_angle)
+                if relative_length > line_max_length:
+                    n_length = round(relative_length / line_max_length)
             elif e.shape == 'LINE':
-                if relative_length > gv.max_line_length_for_net_line:
-                    n_length = round(relative_length / gv.max_line_length_for_net_line)
+                if relative_length > line_max_length:
+                    n_length = round(relative_length / line_max_length)
             if n_length > n:
                 n = n_length
             if n > 1:

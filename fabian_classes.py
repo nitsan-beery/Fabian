@@ -365,3 +365,85 @@ class SplitDialog(object):
             self.get_choice()
 
 
+class SetInitialNetDialog(object):
+    def __init__(self, parent):
+        self.window = tk.Toplevel(parent)
+        self.window.title(' Choose')
+        self.window.geometry('220x120')
+        self.window.resizable(0, 0)
+
+        self.frame_1 = tk.Frame(self.window)
+        self.frame_1.pack(side=tk.TOP, fill=tk.BOTH, pady=5)
+        self.frame_2 = tk.Frame(self.window)
+        self.frame_2.pack(side=tk.TOP, fill=tk.BOTH, ipady=6)
+        self.frame_3 = tk.Frame(self.window)
+        self.frame_3.pack(side=tk.BOTTOM, fill=tk.BOTH, ipady=0)
+
+        self.label_arc_angle = tk.Label(self.frame_2, text='Max Arc angle', padx=10)
+        self.label_line_length = tk.Label(self.frame_2, text='Max Line length %', padx=10)
+
+        self.label_arc_angle.grid(row=0, column=0)
+        self.label_line_length.grid(row=0, column=1)
+
+        self.entry_arc_angle = tk.Entry(self.frame_2, width=5)
+        self.entry_line_length = tk.Entry(self.frame_2, width=5)
+
+        self.entry_arc_angle.grid(row=1, column=0)
+        self.entry_line_length.grid(row=1, column=1)
+
+        button_ok = tk.Button(self.frame_3, text="OK", width=5, command=self.get_choice)
+        button_cancel = tk.Button(self.frame_3, text="Cancel", width=5, command=self.window.destroy)
+        button_ok.pack(side=tk.RIGHT, padx=5, pady=5)
+        button_cancel.pack(side=tk.LEFT, padx=5)
+
+        self.window.bind('<Key>', self.key)
+        self.window.lift()
+
+        # set default values
+        self.entry_arc_angle.insert(0, gv.max_arc_angle_for_net_line)
+        self.entry_line_length.insert(0, gv.max_line_length_for_net_line)
+        self.choice = None
+
+    def get_choice(self):
+        arc_angle = self.entry_arc_angle.get()
+        line_length = self.entry_line_length.get()
+
+        min_arc_angle = 1
+        max_arc_angle = 359
+        min_length_percentage = math.pow(10, -gv.accuracy)
+        max_length_percentage = 100
+
+        # validity check
+        try:
+            arc_angle = float(arc_angle)
+        except ValueError:
+            print(f'choose arc angle between {min_arc_angle}-{max_arc_angle}')
+            return
+        try:
+            line_length = float(line_length)
+        except ValueError:
+            print(f'choose line length percentage between {min_length_percentage}-{max_length_percentage}')
+            return
+
+        if arc_angle < min_arc_angle or arc_angle > max_arc_angle:
+            print(f'choose arc angle between {min_arc_angle}-{max_arc_angle}')
+            return
+        if line_length < min_length_percentage or line_length > max_length_percentage:
+            print(f'choose line length percentage between {min_length_percentage}-{max_length_percentage}')
+            return
+
+        self.choice = {
+            'arc_max_angle': arc_angle,
+            'line_max_length': line_length
+        }
+        self.window.destroy()
+
+    def show(self):
+        self.window.deiconify()
+        self.window.wait_window()
+        return self.choice
+
+    def key(self, event):
+        if event.keycode == 13:
+            self.get_choice()
+
