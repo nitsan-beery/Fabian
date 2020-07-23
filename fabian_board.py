@@ -508,6 +508,21 @@ class FabianBoard(Board):
         node = self.node_list[self.get_node_index_from_hash(node_hash_index)]
         node.attached_entities.append(i)
 
+    def get_split_circle_points(self, circle, parts, start_angle, end_angle=None):
+        point_list = []
+        n = parts
+        diff_angle = 360
+        if end_angle is not None:
+            if end_angle < start_angle:
+                end_angle += 360
+            diff_angle = end_angle - start_angle
+        for i in range(n):
+            end_angle = start_angle + (diff_angle/n)
+            arc = Entity('ARC', center=circle.center, radius=circle.radius, start_angle=start_angle, end_angle=end_angle)
+            point_list.append(arc.start)
+            start_angle = end_angle
+        return point_list
+
     def get_split_line_points(self, p1, p2, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):
         point_list = [p1]
         alfa = p1.get_alfa_to(p2) * math.pi / 180
@@ -802,7 +817,11 @@ class FabianBoard(Board):
         if s_part.part_type == gv.part_type_entity and self.work_mode == gv.work_mode_dxf:
             changed = self.split_entity(part, split_mode, split_additional_arg)
         elif s_part.part_type == gv.part_type_entity and self.work_mode == gv.work_mode_inp:
-            changed = self.split_net_line_by_entity(part, 0, -1, split_mode, split_additional_arg)
+            start = None
+            if self.entity_list[s_part.index].shape == 'CIRCLE':
+                start = split_mode
+                split_mode = gv.split_mode_by_angle
+            changed = self.split_net_line_by_entity(part, split_mode, split_additional_arg, start)
         # split net line
         else:
             changed = self.split_net_line(part, split_mode, split_additional_arg)
@@ -817,24 +836,24 @@ class FabianBoard(Board):
         if self.selected_part is None:
             return
         s_part = self.selected_part
-        if s_part.part_type == gv.part_type_entity:
-            if self.entity_list[self.selected_part.index].shape == 'CIRCLE':
-                longitude = self.get_longitude()
-                if split_mode is None:
-                    choice = SplitCircleDialog(self.window_main).show()
-                    if choice is not None:
-                        split_mode = choice.get('split_mode')
-                        angle = choice.get('angle')
-                        parts = choice.get('parts')
-                        if split_mode == gv.split_mode_by_longitude:
-                            angle = longitude + angle
-                    else:
-                        return
-                # default split circle
+        if s_part.part_type == gv.part_type_entity and self.entity_list[self.selected_part.index].shape == 'CIRCLE':
+            longitude = self.get_longitude()
+            if split_mode is None:
+                choice = SplitCircleDialog(self.window_main).show()
+                if choice is not None:
+                    split_mode = choice.get('split_mode')
+                    angle = choice.get('angle')
+                    parts = choice.get('parts')
+                    if split_mode == gv.split_mode_by_longitude:
+                        angle = longitude + angle
                 else:
-                    angle = longitude + 45
-                    parts = 4
-                self.split_circle(s_part.index, angle, parts)
+                    return
+            # default split circle
+            else:
+                angle = longitude + 45
+                parts = 4
+            split_mode = angle
+            split_arg = parts
         else:
             if split_mode is None:
                 choice = SplitDialog(self.window_main).show()
@@ -893,7 +912,7 @@ class FabianBoard(Board):
                 new_part_list.append(line)
                 start = end
         elif e.shape == 'CIRCLE':
-            self.split_circle(part)
+            self.split_circle(part, split_mode, split_additional_arg)
             return True
         self.remove_parts_from_list([part], gv.part_list_entities)
         for m in range(n):
@@ -935,7 +954,7 @@ class FabianBoard(Board):
             if n_length > n:
                 n = n_length
             if n > 1:
-                self.split_net_line_by_entity(i, 0, -1, gv.split_mode_evenly_n_parts, n)
+                self.split_net_line_by_entity(i, gv.split_mode_evenly_n_parts, n)
             i -= 1
         self.update_view()
 
@@ -952,7 +971,7 @@ class FabianBoard(Board):
         if len(self.entity_list) < (part + 1):
             return 
         e = self.entity_list[part]
-        if e.shape != 'CIRCLE':
+        if e.shape != 'CIRCLE' or self.work_mode != gv.work_mode_dxf:
             return
         for i in range(n):
             end_angle = start_angle + (360/n)
@@ -970,24 +989,24 @@ class FabianBoard(Board):
         new_lines.append(NetLine(new_node_index, line.end_node, None))
         self.remove_parts_from_list([part], gv.part_list_net_lines)
 
-    def split_net_line_by_entity(self, part, start_node=0, end_node=-1, split_mode=gv.split_mode_evenly_n_parts,
-                                 split_additional_arg=gv.default_split_parts):
+    def split_net_line_by_entity(self, part, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=gv.default_split_parts,
+                                 start=None):
         if self.work_mode != gv.work_mode_inp:
             return False
         old_lines = self.get_lines_attached_to_entity(part)
-        if len(old_lines) < 1:
-            # fix me
-            return False
         entity = self.entity_list[part]
-        if entity.shape == 'CIRCLE':
-            return False
         entity_nodes = self.get_nodes_attached_to_lines(old_lines)
-        start_hash_node = entity.nodes_list[0]
-        end_hash_node = entity.nodes_list[-1]
-        start_node_index = self.get_node_index_from_hash(start_hash_node)
-        end_node_index = self.get_node_index_from_hash(end_hash_node)
-        # fix me - currently only split_mode_evenly_n_parts supported
-        if entity.shape == 'LINE':
+        if len(entity_nodes) > 1:
+            start_hash_node = entity.nodes_list[0]
+            end_hash_node = entity.nodes_list[-1]
+        if entity.shape == 'CIRCLE':
+            new_points = self.get_split_circle_points(entity, split_additional_arg, start)
+            new_node = Node(new_points[0], entity=part)
+            start_hash_node = self.add_node_to_node_list(new_node)
+            circle_first_node = start_hash_node
+        elif entity.shape == 'LINE':
+            start_node_index = self.get_node_index_from_hash(start_hash_node)
+            end_node_index = self.get_node_index_from_hash(end_hash_node)
             if start_node_index is None or end_node_index is None:
                 #debug - fix me
                 print('bug in split_net_line_by_entity')
@@ -1007,6 +1026,8 @@ class FabianBoard(Board):
             end_node.attached_entities.append(part)
             self.net_line_list.append(NetLine(start_hash_node, end_hash_node, part))
             start_hash_node = end_hash_node
+        if entity.shape == 'CIRCLE':
+            self.net_line_list.append(NetLine(start_hash_node, circle_first_node, part))
         return True
 
     def split_net_line(self, part, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=gv.default_split_parts):
@@ -1023,20 +1044,17 @@ class FabianBoard(Board):
             shape = self.entity_list[line.entity].shape
         if shape == 'LINE':
             new_points = self.get_split_line_points(node1.p, node2.p, split_mode, split_additional_arg)
-        # line on ARC
-        else:
-            reference_arc = self.entity_list[line.entity]
-            start_angle = reference_arc.center.get_alfa_to(node1.p)
-            end_angle = reference_arc.center.get_alfa_to(node2.p)
-            # set the correct order of start - end angles according to reference_arc start_angle
-            accuracy = math.pow(10, -gv.accuracy)
-            if start_angle + accuracy < reference_arc.arc_start_angle:
-                start_angle += 360
-            if end_angle + accuracy < reference_arc.arc_start_angle:
+        elif shape == 'ARC' or shape == 'CIRCLE':
+            reference_entity = self.entity_list[line.entity]
+            start_angle = reference_entity.center.get_alfa_to(node1.p)
+            end_angle = reference_entity.center.get_alfa_to(node2.p)
+            if end_angle + 360 - start_angle < 180:
                 end_angle += 360
+            if start_angle + 360 - end_angle < 180:
+                start_angle += 360
             if end_angle < start_angle:
                 start_angle, end_angle = end_angle, start_angle
-            arc = Entity('ARC', reference_arc.center, reference_arc.radius, start_angle=start_angle, end_angle=end_angle)
+            arc = Entity('ARC', reference_entity.center, reference_entity.radius, start_angle=start_angle, end_angle=end_angle)
             new_points = self.get_split_arc_points(arc, split_mode, split_additional_arg)
         start_node = line.start_node
         for j in range(len(new_points) - 1):

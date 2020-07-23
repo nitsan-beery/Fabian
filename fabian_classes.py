@@ -273,13 +273,6 @@ split_arc_and_line_mode_dictionary = {
     split_arc_and_line_choices_list[2]: gv.split_mode_3_parts_percentage_middle
 }
 
-split_circle_choices_list = ['by longitude', 'by angle']
-
-split_circle_mode_dictionary = {
-    split_circle_choices_list[0]: gv.split_mode_by_longitude,
-    split_circle_choices_list[1]: gv.split_mode_by_angle
-}
-
 
 class SplitDialog(object):
     def __init__(self, parent):
@@ -456,11 +449,19 @@ class SetInitialNetDialog(object):
             self.get_choice()
 
 
+split_circle_choices_list = ['by longitude', 'by absolute angle']
+
+split_circle_mode_dictionary = {
+    split_circle_choices_list[0]: gv.split_mode_by_longitude,
+    split_circle_choices_list[1]: gv.split_mode_by_angle
+}
+
+
 class SplitCircleDialog(object):
     def __init__(self, parent):
         self.window = tk.Toplevel(parent)
         self.window.title(' Choose')
-        self.window.geometry('250x160')
+        self.window.geometry('305x160')
         self.window.resizable(0, 0)
 
         self.frame_1 = tk.Frame(self.window)
@@ -471,14 +472,14 @@ class SplitCircleDialog(object):
         self.frame_3.pack(side=tk.BOTTOM, fill=tk.BOTH, ipady=0)
 
         self.label_mode = tk.Label(self.frame_2, text='Split mode', padx=10)
-        self.label_angle = tk.Label(self.frame_2, width=5, text='relative start angle', padx=7)
+        self.label_angle = tk.Label(self.frame_2, width=15, text='relative start angle', padx=7)
         self.label_parts = tk.Label(self.frame_2, width=5, text='#parts', padx=7)
 
-        self.label_mode.grid(row=0, column=0, sticky='w')
+        self.label_mode.grid(row=0, column=0)
         self.label_angle.grid(row=0, column=1)
         self.label_parts.grid(row=0, column=2)
 
-        self.split_choice_menu = ttk.Combobox(self.frame_2, width=25, values=split_circle_choices_list)
+        self.split_choice_menu = ttk.Combobox(self.frame_2, width=15, values=split_circle_choices_list)
         self.entry_angle = tk.Entry(self.frame_2, width=3)
         self.entry_parts = tk.Entry(self.frame_2, width=3)
 
@@ -509,7 +510,7 @@ class SplitCircleDialog(object):
             self.entry_angle.insert(0, '45')
         #  split_circle_mode_dictionary.get(split_mode) == gv.split_mode_by_angle
         else:
-            self.label_angle.config(text='start angle')
+            self.label_angle.config(text='absolute start angle')
             self.entry_angle.delete(0, tk.END)
             self.entry_angle.insert(0, '0')
 
@@ -528,6 +529,13 @@ class SplitCircleDialog(object):
         except ValueError:
             print('choose a number for #parts')
             return
+
+        self.choice = {
+            'angle': angle,
+            'parts': parts
+        }
+        self.window.destroy()
+
 
     def show(self):
         self.window.deiconify()
