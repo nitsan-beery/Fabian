@@ -370,7 +370,7 @@ class SetInitialNetDialog(object):
     def __init__(self, parent):
         self.window = tk.Toplevel(parent)
         self.window.title(' Choose')
-        self.window.geometry('210x120')
+        self.window.geometry('290x120')
         self.window.resizable(0, 0)
 
         self.frame_1 = tk.Frame(self.window)
@@ -382,15 +382,19 @@ class SetInitialNetDialog(object):
 
         self.label_arc_angle = tk.Label(self.frame_2, text='Max Arc angle', padx=10)
         self.label_line_length = tk.Label(self.frame_2, text='Max Line length', padx=10)
+        self.label_circle_parts = tk.Label(self.frame_2, text='Circle parts', padx=10)
 
         self.label_arc_angle.grid(row=0, column=0)
         self.label_line_length.grid(row=0, column=1)
+        self.label_circle_parts.grid(row=0, column=2)
 
         self.entry_arc_angle = tk.Entry(self.frame_2, width=5)
         self.entry_line_length = tk.Entry(self.frame_2, width=5)
+        self.entry_circle_parts = tk.Entry(self.frame_2, width=5)
 
         self.entry_arc_angle.grid(row=1, column=0)
         self.entry_line_length.grid(row=1, column=1)
+        self.entry_circle_parts.grid(row=1, column=2)
 
         button_ok = tk.Button(self.frame_3, text="OK", width=5, command=self.get_choice)
         button_cancel = tk.Button(self.frame_3, text="Cancel", width=5, command=self.window.destroy)
@@ -403,16 +407,20 @@ class SetInitialNetDialog(object):
         # set default values
         self.entry_arc_angle.insert(0, gv.max_arc_angle_for_net_line)
         self.entry_line_length.insert(0, gv.max_line_length_for_net_line)
+        self.entry_circle_parts.insert(0, gv.default_split_circle_parts)
         self.choice = None
 
     def get_choice(self):
         arc_angle = self.entry_arc_angle.get()
         line_length = self.entry_line_length.get()
+        circle_parts = self.entry_circle_parts.get()
 
         min_arc_angle = 1
         max_arc_angle = 359
         min_length_percentage = math.pow(10, -gv.accuracy)
         max_length_percentage = 100
+        min_circle_parts = 2
+        max_circle_parts = 45
 
         # validity check
         try:
@@ -425,6 +433,11 @@ class SetInitialNetDialog(object):
         except ValueError:
             print(f'choose line length percentage between {min_length_percentage}-{max_length_percentage}')
             return
+        try:
+            circle_parts = int(circle_parts)
+        except ValueError:
+            print(f'choose circle parts between {min_circle_parts}-{max_circle_parts}')
+            return
 
         if arc_angle < min_arc_angle or arc_angle > max_arc_angle:
             print(f'choose arc angle between {min_arc_angle}-{max_arc_angle}')
@@ -432,10 +445,14 @@ class SetInitialNetDialog(object):
         if line_length < min_length_percentage or line_length > max_length_percentage:
             print(f'choose line length percentage between {min_length_percentage}-{max_length_percentage}')
             return
+        if circle_parts < min_circle_parts or circle_parts > max_circle_parts:
+            print(f'choose circle parts between {min_circle_parts}-{max_circle_parts}')
+            return
 
         self.choice = {
             'arc_max_angle': arc_angle,
-            'line_max_length': line_length
+            'line_max_length': line_length,
+            'circle_parts': circle_parts
         }
         self.window.destroy()
 

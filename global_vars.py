@@ -8,7 +8,7 @@ BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 max_nodes_to_create_element = 4
 
 default_split_parts = 2
-default_split_circle_parts = 4
+default_split_circle_parts = 12
 max_arc_angle_for_net_line = 36
 # length relative to length of object measured from bottom-left to right-up
 max_line_length_for_net_line = 0.6

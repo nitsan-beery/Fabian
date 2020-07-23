@@ -927,6 +927,7 @@ class FabianBoard(Board):
         if choice is not None:
             arc_max_angle = choice.get('arc_max_angle')
             line_max_length = choice.get('line_max_length')
+            circle_parts = choice.get('circle_parts')
         else:
             return
         hash_bottom_left = self.get_bottom_left_node()
@@ -941,7 +942,7 @@ class FabianBoard(Board):
             e = self.entity_list[i]
             if e.shape == 'CIRCLE':
                 angle = self.get_longitude() + 45
-                self.split_net_line_by_entity(i, gv.split_mode_by_angle, 12, angle)
+                self.split_net_line_by_entity(i, gv.split_mode_by_angle, circle_parts, angle)
                 i -= 1
                 continue
             n = n_length = 0
