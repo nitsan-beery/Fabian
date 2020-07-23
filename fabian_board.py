@@ -1674,9 +1674,10 @@ class FabianBoard(Board):
         #self.print_node_list()
         #self.print_line_list()
         filename = self.save_json(data)
-        i = filename.rfind('/')
-        title = filename[i+1:]
-        self.window_main.title(title)
+        if filename is not None:
+            i = filename.rfind('/')
+            title = filename[i+1:]
+            self.window_main.title(title)
 
     def save_dxf(self):
         doc = ezdxf.new('R2010')
@@ -1969,15 +1970,17 @@ class FabianBoard(Board):
             self.state.pop(-1)
 
     def remove_temp_line(self):
-        if self.new_line_edge[1] is not None:
+        if self.new_line_edge_mark[1] is not None:
             self.board.delete(self.new_line_edge_mark[1])
-            self.new_line_edge[1] = None
-            self.new_line_original_part[1] = None
+        self.new_line_edge[1] = None
+        self.new_line_original_part[1] = None
+        if self.new_line_mark is not None:
             self.board.delete(self.new_line_mark)
-        if self.new_line_edge[0] is not None:
+        if self.new_line_edge_mark[0] is not None:
             self.board.delete(self.new_line_edge_mark[0])
-            self.new_line_edge[0] = None
-            self.new_line_original_part[0] = None
+        self.new_line_edge[0] = None
+        self.new_line_original_part[0] = None
+        if self.temp_line_mark is not None:
             self.board.delete(self.temp_line_mark)
 
     # add line from p1 to p2. s_part_1 and s_part_2 holds part type (entity or net_line) and index in list
