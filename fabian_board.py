@@ -400,7 +400,7 @@ class FabianBoard(Board):
             menu.add_cascade(label='Elements', menu=show_elements_menu)
             menu.add_cascade(label='Entities', menu=show_entities_menu)
             menu.add_separator()
-            menu.add_command(label="Split arcs and lines...", command=self.split_arcs_and_lines_for_inp)
+            menu.add_command(label="Set initial border nodes...", command=self.set_initial_border_nodes)
             menu.add_command(label="Clear net", command=self.clear_net)
             menu.add_command(label="Set net", command=self.set_net)
             menu.add_separator()
@@ -921,7 +921,7 @@ class FabianBoard(Board):
             self.show_entity(-1)
         return True
 
-    def split_arcs_and_lines_for_inp(self):
+    def set_initial_border_nodes(self):
         self.keep_state()
         choice = SetInitialNetDialog(self.window_main).show()
         if choice is not None:
@@ -940,6 +940,9 @@ class FabianBoard(Board):
         while i >= 0:
             e = self.entity_list[i]
             if e.shape == 'CIRCLE':
+                angle = self.get_longitude() + 45
+                self.split_net_line_by_entity(i, gv.split_mode_by_angle, 12, angle)
+                i -= 1
                 continue
             n = n_length = 0
             d = e.start.get_distance_to_point(e.end)
@@ -996,16 +999,15 @@ class FabianBoard(Board):
         old_lines = self.get_lines_attached_to_entity(part)
         entity = self.entity_list[part]
         entity_nodes = self.get_nodes_attached_to_lines(old_lines)
-        if len(entity_nodes) > 1:
-            start_hash_node = entity.nodes_list[0]
-            end_hash_node = entity.nodes_list[-1]
         if entity.shape == 'CIRCLE':
             new_points = self.get_split_circle_points(entity, split_additional_arg, start)
             new_node = Node(new_points[0], entity=part)
             start_hash_node = self.add_node_to_node_list(new_node)
             circle_first_node = start_hash_node
         elif entity.shape == 'LINE':
+            start_hash_node = entity.nodes_list[0]
             start_node_index = self.get_node_index_from_hash(start_hash_node)
+            end_hash_node = entity.nodes_list[-1]
             end_node_index = self.get_node_index_from_hash(end_hash_node)
             if start_node_index is None or end_node_index is None:
                 #debug - fix me
@@ -1015,6 +1017,7 @@ class FabianBoard(Board):
             new_points = self.get_split_line_points(p1, p2, split_mode, split_additional_arg)
         # shape == 'ARC'
         else:
+            start_hash_node = entity.nodes_list[0]
             arc = self.entity_list[part]
             new_points = self.get_split_arc_points(arc, split_mode, split_additional_arg)
         self.remove_parts_from_list(old_lines, gv.part_list_net_lines)
