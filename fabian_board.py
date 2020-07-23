@@ -401,7 +401,7 @@ class FabianBoard(Board):
             menu.add_cascade(label='Entities', menu=show_entities_menu)
             menu.add_separator()
             menu.add_command(label="Split arcs and lines...", command=self.split_arcs_and_lines_for_inp)
-            menu.add_command(label="Clear net", command=lambda: self.reset_net(True))
+            menu.add_command(label="Clear net", command=self.clear_net)
             menu.add_command(label="Set net", command=self.set_net)
             menu.add_separator()
         menu.add_command(label="Quit")
@@ -420,7 +420,7 @@ class FabianBoard(Board):
                 changed = True
         elif mode == gv.clear_mode:
             if len(self.net_line_list) > 0:
-                self.reset_net(True)
+                self.clear_net()
                 changed = True
         if changed:
             self.update_view()
@@ -428,10 +428,11 @@ class FabianBoard(Board):
             self.state.pop(-1)
 
     def change_work_mode(self, mode):
-        self.work_mode = mode
         if self.selected_part is not None:
             self.remove_selected_part_mark()
         if mode.lower() == gv.work_mode_dxf:
+            if self.work_mode == gv.work_mode_dxf:
+                return
             self.show_nodes = False
             self.show_net = False
             self.show_elements = False
@@ -439,7 +440,8 @@ class FabianBoard(Board):
             self.choose_mark_option(gv.mark_option_mark)
             self.set_all_dxf_entities_color(gv.default_color)
         elif mode.lower() == gv.work_mode_inp:
-            self.split_all_circles_by_longitude()
+            if self.work_mode == gv.work_mode_inp:
+                return
             self.set_initial_net()
             tmp_list = self.get_unattached_nodes(True)
             if len(tmp_list) == 0:
@@ -450,6 +452,7 @@ class FabianBoard(Board):
             self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
             self.change_select_parts_mode('all')
             self.choose_mark_option('quit')
+        self.work_mode = mode
         self.update_view()
 
     def change_mouse_selection_mode(self, mode):
@@ -814,14 +817,32 @@ class FabianBoard(Board):
         if self.selected_part is None:
             return
         s_part = self.selected_part
-        if split_mode is None:
-            split_mode = gv.split_mode_evenly_n_parts
-            choice = SplitDialog(self.window_main).show()
-            if choice is not None:
-                split_mode = choice.get('split_mode')
-                split_arg = choice.get('arg')
-            else:
-                return
+        if s_part.part_type == gv.part_type_entity:
+            if self.entity_list[self.selected_part.index].shape == 'CIRCLE':
+                longitude = self.get_longitude()
+                if split_mode is None:
+                    choice = SplitCircleDialog(self.window_main).show()
+                    if choice is not None:
+                        split_mode = choice.get('split_mode')
+                        angle = choice.get('angle')
+                        parts = choice.get('parts')
+                        if split_mode == gv.split_mode_by_longitude:
+                            angle = longitude + angle
+                    else:
+                        return
+                # default split circle
+                else:
+                    angle = longitude + 45
+                    parts = 4
+                self.split_circle(s_part.index, angle, parts)
+        else:
+            if split_mode is None:
+                choice = SplitDialog(self.window_main).show()
+                if choice is not None:
+                    split_mode = choice.get('split_mode')
+                    split_arg = choice.get('arg')
+                else:
+                    return
         self.split_part(s_part, split_mode, split_arg)
 
     def split_entity_by_point(self, s_part, p):
@@ -872,7 +893,7 @@ class FabianBoard(Board):
                 new_part_list.append(line)
                 start = end
         elif e.shape == 'CIRCLE':
-            self.split_circle_by_longitude(part)
+            self.split_circle(part)
             return True
         self.remove_parts_from_list([part], gv.part_list_entities)
         for m in range(n):
@@ -918,24 +939,21 @@ class FabianBoard(Board):
             i -= 1
         self.update_view()
 
-    def split_all_circles_by_longitude(self, n=gv.default_split_circle_parts):
+    def split_all_circles(self, n=gv.default_split_circle_parts):
         longitude = self.get_longitude()
         i = len(self.entity_list) - 1
         while i >= 0:
             e = self.entity_list[i]
             if e.shape == 'CIRCLE':
-                self.split_circle_by_longitude(i, longitude, n)
+                self.split_circle(i, longitude, n)
             i -= 1
 
-    def split_circle_by_longitude(self, part, longitude=None, n=gv.default_split_circle_parts):
+    def split_circle(self, part, start_angle, n=gv.default_split_circle_parts):
         if len(self.entity_list) < (part + 1):
             return 
         e = self.entity_list[part]
         if e.shape != 'CIRCLE':
             return
-        start_angle = longitude
-        if start_angle is None:
-            start_angle = self.get_longitude()
         for i in range(n):
             end_angle = start_angle + (360/n)
             arc = Entity('ARC', center=e.center, radius=e.radius, start_angle=start_angle, end_angle=end_angle)
@@ -1337,6 +1355,8 @@ class FabianBoard(Board):
 
     def set_all_nodes_attached_line_list(self):
         c = len(self.node_list)
+        if c < 2:
+            return
         self.show_text_on_screen('matching lines to nodes')
         self.show_progress_bar(c)
         for i in range(1, len(self.node_list)):
@@ -1446,7 +1466,6 @@ class FabianBoard(Board):
 
     # set net with nodes only on entity edges
     def set_initial_net(self):
-        self.node_list = [Node()]
         self.reset_net()
         c = len(self.entity_list)
         self.show_text_on_screen('setting initial net')
@@ -2310,16 +2329,29 @@ class FabianBoard(Board):
         self.entity_list[part].color = color
         self.show_entity(part)
 
+    def clear_net(self):
+        self.keep_state()
+        self.hide_all_elements()
+        line_list = []
+        node_list = []
+        for i in range(len(self.net_line_list)):
+            line = self.net_line_list[i]
+            if line.entity is None:
+                line_list.append(i)
+                node_list.append(line.start_node)
+                node_list.append(line.end_node)
+        self.remove_parts_from_list(line_list, gv.part_list_net_lines)
+        self.clear_lonely_nodes(node_list)
+
     def reset_net(self, keep_state=False):
         if keep_state:
             self.keep_state()
         self.hide_all_elements()
-        part_list = []
-        for i in range(len(self.net_line_list)):
-            line = self.net_line_list[i]
-            if line.entity is None:
-                part_list.append(i)
-        self.remove_parts_from_list(part_list, gv.part_list_net_lines)
+        self.hide_all_net_lines()
+        self.hide_all_nodes()
+        self.node_list = [Node()]
+        self.nodes_hash = {'0': 0}
+        self.net_line_list = []
 
     def set_all_dxf_entities_color(self, color):
         for i in range(len(self.entity_list)):

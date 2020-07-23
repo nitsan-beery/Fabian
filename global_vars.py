@@ -42,6 +42,8 @@ split_mode_evenly_n_parts = 'evenly_n_parts'
 split_mode_2_parts_by_point = '2_parts_by_point'
 split_mode_2_parts_percentage_left = '2_parts_percentage_left'
 split_mode_3_parts_percentage_middle = '3_parts_percentage_middle'
+split_mode_by_longitude = 'by_longitude'
+split_mode_by_angle = 'by_angle'
 
 default_mouse_select_mode = mouse_select_mode_edge
 default_work_mode = work_mode_dxf

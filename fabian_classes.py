@@ -265,13 +265,21 @@ class FabianState:
         self.scale = None
 
 
-split_choices_list = ['n parts evenly', '2 different parts', '3 parts different middle part']
+split_arc_and_line_choices_list = ['n parts evenly', '2 different parts', '3 parts different middle part']
 
-split_mode_dictionary = {
-    split_choices_list[0]: gv.split_mode_evenly_n_parts,
-    split_choices_list[1]: gv.split_mode_2_parts_percentage_left,
-    split_choices_list[2]: gv.split_mode_3_parts_percentage_middle
+split_arc_and_line_mode_dictionary = {
+    split_arc_and_line_choices_list[0]: gv.split_mode_evenly_n_parts,
+    split_arc_and_line_choices_list[1]: gv.split_mode_2_parts_percentage_left,
+    split_arc_and_line_choices_list[2]: gv.split_mode_3_parts_percentage_middle
 }
+
+split_circle_choices_list = ['by longitude', 'by angle']
+
+split_circle_mode_dictionary = {
+    split_circle_choices_list[0]: gv.split_mode_by_longitude,
+    split_circle_choices_list[1]: gv.split_mode_by_angle
+}
+
 
 class SplitDialog(object):
     def __init__(self, parent):
@@ -293,7 +301,7 @@ class SplitDialog(object):
         self.label_mode.grid(row=0, column=0, sticky='w')
         self.label_arg.grid(row=0, column=1)
 
-        self.split_choice_menu = ttk.Combobox(self.frame_2, width=25, values=split_choices_list)
+        self.split_choice_menu = ttk.Combobox(self.frame_2, width=25, values=split_arc_and_line_choices_list)
         self.entry_arg = tk.Entry(self.frame_2, width=3)
         self.split_choice_menu.grid(row=1, column=0, padx=10, pady=5)
         self.entry_arg.grid(row=1, column=1)
@@ -314,11 +322,11 @@ class SplitDialog(object):
 
     def mode_selected(self, key):
         split_mode = self.split_choice_menu.get()
-        if split_mode_dictionary.get(split_mode) == gv.split_mode_evenly_n_parts:
+        if split_arc_and_line_mode_dictionary.get(split_mode) == gv.split_mode_evenly_n_parts:
             self.label_arg.config(text='n')
             self.entry_arg.delete(0, tk.END)
             self.entry_arg.insert(0, '2')
-        elif split_mode_dictionary.get(split_mode) == gv.split_mode_2_parts_percentage_left:
+        elif split_arc_and_line_mode_dictionary.get(split_mode) == gv.split_mode_2_parts_percentage_left:
             self.label_arg.config(text='% left')
             self.entry_arg.delete(0, tk.END)
             self.entry_arg.insert(0, '33')
@@ -330,7 +338,7 @@ class SplitDialog(object):
         self.entry_arg.focus_set()
 
     def get_choice(self):
-        split_mode = split_mode_dictionary.get(self.split_choice_menu.get())
+        split_mode = split_arc_and_line_mode_dictionary.get(self.split_choice_menu.get())
         split_arg = self.entry_arg.get()
         # validity check
         min_arg = 2
@@ -369,7 +377,7 @@ class SetInitialNetDialog(object):
     def __init__(self, parent):
         self.window = tk.Toplevel(parent)
         self.window.title(' Choose')
-        self.window.geometry('220x120')
+        self.window.geometry('210x120')
         self.window.resizable(0, 0)
 
         self.frame_1 = tk.Frame(self.window)
@@ -380,7 +388,7 @@ class SetInitialNetDialog(object):
         self.frame_3.pack(side=tk.BOTTOM, fill=tk.BOTH, ipady=0)
 
         self.label_arc_angle = tk.Label(self.frame_2, text='Max Arc angle', padx=10)
-        self.label_line_length = tk.Label(self.frame_2, text='Max Line length %', padx=10)
+        self.label_line_length = tk.Label(self.frame_2, text='Max Line length', padx=10)
 
         self.label_arc_angle.grid(row=0, column=0)
         self.label_line_length.grid(row=0, column=1)
@@ -446,4 +454,88 @@ class SetInitialNetDialog(object):
     def key(self, event):
         if event.keycode == 13:
             self.get_choice()
+
+
+class SplitCircleDialog(object):
+    def __init__(self, parent):
+        self.window = tk.Toplevel(parent)
+        self.window.title(' Choose')
+        self.window.geometry('250x160')
+        self.window.resizable(0, 0)
+
+        self.frame_1 = tk.Frame(self.window)
+        self.frame_1.pack(side=tk.TOP, fill=tk.BOTH, pady=5)
+        self.frame_2 = tk.Frame(self.window)
+        self.frame_2.pack(side=tk.TOP, fill=tk.BOTH, ipady=6)
+        self.frame_3 = tk.Frame(self.window)
+        self.frame_3.pack(side=tk.BOTTOM, fill=tk.BOTH, ipady=0)
+
+        self.label_mode = tk.Label(self.frame_2, text='Split mode', padx=10)
+        self.label_angle = tk.Label(self.frame_2, width=5, text='relative start angle', padx=7)
+        self.label_parts = tk.Label(self.frame_2, width=5, text='#parts', padx=7)
+
+        self.label_mode.grid(row=0, column=0, sticky='w')
+        self.label_angle.grid(row=0, column=1)
+        self.label_parts.grid(row=0, column=2)
+
+        self.split_choice_menu = ttk.Combobox(self.frame_2, width=25, values=split_circle_choices_list)
+        self.entry_angle = tk.Entry(self.frame_2, width=3)
+        self.entry_parts = tk.Entry(self.frame_2, width=3)
+
+        self.split_choice_menu.grid(row=1, column=0, padx=10, pady=5)
+        self.entry_angle.grid(row=1, column=1)
+        self.entry_parts.grid(row=1, column=2)
+
+        button_ok = tk.Button(self.frame_3, text="OK", width=5, command=self.get_choice)
+        button_cancel = tk.Button(self.frame_3, text="Cancel", width=5, command=self.window.destroy)
+        button_ok.pack(side=tk.RIGHT, padx=5, pady=5)
+        button_cancel.pack(side=tk.LEFT, padx=5)
+
+        self.window.bind('<Key>', self.key)
+        self.window.lift()
+
+        # set default values
+        self.split_choice_menu.current(0)
+        self.split_choice_menu.bind("<<ComboboxSelected>>", self.mode_selected)
+        self.entry_angle.insert(0, '45')
+        self.entry_parts.insert(0, '4')
+        self.choice = None
+
+    def mode_selected(self, key):
+        split_mode = self.split_choice_menu.get()
+        if split_circle_mode_dictionary.get(split_mode) == gv.split_mode_by_longitude:
+            self.label_angle.config(text='relative start angle')
+            self.entry_angle.delete(0, tk.END)
+            self.entry_angle.insert(0, '45')
+        #  split_circle_mode_dictionary.get(split_mode) == gv.split_mode_by_angle
+        else:
+            self.label_angle.config(text='start angle')
+            self.entry_angle.delete(0, tk.END)
+            self.entry_angle.insert(0, '0')
+
+    def get_choice(self):
+        split_mode = split_circle_mode_dictionary.get(self.split_choice_menu.get())
+        angle = self.entry_angle.get()
+        parts = self.entry_parts.get()
+        # validity check
+        try:
+            angle = int(angle)
+        except ValueError:
+            print('choose a number for angle')
+            return
+        try:
+            parts = int(parts)
+        except ValueError:
+            print('choose a number for #parts')
+            return
+
+    def show(self):
+        self.window.deiconify()
+        self.window.wait_window()
+        return self.choice
+
+    def key(self, event):
+        if event.keycode == 13:
+            self.get_choice()
+
 
