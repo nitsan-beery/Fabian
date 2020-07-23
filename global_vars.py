@@ -9,9 +9,9 @@ max_nodes_to_create_element = 4
 
 default_split_parts = 2
 default_split_circle_parts = 4
-max_arc_angle_for_net_line = 30
+max_arc_angle_for_net_line = 36
 # length relative to length of object measured from bottom-left to right-up
-max_line_length_for_net_line = 0.1
+max_line_length_for_net_line = 0.6
 
 accuracy = 3
 angle_diff_accuracy = 1

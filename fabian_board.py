@@ -401,6 +401,7 @@ class FabianBoard(Board):
             menu.add_cascade(label='Entities', menu=show_entities_menu)
             menu.add_separator()
             menu.add_command(label="Split arcs and lines...", command=self.split_arcs_and_lines_for_inp)
+            menu.add_command(label="Clear net", command=lambda: self.reset_net(True))
             menu.add_command(label="Set net", command=self.set_net)
             menu.add_separator()
         menu.add_command(label="Quit")
@@ -902,15 +903,14 @@ class FabianBoard(Board):
                 continue
             n = n_length = 0
             d = e.start.get_distance_to_point(e.end)
-            relative_length = d / d_dxf
             if e.shape == 'ARC':
                 angle = e.arc_end_angle - e.arc_start_angle
                 n = round(angle/arc_max_angle)
-                if relative_length > line_max_length:
-                    n_length = round(relative_length / line_max_length)
+                if d > line_max_length:
+                    n_length = round(d / line_max_length)
             elif e.shape == 'LINE':
-                if relative_length > line_max_length:
-                    n_length = round(relative_length / line_max_length)
+                if d > line_max_length:
+                    n_length = round(d / line_max_length)
             if n_length > n:
                 n = n_length
             if n > 1:
@@ -2313,9 +2313,13 @@ class FabianBoard(Board):
     def reset_net(self, keep_state=False):
         if keep_state:
             self.keep_state()
-        self.hide_all_net_lines()
         self.hide_all_elements()
-        self.net_line_list = []
+        part_list = []
+        for i in range(len(self.net_line_list)):
+            line = self.net_line_list[i]
+            if line.entity is None:
+                part_list.append(i)
+        self.remove_parts_from_list(part_list, gv.part_list_net_lines)
 
     def set_all_dxf_entities_color(self, color):
         for i in range(len(self.entity_list)):
