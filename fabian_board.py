@@ -1642,6 +1642,8 @@ class FabianBoard(Board):
         #self.print_nodes_expected_elements()
         element_list = []
         exception_element_list = []
+        counter_r3_elements = 0
+        counter_r4_elements = 0
         # iterate all nodes
         for i in range(1, len(self.node_list)):
             node = self.node_list[i]
@@ -1675,6 +1677,10 @@ class FabianBoard(Board):
                     element.nodes = new_element_nodes
                     if len(new_element_nodes) <= gv.max_nodes_to_create_element:
                         element_list.append(element)
+                        if len(new_element_nodes) == 4:
+                            counter_r4_elements += 1
+                        elif len(new_element_nodes) == 3:
+                            counter_r3_elements += 1
                         for element_node in new_element_nodes:
                             self.node_list[element_node].expected_elements -= 1
                     else:
@@ -1700,10 +1706,13 @@ class FabianBoard(Board):
             self.print_elements(exception_element_list)
             messagebox.showwarning("Warning", m)
         if m is None:
-            print(f'SUCCESS: net created with {len(element_list)} elements\n')
+            self.show_elements = True
+            self.update_view()
+            print(f'\nSUCCESS')
+            print(f'net created with {counter_r4_elements} R4 elements and {counter_r3_elements} R3 elements   {len(self.node_list)} nodes\n')
         # debug
         #self.print_nodes_expected_elements()
-        self.print_elements(self.element_list)
+        #self.print_elements(self.element_list)
 
     def save_inp(self):
         self.create_net_element_list()
@@ -2316,6 +2325,8 @@ class FabianBoard(Board):
     def hide_all_nodes(self):
         for i in range(len(self.node_list)):
             self.hide_node(i)
+        self.show_nodes = False
+
     # i = index in node_list (not hash)
     def show_node(self, i, with_number=False):
         n = self.node_list[i]
@@ -2331,6 +2342,7 @@ class FabianBoard(Board):
     def show_all_nodes(self):
         for i in range(1, len(self.node_list)):
             self.show_node(i, self.show_node_number)
+        self.show_nodes = True
 
     def show_entity(self, i):
         part = None
@@ -2363,10 +2375,12 @@ class FabianBoard(Board):
     def show_all_elements(self):
         for i in range(len(self.element_list)):
             self.show_element(i)
+        self.show_elements = True
 
     def hide_all_elements(self):
         for i in range(len(self.element_list)):
             self.hide_element(i)
+        self.show_elements = False
 
     def show_net_line(self, i):
         line = self.net_line_list[i]
@@ -2390,14 +2404,17 @@ class FabianBoard(Board):
     def show_all_net_lines(self):
         for i in range(len(self.net_line_list)):
             self.show_net_line(i)
+        self.show_net = True
 
     def hide_all_net_lines(self):
         for i in range(len(self.net_line_list)):
             self.hide_net_line(i)
+        self.show_net = False
 
     def show_dxf_entities(self):
         for i in range(len(self.entity_list)):
             self.show_entity(i)
+        self.show_entities = True
 
     def hide_entity(self, part):
         if self.entity_list[part].board_part is None:
@@ -2408,6 +2425,7 @@ class FabianBoard(Board):
     def hide_dxf_entities(self):
         for i in range(len(self.entity_list)):
             self.hide_entity(i)
+        self.show_entities = False
 
     def set_net_line_color(self, part, color):
         self.hide_net_line(part)
@@ -2548,10 +2566,18 @@ class FabianBoard(Board):
         print(f'set accuracy: 1/{int(math.pow(10, gv.accuracy))}')
 
     def update_view(self):
+        show_elements = self.show_elements
+        show_entities = self.show_entities
+        show_nodes = self.show_nodes
+        show_net = self.show_net
         self.hide_dxf_entities()
         self.hide_all_net_lines()
         self.hide_all_nodes()
         self.hide_all_elements()
+        self.show_elements = show_elements
+        self.show_entities = show_entities
+        self.show_nodes = show_nodes
+        self.show_net = show_net
         if self.show_elements:
             self.show_all_elements()
         if self.show_entities:
