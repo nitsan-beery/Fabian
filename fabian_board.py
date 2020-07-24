@@ -554,10 +554,8 @@ class FabianBoard(Board):
             point_list.append(new_point_2)
             point_list.append(p2)
         elif split_mode == gv.split_mode_graduate_from_left:
-            original_left = split_arg[0]
-            original_right = split_arg[1]
-            left = original_left
-            right = original_right
+            left = split_arg[0]
+            right = split_arg[1]
             opposite = False
             if right > left:
                 left, right = right, left
@@ -577,6 +575,7 @@ class FabianBoard(Board):
             for i in range(1, n+1):
                 left_to_right_p = current_p
                 if opposite:
+                    pass
                     left_to_right_p = 100 - current_p
                 d1 = d * left_to_right_p / 100
                 new_point = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
@@ -626,6 +625,40 @@ class FabianBoard(Board):
             new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
                              end_angle=end_angle)
             point_list.append(new_arc.end)
+            point_list.append(arc.end)
+        elif split_mode == gv.split_mode_graduate_from_left:
+            left = split_arg[0]
+            right = split_arg[1]
+            opposite = False
+            if arc.end.is_smaller_x_smaller_y(arc.start):
+                opposite = True
+            diff = 100 - (left + right)
+            sum = left + right
+            residual = left - right
+            chunk = math.ceil(diff / sum)
+            bulk = 100 / chunk
+            add_on = (bulk - sum) / 2
+            left += add_on
+            right += add_on
+            n = 2 * chunk - 1
+            step = residual / n
+            angle_p = left
+            add_on = left
+            for i in range(1, n + 1):
+                left_to_right_p = angle_p
+                if opposite:
+                    left_to_right_p = 100 - angle_p
+                angle = diff_angle * left_to_right_p / 100
+                end_angle = start_angle + angle
+                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
+                             end_angle=end_angle)
+                point_list.append(new_arc.end)
+                add_on -= step
+                angle_p += add_on
+            if opposite:
+                point_list.remove(arc.start)
+                point_list.reverse()
+                point_list.insert(0, arc.start)
             point_list.append(arc.end)
         return point_list
 
