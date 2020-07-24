@@ -436,6 +436,7 @@ class FabianBoard(Board):
             self.show_nodes = False
             self.show_net = False
             self.show_elements = False
+            self.show_entities = True
             self.change_select_parts_mode(gv.part_type_entity)
             self.choose_mark_option(gv.mark_option_mark)
             self.set_all_dxf_entities_color(gv.default_color)
@@ -447,6 +448,7 @@ class FabianBoard(Board):
             if len(tmp_list) == 0:
                 print('no unattached nodes')
             self.set_all_dxf_entities_color(gv.weak_entity_color)
+            self.show_entities = True
             self.show_nodes = True
             self.show_net = True
             self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
@@ -2343,6 +2345,7 @@ class FabianBoard(Board):
         for i in range(1, len(self.node_list)):
             self.show_node(i, self.show_node_number)
         self.show_nodes = True
+        self.window_main.update()
 
     def show_entity(self, i):
         part = None
@@ -2376,6 +2379,7 @@ class FabianBoard(Board):
         for i in range(len(self.element_list)):
             self.show_element(i)
         self.show_elements = True
+        self.window_main.update()
 
     def hide_all_elements(self):
         for i in range(len(self.element_list)):
@@ -2405,6 +2409,7 @@ class FabianBoard(Board):
         for i in range(len(self.net_line_list)):
             self.show_net_line(i)
         self.show_net = True
+        self.window_main.update()
 
     def hide_all_net_lines(self):
         for i in range(len(self.net_line_list)):
@@ -2415,6 +2420,7 @@ class FabianBoard(Board):
         for i in range(len(self.entity_list)):
             self.show_entity(i)
         self.show_entities = True
+        self.window_main.update()
 
     def hide_entity(self, part):
         if self.entity_list[part].board_part is None:
@@ -2464,6 +2470,8 @@ class FabianBoard(Board):
     def set_all_dxf_entities_color(self, color):
         for i in range(len(self.entity_list)):
             self.set_entity_color(i, color)
+            self.show_entities = True
+            self.update_view()
 
     def mark_part(self, i, part_type, color=gv.mark_rect_color):
         self.selected_part = SelectedPart(index=i, part_type=part_type)
@@ -2586,6 +2594,5 @@ class FabianBoard(Board):
             self.show_all_nodes()
         if self.show_net:
             self.show_all_net_lines()            
-        self.window_main.update()
 
             
