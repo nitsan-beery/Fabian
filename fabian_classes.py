@@ -265,14 +265,13 @@ class FabianState:
         self.scale = None
 
 
-split_arc_and_line_choices_list = ['n parts evenly', '2 different parts', '3 parts different middle part',
-                                   'graduate from left']
+split_arc_and_line_choices_list = ['n parts evenly', '2 different parts', 'graduate from left', '3 parts different middle part']
 
 split_arc_and_line_mode_dictionary = {
     split_arc_and_line_choices_list[0]: gv.split_mode_evenly_n_parts,
     split_arc_and_line_choices_list[1]: gv.split_mode_2_parts_percentage_left,
-    split_arc_and_line_choices_list[2]: gv.split_mode_3_parts_percentage_middle,
-    split_arc_and_line_choices_list[3]: gv.split_mode_graduate_from_left
+    split_arc_and_line_choices_list[2]: gv.split_mode_graduate_from_left,
+    split_arc_and_line_choices_list[3]: gv.split_mode_3_parts_percentage_middle
 }
 
 
@@ -281,7 +280,7 @@ class SplitDialog(object):
         self.window = tk.Toplevel(parent)
         self.window.title(' Choose')
         self.window.geometry('305x160')
-#        self.window.resizable(0, 0)
+        self.window.resizable(0, 0)
 
         self.frame_1 = tk.Frame(self.window)
         self.frame_1.pack(side=tk.TOP, fill=tk.BOTH, pady=5)

@@ -58,8 +58,8 @@ class Point:
 
     # return the angle vector to Point p (degrees), None if p == self
     def get_alfa_to(self, p):
-        if self.is_equal(p):
-            return None
+        if p is None or self.is_equal(p):
+            return 0
         dx = p.x - self.x
         dy = p.y - self.y
         if dx == 0:
@@ -82,11 +82,12 @@ class Point:
 
 # return new coordinates of Point p relative to Point new00 with rotation_angle
 def get_shifted_point(p, new00, rotation_angle):
-    if p.is_equal(new00):
-        return Point(0, 0)
     shifted_p = Point(p.x - new00.x, p.y - new00.y)
-    r = shifted_p.get_distance_to_point(Point(0, 0))
-    alfa = Point(0, 0).get_alfa_to(shifted_p) + rotation_angle
+    point_zero = Point(0, 0)
+    if shifted_p.is_equal(point_zero):
+        return point_zero
+    r = shifted_p.get_distance_to_point(point_zero)
+    alfa = point_zero.get_alfa_to(shifted_p) + rotation_angle
     alfa = alfa*math.pi/180
     shifted_p.x = math.cos(alfa)*r
     shifted_p.y = math.sin(alfa)*r
