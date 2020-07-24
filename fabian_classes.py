@@ -265,12 +265,14 @@ class FabianState:
         self.scale = None
 
 
-split_arc_and_line_choices_list = ['n parts evenly', '2 different parts', '3 parts different middle part']
+split_arc_and_line_choices_list = ['n parts evenly', '2 different parts', '3 parts different middle part',
+                                   'graduate from left']
 
 split_arc_and_line_mode_dictionary = {
     split_arc_and_line_choices_list[0]: gv.split_mode_evenly_n_parts,
     split_arc_and_line_choices_list[1]: gv.split_mode_2_parts_percentage_left,
-    split_arc_and_line_choices_list[2]: gv.split_mode_3_parts_percentage_middle
+    split_arc_and_line_choices_list[2]: gv.split_mode_3_parts_percentage_middle,
+    split_arc_and_line_choices_list[3]: gv.split_mode_graduate_from_left
 }
 
 
@@ -278,8 +280,8 @@ class SplitDialog(object):
     def __init__(self, parent):
         self.window = tk.Toplevel(parent)
         self.window.title(' Choose')
-        self.window.geometry('250x160')
-        self.window.resizable(0, 0)
+        self.window.geometry('305x160')
+#        self.window.resizable(0, 0)
 
         self.frame_1 = tk.Frame(self.window)
         self.frame_1.pack(side=tk.TOP, fill=tk.BOTH, pady=5)
@@ -289,13 +291,13 @@ class SplitDialog(object):
         self.frame_3.pack(side=tk.BOTTOM, fill=tk.BOTH, ipady=0)
 
         self.label_mode = tk.Label(self.frame_2, text='Split mode', padx=10)
-        self.label_arg = tk.Label(self.frame_2, width=5, text='n', padx=7)
+        self.label_arg = tk.Label(self.frame_2, width=15, text='n', padx=7)
 
         self.label_mode.grid(row=0, column=0, sticky='w')
         self.label_arg.grid(row=0, column=1)
 
         self.split_choice_menu = ttk.Combobox(self.frame_2, width=25, values=split_arc_and_line_choices_list)
-        self.entry_arg = tk.Entry(self.frame_2, width=3)
+        self.entry_arg = tk.Entry(self.frame_2, width=6)
         self.split_choice_menu.grid(row=1, column=0, padx=10, pady=5)
         self.entry_arg.grid(row=1, column=1)
 
@@ -323,38 +325,71 @@ class SplitDialog(object):
             self.label_arg.config(text='% left')
             self.entry_arg.delete(0, tk.END)
             self.entry_arg.insert(0, '33')
-        # 3 parts
-        else:
+        elif split_arc_and_line_mode_dictionary.get(split_mode) == gv.split_mode_3_parts_percentage_middle:
             self.label_arg.config(text='% middle')
             self.entry_arg.delete(0, tk.END)
             self.entry_arg.insert(0, '70')
+        elif split_arc_and_line_mode_dictionary.get(split_mode) == gv.split_mode_graduate_from_left:
+            self.label_arg.config(text='% left - % right')
+            self.entry_arg.delete(0, tk.END)
+            self.entry_arg.insert(0, '10-20')
+
         self.entry_arg.focus_set()
 
     def get_choice(self):
         split_mode = split_arc_and_line_mode_dictionary.get(self.split_choice_menu.get())
         split_arg = self.entry_arg.get()
         # validity check
+        is_valid = False
         min_arg = 2
         max_arg = gv.max_split_parts
-        try:
-            split_arg = int(split_arg)
-        except ValueError:
-            print('choose a number')
-            return
-        if split_mode == gv.split_mode_2_parts_percentage_left:
-            min_arg = gv.min_split_percentage
-            max_arg = gv.max_split_side_percentage
-        elif split_mode == gv.split_mode_3_parts_percentage_middle:
-            min_arg = gv.min_split_percentage
-            max_arg = gv.max_split_middle_percentage
-        if min_arg <= split_arg <= max_arg:
+        if split_mode == gv.split_mode_graduate_from_left:
+            i = split_arg.find('-')
+            if i < 0:
+                print('choose format %left - %right')
+                return
+            left = split_arg[:i]
+            right = split_arg[i+1:]
+            try:
+                left = int(left)
+            except ValueError:
+                print('choose a number for %left')
+                return
+            try:
+                right = int(right)
+            except ValueError:
+                print('choose a number for %right')
+                return
+            if left + right > 100:
+                print('%left + %right should not exceed 100%')
+                return
+            if left < gv.min_split_percentage or right < gv.min_split_percentage:
+                print(f'%left - %right must be >= {gv.min_split_percentage}')
+                return
+            split_arg = (left, right)
+            is_valid = True
+        else:
+            try:
+                split_arg = int(split_arg)
+            except ValueError:
+                print('choose a number')
+                return
+            if split_mode == gv.split_mode_2_parts_percentage_left:
+                min_arg = gv.min_split_percentage
+                max_arg = gv.max_split_side_percentage
+            elif split_mode == gv.split_mode_3_parts_percentage_middle:
+                min_arg = gv.min_split_percentage
+                max_arg = gv.max_split_middle_percentage
+            if min_arg <= split_arg <= max_arg:
+                is_valid = True
+            else:
+                print(f'Please select a valid number')
+        if is_valid:
             self.choice = {
                 'split_mode': split_mode,
                 'arg': split_arg
             }
             self.window.destroy()
-        else:
-            print(f'Please select a valid number {min_arg}-{max_arg}')
 
     def show(self):
         self.window.deiconify()

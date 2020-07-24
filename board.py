@@ -41,6 +41,8 @@ class Board:
         self.text_on_screen = None
 
         self.board.bind('<MouseWheel>', self.mouse_wheel)
+        self.window_main.bind('<Key>', self.key)
+
 
     # scroll view to x, y in canvas coordinates
     def set_screen_position(self, x, y):
@@ -138,6 +140,17 @@ class Board:
             i = '-1'
         self.board.yview('scroll', i, 'units')
 
+    def key(self, key):
+        self.hide_text_on_screen()
+        if key.keycode == 37:
+            self.board.xview('scroll', -1, 'units')
+        elif key.keycode == 39:
+            self.board.xview('scroll', 1, 'units')
+        elif key.keycode == 38:
+            self.board.yview('scroll', -1, 'units')
+        elif key.keycode == 40:
+            self.board.yview('scroll', 1, 'units')
+
     def load_json(self, filename=None, my_dir="./data files/"):
         if filename is None:
             filename = filedialog.askopenfilename(parent=self.window_main, initialdir=my_dir, title="Select file",
@@ -156,6 +169,6 @@ class Board:
         if filename == '' or data is None:
             return None
         with open(filename, "w") as json_file:
-            json.dump(data, json_file)
+            json.dump(data, json_file, indent=2, separators=(",", ":"))
         return filename
 

@@ -553,6 +553,8 @@ class FabianBoard(Board):
             point_list.append(new_point_1)
             point_list.append(new_point_2)
             point_list.append(p2)
+        elif split_mode == gv.split_mode_graduate_from_left:
+            pass
         return point_list
 
     def get_split_arc_points(self, arc, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):
