@@ -565,47 +565,28 @@ class FabianBoard(Board):
             diff = 100 - (left + right)
             sum = left + right
             residual = left-right
-            if diff < sum:
-                # left > diff > right
-                d1 = d * left / 100
-                d2 = d * (left + diff) / 100
+            chunk = math.ceil(diff/sum)
+            bulk = 100 / chunk
+            add_on = (bulk - sum) / 2
+            left += add_on
+            right += add_on
+            n = 2 * chunk - 1
+            step = residual / n
+            current_p = left
+            add_on = left
+            for i in range(1, n+1):
+                left_to_right_p = current_p
                 if opposite:
-                    d1 = d * (100 - (left + diff)) / 100
-                    d2 = d * (100 - left) / 100
-                if diff < right:
-                    if opposite:
-                        d1 = d * (100 - (left + right)) / 100
-                    else:
-                        d2 = d * (left + right) / 100
-                elif diff < left:
-                    if opposite:
-                        d2 = d * (100 - diff) / 100
-                    else:
-                        d1 = d * diff / 100
-                new_point_1 = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
-                new_point_2 = Point(start.x + d2 * math.cos(alfa), start.y + d2 * math.sin(alfa))
-                point_list.append(new_point_1)
-                point_list.append(new_point_2)
-            # diff > sum
-            else:
-                chunk = math.ceil(diff/sum)
-                bulk = 100 / chunk
-                add_on = (bulk - sum) / 2
-                left += add_on
-                right += add_on
-                n = 2 * chunk - 1
-                step = residual / n
-                current_p = left
-                add_on = left
-                for i in range(1, n+1):
-                    left_to_right_p = current_p
-                    if opposite:
-                        left_to_right_p = 100 - current_p
-                    d1 = d * left_to_right_p / 100
-                    new_point = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
-                    point_list.append(new_point)
-                    add_on -= step
-                    current_p += add_on
+                    left_to_right_p = 100 - current_p
+                d1 = d * left_to_right_p / 100
+                new_point = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
+                point_list.append(new_point)
+                add_on -= step
+                current_p += add_on
+            if opposite:
+                point_list.remove(p1)
+                point_list.reverse()
+                point_list.insert(0, p1)
             point_list.append(p2)
         return point_list
 
