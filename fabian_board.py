@@ -554,7 +554,59 @@ class FabianBoard(Board):
             point_list.append(new_point_2)
             point_list.append(p2)
         elif split_mode == gv.split_mode_graduate_from_left:
-            pass
+            original_left = split_arg[0]
+            original_right = split_arg[1]
+            left = original_left
+            right = original_right
+            opposite = False
+            if right > left:
+                left, right = right, left
+                opposite = True
+            diff = 100 - (left + right)
+            sum = left + right
+            residual = left-right
+            if diff < sum:
+                # left > diff > right
+                d1 = d * left / 100
+                d2 = d * (left + diff) / 100
+                if opposite:
+                    d1 = d * (100 - (left + diff)) / 100
+                    d2 = d * (100 - left) / 100
+                if diff < right:
+                    if opposite:
+                        d1 = d * (100 - (left + right)) / 100
+                    else:
+                        d2 = d * (left + right) / 100
+                elif diff < left:
+                    if opposite:
+                        d2 = d * (100 - diff) / 100
+                    else:
+                        d1 = d * diff / 100
+                new_point_1 = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
+                new_point_2 = Point(start.x + d2 * math.cos(alfa), start.y + d2 * math.sin(alfa))
+                point_list.append(new_point_1)
+                point_list.append(new_point_2)
+            # diff > sum
+            else:
+                chunk = math.ceil(diff/sum)
+                bulk = 100 / chunk
+                add_on = (bulk - sum) / 2
+                left += add_on
+                right += add_on
+                n = 2 * chunk - 1
+                step = residual / n
+                current_p = left
+                add_on = left
+                for i in range(1, n+1):
+                    left_to_right_p = current_p
+                    if opposite:
+                        left_to_right_p = 100 - current_p
+                    d1 = d * left_to_right_p / 100
+                    new_point = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
+                    point_list.append(new_point)
+                    add_on -= step
+                    current_p += add_on
+            point_list.append(p2)
         return point_list
 
     def get_split_arc_points(self, arc, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):

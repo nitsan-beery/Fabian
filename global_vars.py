@@ -19,7 +19,7 @@ min_angle_to_create_element = 20
 max_angle_to_create_element = 160
 max_state_stack = 100
 max_split_parts = 16
-min_split_percentage = 2
+min_split_percentage = 1
 max_split_side_percentage = 100-min_split_percentage
 max_split_middle_percentage = 100-2*min_split_percentage
 
