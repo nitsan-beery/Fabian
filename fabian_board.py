@@ -556,6 +556,31 @@ class FabianBoard(Board):
             point_list.append(new_point_2)
             point_list.append(p2)
         elif split_mode == gv.split_mode_graduate_from_left:
+            opposite = False
+            if p2.is_smaller_x_smaller_y(p1):
+                opposite = True
+            n = split_arg[0]
+            left = split_arg[1]
+            diff = 100 - (n * left)
+            sum_n = n * (n - 1) / 2
+            step = diff / sum_n
+            add_on = 0
+            for i in range(n - 1):
+                add_on = add_on + left + step * i
+                actual_p = add_on
+                if opposite:
+                    actual_p = 100 - actual_p
+                d1 = d * actual_p / 100
+                new_point = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
+                point_list.append(new_point)
+            if opposite:
+                point_list.remove(p1)
+                point_list.reverse()
+                point_list.insert(0, p1)
+            point_list.append(p2)
+        '''
+        # old version - split by %left - %right
+        elif split_mode == #gv.split_mode_graduate_from_left:
             left = split_arg[0]
             right = split_arg[1]
             opposite = False
@@ -589,6 +614,7 @@ class FabianBoard(Board):
                 point_list.reverse()
                 point_list.insert(0, p1)
             point_list.append(p2)
+        '''
         return point_list
 
     def get_split_arc_points(self, arc, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):
@@ -629,6 +655,34 @@ class FabianBoard(Board):
             point_list.append(new_arc.end)
             point_list.append(arc.end)
         elif split_mode == gv.split_mode_graduate_from_left:
+            n = split_arg[0]
+            left = split_arg[1]
+            opposite = False
+            if arc.end.is_smaller_x_smaller_y(arc.start):
+                opposite = True
+            diff = 100 - (n * left)
+            sum_n = n * (n - 1) / 2
+            step = diff / sum_n
+            add_on = 0
+            for i in range(n-1):
+                add_on = add_on + left + step * i
+                angle_p = add_on
+                actual_p = angle_p
+                if opposite:
+                    actual_p = 100 - angle_p
+                angle = diff_angle * actual_p / 100
+                end_angle = start_angle + angle
+                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
+                             end_angle=end_angle)
+                point_list.append(new_arc.end)
+            if opposite:
+                point_list.remove(arc.start)
+                point_list.reverse()
+                point_list.insert(0, arc.start)
+            point_list.append(arc.end)
+        '''
+        # old version - split by %left - %right
+        elif split_mode == gv.split_mode_graduate_from_left:
             left = split_arg[0]
             right = split_arg[1]
             opposite = False
@@ -662,6 +716,7 @@ class FabianBoard(Board):
                 point_list.reverse()
                 point_list.insert(0, arc.start)
             point_list.append(arc.end)
+        '''
         return point_list
 
     def merge(self, marked_parts=False):
@@ -1711,7 +1766,7 @@ class FabianBoard(Board):
             self.show_elements = True
             self.update_view()
             print(f'\nSUCCESS')
-            print(f'net created with {counter_r4_elements} R4 elements and {counter_r3_elements} R3 elements   {len(self.node_list)} nodes\n')
+            print(f'net created with {counter_r4_elements} R4 elements and {counter_r3_elements} R3 elements   {len(self.node_list-1)} nodes\n')
         # debug
         #self.print_nodes_expected_elements()
         #self.print_elements(self.element_list)
