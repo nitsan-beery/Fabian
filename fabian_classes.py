@@ -265,15 +265,22 @@ class FabianState:
         self.scale = None
 
 
-split_arc_and_line_choices_list = ['n parts evenly', '2 different parts', 'graduate n parts', 'graduate left right', '3 parts different middle part']
+split_arc_and_line_choices_list = ['graduate n parts', 'n parts evenly', '2 different parts', 'graduate left right', '3 parts different middle part']
 
 split_arc_and_line_mode_dictionary = {
-    split_arc_and_line_choices_list[0]: gv.split_mode_evenly_n_parts,
-    split_arc_and_line_choices_list[1]: gv.split_mode_2_parts_percentage_left,
-    split_arc_and_line_choices_list[2]: gv.split_mode_graduate_n_parts,
+    split_arc_and_line_choices_list[0]: gv.split_mode_graduate_n_parts,
+    split_arc_and_line_choices_list[1]: gv.split_mode_evenly_n_parts,
+    split_arc_and_line_choices_list[2]: gv.split_mode_2_parts_percentage_left,
     split_arc_and_line_choices_list[3]: gv.split_mode_graduate_percentage_left_right,
     split_arc_and_line_choices_list[4]: gv.split_mode_3_parts_percentage_middle
 }
+
+default_graduate_n_parts = 12
+default_graduate_left = 5
+default_evenly_n_parts = 4
+default_percentage_left = 20
+default_percentage_right = 5
+default_percentage_middle = 50
 
 
 class SplitDialog(object):
@@ -300,7 +307,7 @@ class SplitDialog(object):
 
         self.split_choice_menu = ttk.Combobox(self.frame_2, width=25, values=split_arc_and_line_choices_list)
         self.entry_arg = tk.Entry(self.frame_2, width=3)
-        self.entry_left = tk.Entry(self.frame_2, state=tk.DISABLED, width=3)
+        self.entry_left = tk.Entry(self.frame_2, state=tk.NORMAL, width=3)
         self.split_choice_menu.grid(row=1, column=0, padx=10, pady=5)
         self.entry_arg.grid(row=1, column=1)
         self.entry_left.grid(row=1, column=2)
@@ -316,7 +323,8 @@ class SplitDialog(object):
         # set default values
         self.split_choice_menu.current(0)
         self.split_choice_menu.bind("<<ComboboxSelected>>", self.mode_selected)
-        self.entry_arg.insert(0, '3')
+        self.entry_arg.insert(0, default_graduate_n_parts)
+        self.entry_left.insert(0, default_graduate_left)
         self.entry_arg.focus_set()
         self.choice = None
 
@@ -325,37 +333,36 @@ class SplitDialog(object):
         if split_arc_and_line_mode_dictionary.get(split_mode) == gv.split_mode_evenly_n_parts:
             self.label_arg.config(text='n')
             self.entry_arg.delete(0, tk.END)
-            self.entry_arg.insert(0, '4')
+            self.entry_arg.insert(0, default_evenly_n_parts)
         elif split_arc_and_line_mode_dictionary.get(split_mode) == gv.split_mode_2_parts_percentage_left:
             self.label_arg.config(text='% left')
             self.entry_arg.delete(0, tk.END)
-            self.entry_arg.insert(0, '20')
+            self.entry_arg.insert(0, default_percentage_left)
         elif split_arc_and_line_mode_dictionary.get(split_mode) == gv.split_mode_3_parts_percentage_middle:
             self.label_arg.config(text='% middle')
             self.entry_arg.delete(0, tk.END)
-            self.entry_arg.insert(0, '50')
+            self.entry_arg.insert(0, default_percentage_middle)
         elif split_arc_and_line_mode_dictionary.get(split_mode) == gv.split_mode_graduate_n_parts:
             self.label_left.config(text='Left size (%)')
             self.label_arg.config(text='n')
             self.entry_arg.delete(0, tk.END)
-            self.entry_arg.insert(0, '12')
+            self.entry_arg.insert(0, default_graduate_n_parts)
             self.entry_left.config(state=tk.NORMAL)
             self.entry_left.delete(0, tk.END)
-            self.entry_left.insert(0, '5')
+            self.entry_left.insert(0, default_graduate_left)
         elif split_arc_and_line_mode_dictionary.get(split_mode) == gv.split_mode_graduate_percentage_left_right:
             self.label_left.config(text='% right')
             self.label_arg.config(text='% left')
             self.entry_arg.delete(0, tk.END)
-            self.entry_arg.insert(0, '20')
+            self.entry_arg.insert(0, default_percentage_left)
             self.entry_left.config(state=tk.NORMAL)
             self.entry_left.delete(0, tk.END)
-            self.entry_left.insert(0, '5')
+            self.entry_left.insert(0, default_percentage_right)
         if split_arc_and_line_mode_dictionary.get(split_mode) != gv.split_mode_graduate_n_parts and \
                 split_arc_and_line_mode_dictionary.get(split_mode) != gv.split_mode_graduate_percentage_left_right:
             self.label_left.config(text='')
             self.entry_left.delete(0, tk.END)
             self.entry_left.config(state=tk.DISABLED)
-
         self.entry_arg.focus_set()
 
     def get_choice(self):

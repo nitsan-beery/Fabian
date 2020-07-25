@@ -981,7 +981,7 @@ class FabianBoard(Board):
                     return
             # default split circle
             else:
-                angle = longitude + 45
+                angle = longitude
                 parts = 4
             split_mode = angle
             split_arg = parts
@@ -2196,6 +2196,7 @@ class FabianBoard(Board):
             i = len(crossing_lines) - 1
             while i >= 0:
                 pair = crossing_lines[i]
+                # index of line in self.net_line_list
                 line = pair[0]
                 self.split_net_line(line, split_middle_lines_mode, split_additional_arg)
                 new_points.append(self.node_list[-1].p)
