@@ -330,15 +330,14 @@ class FabianBoard(Board):
         select_part_menu.add_command(label="Net lines", command=lambda: self.change_select_parts_mode(gv.part_type_net_line))
         select_part_menu.add_command(label="all", command=lambda: self.change_select_parts_mode('all'))
         select_part_menu.add_separator()
-        if self.work_mode == gv.work_mode_dxf:
-            select_part_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_edge))
-            select_part_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_point))
-            select_part_menu.add_separator()
+        select_part_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_edge))
+        select_part_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_point))
+        select_part_menu.add_separator()
         select_part_menu.add_command(label="Quit")
         mark_option_menu = tk.Menu(self.board, tearoff=0)
-        mark_option_menu.add_command(label="mark", command=lambda: self.choose_mark_option(gv.mark_option_mark))
-        mark_option_menu.add_command(label="unmark", command=lambda: self.choose_mark_option(gv.mark_option_unmark))
-        mark_option_menu.add_command(label="invert", command=lambda: self.choose_mark_option(gv.mark_option_invert))
+        mark_option_menu.add_command(label="Mark", command=lambda: self.choose_mark_option(gv.mark_option_mark))
+        mark_option_menu.add_command(label="Unmark", command=lambda: self.choose_mark_option(gv.mark_option_unmark))
+        mark_option_menu.add_command(label="Invert", command=lambda: self.choose_mark_option(gv.mark_option_invert))
         mark_option_menu.add_separator()
         mark_option_menu.add_command(label="Quit", command=lambda: self.choose_mark_option("quit"))
         show_entities_menu = tk.Menu(menu, tearoff=0)
@@ -351,12 +350,12 @@ class FabianBoard(Board):
         show_node_number_menu.add_command(label="Show", command=lambda: self.set_node_number_state(gv.show_mode))
         show_node_number_menu.add_command(label="Hide", command=lambda: self.set_node_number_state(gv.hide_mode))
         net_menu = tk.Menu(menu, tearoff=0)
-        net_menu.add_command(label="show", command=lambda: self.change_show_net_mode(gv.show_mode))
-        net_menu.add_command(label="hide", command=lambda: self.change_show_net_mode(gv.hide_mode))
-        net_menu.add_command(label="clear", command=lambda: self.change_show_net_mode(gv.clear_mode))
+        net_menu.add_command(label="Show", command=lambda: self.change_show_net_mode(gv.show_mode))
+        net_menu.add_command(label="Hide", command=lambda: self.change_show_net_mode(gv.hide_mode))
+        net_menu.add_command(label="Clear", command=lambda: self.change_show_net_mode(gv.clear_mode))
         show_elements_menu = tk.Menu(menu, tearoff=0)
-        show_elements_menu.add_command(label="show", command=self.show_all_elements)
-        show_elements_menu.add_command(label="hide", command=self.hide_all_elements)
+        show_elements_menu.add_command(label="Show", command=self.show_all_elements)
+        show_elements_menu.add_command(label="Hide", command=self.hide_all_elements)
         menu.add_command(label="Undo", command=self.resume_state)
         menu.add_separator()
         menu.add_cascade(label='Select mode', menu=select_part_menu)
@@ -367,33 +366,35 @@ class FabianBoard(Board):
         menu.add_separator()
         if self.new_line_edge[0] is not None:
             self.board.delete(self.temp_line_mark)
-            menu.add_command(label="remove line", command=self.remove_temp_line)
+            menu.add_command(label="Remove line", command=self.remove_temp_line)
             menu.add_separator()
         if self.selected_part is not None:
+            if self.work_mode == gv.work_mode_inp and self.new_line_edge[0] is not None:
+                menu.add_command(label="Split by point", command=lambda: self.split_selected_part(gv.split_mode_2_parts_by_point))
             menu.add_command(label="split", command=lambda: self.split_selected_part(gv.split_mode_evenly_n_parts))
             menu.add_command(label="split...", command=lambda: self.split_selected_part())
             if self.work_mode == gv.work_mode_inp and self.selected_part.part_type == gv.part_type_entity:
-                menu.add_command(label="merge", command=self.merge)
+                menu.add_command(label="Merge", command=self.merge)
             if self.work_mode == gv.work_mode_dxf or (self.work_mode == gv.work_mode_inp and self.selected_part.part_type == gv.part_type_net_line):
-                menu.add_command(label="delete", command=self.remove_selected_part_from_list)
-                menu.add_command(label="mark", command=self.mark_selected_part)
-                menu.add_command(label="unmark", command=self.unmark_selected_part)
+                menu.add_command(label="Delete", command=self.remove_selected_part_from_list)
+                menu.add_command(label="Mark", command=self.mark_selected_part)
+                menu.add_command(label="Unmark", command=self.unmark_selected_part)
             menu.add_separator()
         if self.work_mode == gv.work_mode_dxf:
             if len(self.entity_list) > 0:
                 mark_list = self.get_marked_parts(gv.part_list_entities)
-                menu.add_command(label="mark all entities", command=self.mark_all_entities)
-                menu.add_command(label="unmark all entities", command=self.unmark_all_entities)
+                menu.add_command(label="Mark all entities", command=self.mark_all_entities)
+                menu.add_command(label="Unmark all entities", command=self.unmark_all_entities)
                 if len(mark_list) > 1:
-                    menu.add_command(label="merge marked entities", command=lambda: self.merge(True))
-                    menu.add_command(label="delete marked entities", command=self.remove_marked_entities_from_list)
-                    menu.add_command(label="delete NON marked entities", command=self.remove_non_marked_entities_from_list)
+                    menu.add_command(label="Merge marked entities", command=lambda: self.merge(True))
+                    menu.add_command(label="Delete marked entities", command=self.remove_marked_entities_from_list)
+                    menu.add_command(label="Delete NON marked entities", command=self.remove_non_marked_entities_from_list)
                 menu.add_separator()
         elif self.work_mode == gv.work_mode_inp:
             mark_list = self.get_marked_parts(gv.part_list_net_lines)
             if len(mark_list) > 1:
-                menu.add_command(label="merge marked net lines", command=lambda: self.merge(True))
-                menu.add_command(label="delete marked net lines", command=self.remove_marked_net_lines_from_list)
+                menu.add_command(label="Merge marked net lines", command=lambda: self.merge(True))
+                menu.add_command(label="Delete marked net lines", command=self.remove_marked_net_lines_from_list)
                 menu.add_separator()
             menu.add_cascade(label='Nodes number', menu=show_node_number_menu)
             menu.add_cascade(label='Net lines', menu=net_menu)
@@ -537,6 +538,10 @@ class FabianBoard(Board):
                 end = Point(start.x + step * math.cos(alfa), start.y + step * math.sin(alfa))
                 point_list.append(end)
                 start = end
+        elif split_mode == gv.split_mode_2_parts_by_point:
+            middle_point = split_arg
+            point_list.append(middle_point)
+            point_list.append(p2)
         elif split_mode == gv.split_mode_2_parts_percentage_left:
             percentage_left = split_arg
             if p2.is_smaller_x_smaller_y(p1):
@@ -630,6 +635,13 @@ class FabianBoard(Board):
                              end_angle=end_angle)
                 point_list.append(new_arc.end)
                 start_angle = end_angle
+        elif split_mode == gv.split_mode_2_parts_by_point:
+            middle_point = split_arg
+            end_angle = arc.center.get_alfa_to(middle_point)
+            new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
+                             end_angle=end_angle)
+            point_list.append(new_arc.end)
+            point_list.append(arc.end)
         elif split_mode == gv.split_mode_2_parts_percentage_left:
             percentage_left = split_arg
             if arc.end.is_smaller_x_smaller_y(arc.start):
@@ -987,6 +999,9 @@ class FabianBoard(Board):
                     split_arg = choice.get('arg')
                 else:
                     return
+            elif split_mode == gv.split_mode_2_parts_by_point:
+                split_arg = self.new_line_edge[0]
+                self.remove_temp_line()
         self.split_part(s_part, split_mode, split_arg)
 
     def split_entity_by_point(self, s_part, p):
