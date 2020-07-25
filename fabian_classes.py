@@ -265,13 +265,14 @@ class FabianState:
         self.scale = None
 
 
-split_arc_and_line_choices_list = ['n parts evenly', '2 different parts', 'graduate from left', '3 parts different middle part']
+split_arc_and_line_choices_list = ['n parts evenly', '2 different parts', 'graduate n parts', 'graduate left right', '3 parts different middle part']
 
 split_arc_and_line_mode_dictionary = {
     split_arc_and_line_choices_list[0]: gv.split_mode_evenly_n_parts,
     split_arc_and_line_choices_list[1]: gv.split_mode_2_parts_percentage_left,
-    split_arc_and_line_choices_list[2]: gv.split_mode_graduate_from_left,
-    split_arc_and_line_choices_list[3]: gv.split_mode_3_parts_percentage_middle
+    split_arc_and_line_choices_list[2]: gv.split_mode_graduate_n_parts,
+    split_arc_and_line_choices_list[3]: gv.split_mode_graduate_percentage_left_right,
+    split_arc_and_line_choices_list[4]: gv.split_mode_3_parts_percentage_middle
 }
 
 
@@ -333,14 +334,24 @@ class SplitDialog(object):
             self.label_arg.config(text='% middle')
             self.entry_arg.delete(0, tk.END)
             self.entry_arg.insert(0, '50')
-        elif split_arc_and_line_mode_dictionary.get(split_mode) == gv.split_mode_graduate_from_left:
+        elif split_arc_and_line_mode_dictionary.get(split_mode) == gv.split_mode_graduate_n_parts:
             self.label_left.config(text='Left size (%)')
             self.label_arg.config(text='n')
             self.entry_arg.delete(0, tk.END)
             self.entry_arg.insert(0, '12')
             self.entry_left.config(state=tk.NORMAL)
+            self.entry_left.delete(0, tk.END)
             self.entry_left.insert(0, '5')
-        if split_arc_and_line_mode_dictionary.get(split_mode) != gv.split_mode_graduate_from_left:
+        elif split_arc_and_line_mode_dictionary.get(split_mode) == gv.split_mode_graduate_percentage_left_right:
+            self.label_left.config(text='% right')
+            self.label_arg.config(text='% left')
+            self.entry_arg.delete(0, tk.END)
+            self.entry_arg.insert(0, '20')
+            self.entry_left.config(state=tk.NORMAL)
+            self.entry_left.delete(0, tk.END)
+            self.entry_left.insert(0, '5')
+        if split_arc_and_line_mode_dictionary.get(split_mode) != gv.split_mode_graduate_n_parts and \
+                split_arc_and_line_mode_dictionary.get(split_mode) != gv.split_mode_graduate_percentage_left_right:
             self.label_left.config(text='')
             self.entry_left.delete(0, tk.END)
             self.entry_left.config(state=tk.DISABLED)
@@ -360,7 +371,7 @@ class SplitDialog(object):
         except ValueError:
             print('choose a number')
             return
-        if split_mode == gv.split_mode_graduate_from_left:
+        if split_mode == gv.split_mode_graduate_n_parts:
             try:
                 left = float(left)
             except ValueError:
@@ -373,6 +384,17 @@ class SplitDialog(object):
             add_on = split_arg * (split_arg - 1) / 2
             step = diff / add_on
             print(f'split graduate: right side edge = {left + step * (split_arg-1)}%')
+            split_arg = (split_arg, left)
+            is_valid = True
+        elif split_mode == gv.split_mode_graduate_percentage_left_right:
+            try:
+                left = float(left)
+            except ValueError:
+                print('choose a number for %left')
+                return
+            if left < gv.min_split_percentage or left > gv.max_split_side_percentage:
+                print(f'%right must be {gv.min_split_percentage}-{gv.max_split_side_percentage}')
+                return
             split_arg = (split_arg, left)
             is_valid = True
         else:

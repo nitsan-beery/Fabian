@@ -560,7 +560,7 @@ class FabianBoard(Board):
             point_list.append(new_point_1)
             point_list.append(new_point_2)
             point_list.append(p2)
-        elif split_mode == gv.split_mode_graduate_from_left:
+        elif split_mode == gv.split_mode_graduate_n_parts:
             opposite = False
             if p2.is_smaller_x_smaller_y(p1):
                 opposite = True
@@ -583,9 +583,7 @@ class FabianBoard(Board):
                 point_list.reverse()
                 point_list.insert(0, p1)
             point_list.append(p2)
-        '''
-        # old version - split by %left - %right
-        elif split_mode == #gv.split_mode_graduate_from_left:
+        elif split_mode == gv.split_mode_graduate_percentage_left_right:
             left = split_arg[0]
             right = split_arg[1]
             opposite = False
@@ -619,7 +617,6 @@ class FabianBoard(Board):
                 point_list.reverse()
                 point_list.insert(0, p1)
             point_list.append(p2)
-        '''
         return point_list
 
     def get_split_arc_points(self, arc, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):
@@ -666,7 +663,7 @@ class FabianBoard(Board):
                              end_angle=end_angle)
             point_list.append(new_arc.end)
             point_list.append(arc.end)
-        elif split_mode == gv.split_mode_graduate_from_left:
+        elif split_mode == gv.split_mode_graduate_n_parts:
             n = split_arg[0]
             left = split_arg[1]
             opposite = False
@@ -692,9 +689,7 @@ class FabianBoard(Board):
                 point_list.reverse()
                 point_list.insert(0, arc.start)
             point_list.append(arc.end)
-        '''
-        # old version - split by %left - %right
-        elif split_mode == gv.split_mode_graduate_from_left:
+        elif split_mode == gv.split_mode_graduate_percentage_left_right:
             left = split_arg[0]
             right = split_arg[1]
             opposite = False
@@ -728,7 +723,6 @@ class FabianBoard(Board):
                 point_list.reverse()
                 point_list.insert(0, arc.start)
             point_list.append(arc.end)
-        '''
         return point_list
 
     def merge(self, marked_parts=False):
