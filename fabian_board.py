@@ -309,13 +309,19 @@ class FabianBoard(Board):
         self.mark_option = option
 
     def set_node_number_state(self, mode):
+        changed = False
+        if not self.show_nodes:
+            self.show_nodes = True
+            changed = True
         if mode == gv.show_mode:
             should_show = True
         else:
             should_show = False
         if self.show_node_number != should_show:
-            self.keep_state()
+            changed = True
             self.show_node_number = should_show
+        if changed:
+            self.keep_state()
             self.update_view()
 
     def mouse_3_pressed(self, key):
@@ -346,9 +352,10 @@ class FabianBoard(Board):
         show_entities_menu.add_command(label="Hide", command=lambda: self.hide_dxf_entities())
         show_entities_menu.add_separator()
         show_entities_menu.add_command(label="Quit")
-        show_node_number_menu = tk.Menu(menu, tearoff=0)
-        show_node_number_menu.add_command(label="Show", command=lambda: self.set_node_number_state(gv.show_mode))
-        show_node_number_menu.add_command(label="Hide", command=lambda: self.set_node_number_state(gv.hide_mode))
+        show_node_menu = tk.Menu(menu, tearoff=0)
+        show_node_menu.add_command(label="Show with numbers", command=lambda: self.set_node_number_state(gv.show_mode))
+        show_node_menu.add_command(label="Show without numbers", command=lambda: self.set_node_number_state(gv.hide_mode))
+        show_node_menu.add_command(label="Hide", command=self.hide_all_nodes)
         net_menu = tk.Menu(menu, tearoff=0)
         net_menu.add_command(label="Show", command=lambda: self.change_show_net_mode(gv.show_mode))
         net_menu.add_command(label="Hide", command=lambda: self.change_show_net_mode(gv.hide_mode))
@@ -396,7 +403,7 @@ class FabianBoard(Board):
                 menu.add_command(label="Merge marked net lines", command=lambda: self.merge(True))
                 menu.add_command(label="Delete marked net lines", command=self.remove_marked_net_lines_from_list)
                 menu.add_separator()
-            menu.add_cascade(label='Nodes number', menu=show_node_number_menu)
+            menu.add_cascade(label='Nodes', menu=show_node_menu)
             menu.add_cascade(label='Net lines', menu=net_menu)
             menu.add_cascade(label='Elements', menu=show_elements_menu)
             menu.add_cascade(label='Entities', menu=show_entities_menu)
