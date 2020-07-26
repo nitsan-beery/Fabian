@@ -299,7 +299,7 @@ class SplitDialog(object):
 
         self.label_mode = tk.Label(self.frame_2, text='Split mode', padx=10)
         self.label_arg = tk.Label(self.frame_2, width=7, text='n')
-        self.label_left = tk.Label(self.frame_2, width=10, text='', padx=5)
+        self.label_left = tk.Label(self.frame_2, width=10, text='Left size (%)', padx=5)
 
         self.label_mode.grid(row=0, column=0, sticky='w')
         self.label_arg.grid(row=0, column=1)

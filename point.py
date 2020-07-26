@@ -119,6 +119,7 @@ def get_sorted_points(p1, p2, sort_by_x=True):
             else:
                 return p2, p1
 
+
 def sort_list_point_by_distance_from_p(point_list, p):
     sorted_list = []
     d_list = []
@@ -129,4 +130,5 @@ def sort_list_point_by_distance_from_p(point_list, p):
     for item in d_list:
         sorted_list.append(item[0])
     return sorted_list
+
 
