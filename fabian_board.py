@@ -181,6 +181,10 @@ class FabianBoard(Board):
                 p1 = node_1.p
                 p2 = node_2.p
                 d, p = self.get_distance_from_line_and_nearest_point(Point(x, y), p1, p2)
+            if self.mouse_select_mode == gv.mouse_select_mode_point and self.work_mode == gv.work_mode_inp:
+                self.new_line_edge[0] = p
+                self.split_selected_part(gv.split_mode_2_parts_by_point)
+                return
         if self.mouse_select_mode == gv.mouse_select_mode_edge:
             d1 = p1.get_distance_to_point(Point(x, y))
             d2 = p2.get_distance_to_point(Point(x, y))
@@ -225,7 +229,13 @@ class FabianBoard(Board):
             if self.new_line_edge[1] is None:
                 self.new_line_edge[1] = p
                 self.new_line_original_part[1] = self.selected_part
-                self.add_line()
+                '''
+                p1 = self.new_line_edge[0]
+                p2 = self.new_line_edge[1]
+                s_part_start = self.new_line_original_part[0]
+                s_part_end = self.new_line_original_part[1]
+                '''
+                self.add_line()#p1, p2, s_part_start, s_part_end)
             else:
                 self.board.delete(self.new_line_edge_mark[1])
                 self.new_line_edge_mark[1] = None
@@ -376,8 +386,6 @@ class FabianBoard(Board):
             menu.add_command(label="Remove line", command=self.remove_temp_line)
             menu.add_separator()
         if self.selected_part is not None:
-            if self.work_mode == gv.work_mode_inp and self.new_line_edge[0] is not None:
-                menu.add_command(label="Split by point", command=lambda: self.split_selected_part(gv.split_mode_2_parts_by_point))
             menu.add_command(label="split", command=lambda: self.split_selected_part(gv.split_mode_evenly_n_parts))
             menu.add_command(label="split...", command=lambda: self.split_selected_part())
             if self.work_mode == gv.work_mode_inp and self.selected_part.part_type == gv.part_type_entity:
@@ -467,6 +475,7 @@ class FabianBoard(Board):
         self.update_view()
 
     def change_mouse_selection_mode(self, mode):
+        self.remove_temp_line()
         self.mouse_select_mode = mode
 
     def change_select_parts_mode(self, mode):
@@ -1220,9 +1229,9 @@ class FabianBoard(Board):
         if p1 is None or p2 is None:
             return net_lines_list
         for i in range(len(self.net_line_list)):
-            p = self.get_mutual_point_of_net_line_with_crossing_line(i, p1, p2)
+            p, hash_node = self.get_mutual_point_of_net_line_with_crossing_line(i, p1, p2)
             if p is not None:
-                net_lines_list.append((i, p))
+                net_lines_list.append((i, hash_node, p))
         return net_lines_list
 
     # return mutual point of self.net_line_list[net_line] with crossing line p1-p2, None if there isn't
@@ -1237,19 +1246,22 @@ class FabianBoard(Board):
         p1 = get_shifted_point(p1, start_node.p, angle)
         p2 = get_shifted_point(p2, start_node.p, angle)
         if p1.y == p2.y:
-            return None
+            return None, None
+        if p1.y * p2.y > 0:
+            return None, None
         # x = where line p1-p2 crosses x axe
         x = p2.x - p2.y * (p2.x - p1.x) / (p2.y - p1.y)
-        accuracy = math.pow(10, -gv.accuracy)
-        if x-accuracy <= 0 or x+accuracy >= line_end.x:
-            return None
-        if p1.y * p2.y > 0:
-            return None
+        if round(x, gv.accuracy) == 0:
+            return start_node.p, net_line.start_node
+        elif round(x, gv.accuracy) == round(line_end.x, gv.accuracy):
+            return end_node.p, net_line.end_node
+        elif round(x, gv.accuracy) < 0 or round(x, gv.accuracy) > line_end.x:
+            return None, None
         mutual_point = Point(x, 0)
         mutual_point = get_shifted_point(mutual_point, Point(0, 0), -angle)
         mutual_point.x += start_node.p.x
         mutual_point.y += start_node.p.y
-        return mutual_point
+        return mutual_point, None
 
     # return list of marked parts is list
     def get_marked_parts(self, list_name):
@@ -2209,11 +2221,15 @@ class FabianBoard(Board):
             new_points = [p1, p2]
             i = len(crossing_lines) - 1
             while i >= 0:
-                pair = crossing_lines[i]
+                item = crossing_lines[i]
                 # index of line in self.net_line_list
-                line = pair[0]
-                self.split_net_line(line, gv.split_mode_2_parts_percentage_left, split_middle_lines_percentage_left)
-                new_points.append(self.node_list[-1].p)
+                line = item[0]
+                hash_node = item[1]
+                p = item[2]
+                if hash_node is None:
+                    self.split_net_line(line, gv.split_mode_2_parts_percentage_left, split_middle_lines_percentage_left)
+                    p = self.node_list[-1].p
+                new_points.append(p)
                 i -= 1
             new_points = sort_list_point_by_distance_from_p(new_points, p1)
             start_point = new_points[0]
@@ -2281,11 +2297,8 @@ class FabianBoard(Board):
     def add_line_to_net_list(self, p1, p2):
         if self.work_mode != gv.work_mode_inp:
             return
-        start_node = self.get_hash_index_of_node_with_point(p1)
-        end_node = self.get_hash_index_of_node_with_point(p2)
-        if start_node is None or end_node is None:
-            self.remove_temp_line()
-            return
+        start_node = self.add_node_to_node_list(Node(p1))
+        end_node = self.add_node_to_node_list(Node(p2))
         line = NetLine(start_node, end_node)
         self.net_line_list.append(line)
         self.show_net_line(-1)
