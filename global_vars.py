@@ -61,6 +61,7 @@ node_mark_radius = 3
 
 board_bg_color = '#D1EDFF'
 default_color = '#0099FF'
+default_entity_color = default_color
 marked_entity_color = 'orange'
 weak_entity_color = 'yellow'
 selected_item_color = '#FFFFcc'

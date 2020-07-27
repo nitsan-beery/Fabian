@@ -211,7 +211,7 @@ class FabianBoard(Board):
             if d1 < d2:
                 p = p1
 
-        if self.mouse_select_mode == gv.mouse_select_mode_corner:
+        if self.mouse_select_mode == gv.mouse_select_mode_corner and self.work_mode == gv.work_mode_inp:
             corner = Corner()
             node_hash_index = self.get_hash_index_of_node_with_point(p)
             #debug
@@ -313,7 +313,7 @@ class FabianBoard(Board):
                 }
                 self.keep_state()
                 marked_color = gv.marked_entity_color
-                non_marked_color = gv.default_color
+                non_marked_color = gv.default_entity_color
                 part_list = self.entity_list
                 list_name = gv.part_list_entities
                 if t3:
@@ -371,9 +371,11 @@ class FabianBoard(Board):
             select_part_menu.add_command(label="Net lines", command=lambda: self.change_select_parts_mode(gv.part_type_net_line))
             select_part_menu.add_command(label="all", command=lambda: self.change_select_parts_mode('all'))
             select_part_menu.add_separator()
-            select_part_menu.add_command(label="Corners", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
         select_part_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_edge))
         select_part_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_point))
+        if self.work_mode == gv.work_mode_inp:
+            select_part_menu.add_command(label="Corners",
+                                     command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
         select_part_menu.add_separator()
         select_part_menu.add_command(label="Quit")
         mark_option_menu = tk.Menu(self.board, tearoff=0)
@@ -384,7 +386,7 @@ class FabianBoard(Board):
         mark_option_menu.add_command(label="Quit", command=lambda: self.choose_mark_option("quit"))
         show_entities_menu = tk.Menu(menu, tearoff=0)
         show_entities_menu.add_command(label="Show Weak", command=lambda: self.set_all_dxf_entities_color(gv.weak_entity_color))
-        show_entities_menu.add_command(label="Show Strong", command=lambda: self.set_all_dxf_entities_color(gv.default_color))
+        show_entities_menu.add_command(label="Show Strong", command=lambda: self.set_all_dxf_entities_color(gv.default_entity_color))
         show_entities_menu.add_command(label="Hide", command=lambda: self.hide_dxf_entities())
         show_entities_menu.add_separator()
         show_entities_menu.add_command(label="Quit")
@@ -483,16 +485,18 @@ class FabianBoard(Board):
         if self.selected_part is not None:
             self.remove_selected_part_mark()
         self.remove_temp_line()
+        self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
+        self.choose_mark_option(gv.mark_option_mark)
         if mode == gv.work_mode_dxf:
             if self.work_mode == gv.work_mode_dxf:
                 return
             self.show_nodes = False
             self.show_net = False
+            self.show_corners = False
             self.show_elements = False
             self.show_entities = True
             self.change_select_parts_mode(gv.part_type_entity)
-            self.choose_mark_option(gv.mark_option_mark)
-            self.set_all_dxf_entities_color(gv.default_color)
+            self.set_all_dxf_entities_color(gv.default_entity_color)
         elif mode == gv.work_mode_inp:
             if self.work_mode == gv.work_mode_inp:
                 return
@@ -504,7 +508,7 @@ class FabianBoard(Board):
             self.show_entities = True
             self.show_nodes = True
             self.show_net = True
-            self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
+            self.show_corners = True
             self.change_select_parts_mode('all')
             self.choose_mark_option('quit')
         self.work_mode = mode
@@ -522,7 +526,12 @@ class FabianBoard(Board):
         if mode == gv.handle_corners_mode_clear:
             self.clear_corner_list()
         elif mode == gv.handle_corners_mode_set_net:
-            pass
+            self.keep_state()
+            changed = self.set_net_between_corners()
+            if changed:
+                self.clear_corner_list()
+                self.update_view()
+            self.state.pop(-1)
 
     def motion(self, key):
         x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
@@ -1487,7 +1496,7 @@ class FabianBoard(Board):
         if self.work_mode == gv.work_mode_inp:
             self.entity_list[entity].color = gv.weak_entity_color
         else:
-            self.entity_list[entity].color = gv.default_color
+            self.entity_list[entity].color = gv.default_entity_color
 
     # return the hash key of the exception nodes
     def get_exception_nodes(self):
@@ -1753,6 +1762,61 @@ class FabianBoard(Board):
         print('Expected elements for each node:')
         for i in range(1, len(self.node_list)):
             print(f'{i}: {self.node_list[i].expected_elements}')
+
+    # the terms left-right-top-bottom assume that self.corner_list[0] is the bottom left corner and 2-4 order clockwise
+    # net will start with horizontal lines (left-right) and then split them with vertical lines
+    def set_net_between_corners(self):
+        if len(self.corner_list) < 4:
+            return False
+        n_state = len(self.state)
+        show_elements = self.show_elements
+        show_entities = self.show_entities
+        show_nodes = self.show_nodes
+        show_net = self.show_net
+        self.show_nodes = False
+        self.show_entities = False
+        self.show_net = False
+        self.show_elements = False
+        hash_node = []
+        for i in range(len(self.corner_list)):
+            hash_node.append(self.corner_list[i].hash_node)
+        middle_nodes_left = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[1])
+        middle_nodes_top = self.get_middle_nodes_between_node1_and_node_2(hash_node[1], hash_node[2])
+        middle_nodes_right = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2])
+        middle_nodes_bottom = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[3])
+        if len(middle_nodes_left) != len(middle_nodes_right):
+            print(f'mismatch number of nodes left and right {len(middle_nodes_left)}, {len(middle_nodes_right)}')
+            return False
+        if len(middle_nodes_top) != len(middle_nodes_bottom):
+            print(f'mismatch number of nodes top and bottom {len(middle_nodes_top)}, {len(middle_nodes_bottom)}')
+            return False
+        self.add_lines_between_2_node_list(middle_nodes_left, middle_nodes_right)
+        self.add_lines_between_2_node_list(middle_nodes_bottom, middle_nodes_top)
+        self.show_nodes = show_nodes
+        self.show_entities = show_entities
+        self.show_net = show_net
+        self.show_elements = show_elements
+        i = len(self.state)
+        while(i > n_state):
+            self.state.pop(-1)
+            i -= 1
+        return True
+
+    def add_lines_between_2_node_list(self, hash_node_list_1, hash_node_list_2):
+        if hash_node_list_1 is None or hash_node_list_2 is None:
+            return
+        if len(hash_node_list_1) != len(hash_node_list_2):
+            return
+        n = len(hash_node_list_1) + 1
+        for i in range(len(hash_node_list_1)):
+            start_hash = hash_node_list_1[i]
+            end_hash = hash_node_list_2[i]
+            start_index = self.get_node_index_from_hash(start_hash)
+            end_index = self.get_node_index_from_hash(end_hash)
+            p1 = self.node_list[start_index].p
+            p2 = self.node_list[end_index].p
+            self.add_line(p1, p2, 100/n)
+            n -= 1
 
     def set_net(self):
         self.create_net_element_list()
@@ -2177,7 +2241,7 @@ class FabianBoard(Board):
         if self.selected_part.part_type == gv.part_type_entity:
             e = self.entity_list[i]
             e.is_marked = False
-            self.set_entity_color(i, gv.default_color)
+            self.set_entity_color(i, gv.default_entity_color)
         elif self.selected_part.part_type == gv.part_type_net_line:
             n = self.net_line_list[i]
             n.is_marked = False
@@ -2198,7 +2262,7 @@ class FabianBoard(Board):
         for e in self.entity_list:
             if e.is_marked:
                 e.is_marked = False
-                self.set_entity_color(i, gv.default_color)
+                self.set_entity_color(i, gv.default_entity_color)
             i += 1
 
     def remove_marked_net_lines_from_list(self):
@@ -2246,7 +2310,7 @@ class FabianBoard(Board):
         for e in temp_list:
             e.is_marked = False
             e.board_part = None
-            e.color = gv.default_color
+            e.color = gv.default_entity_color
         self.entity_list = temp_list
         self.remove_temp_line()
         self.remove_selected_part_mark()
@@ -2285,7 +2349,7 @@ class FabianBoard(Board):
 
     # add line from p1 to p2. split_middle_lines_percentage_left = % left of point to split the crossing middle lines
     # by default the line to add is the line created by user selected points
-    def add_line(self, p1=None, p2=None, split_middle_lines_percentage_left=50):
+    def add_line(self, p1=None, p2=None, split_middle_lines_percentage_left=50.0):
         if p1 is None:
             p1 = self.new_line_edge[0]
         if p2 is None:
@@ -2445,7 +2509,7 @@ class FabianBoard(Board):
             return
         e = Entity('LINE', start=p1, end=p2)
         e.is_marked = False
-        e.color = gv.default_color
+        e.color = gv.default_entity_color
         self.entity_list.append(e)
         self.show_entity(-1)
 
@@ -2633,8 +2697,8 @@ class FabianBoard(Board):
             self.corner_list[i].board_part = part
         if corner.board_text is None:
             x, y = self.convert_xy_to_screen(p.x, p.y)
-            x += 8
-            y -= 8
+            x += 9
+            y -= 9
             self.corner_list[i].board_text = self.board.create_text(x, y, text=i+1, fill=gv.corner_text_color, justify=tk.RIGHT)
 
     def hide_corner(self, i):
@@ -2649,7 +2713,7 @@ class FabianBoard(Board):
     def show_all_corners(self):
         for i in range(len(self.corner_list)):
             self.show_corner(i)
-        self.show_nodes = True
+        self.show_corners = True
         self.window_main.update()
 
     def hide_all_corners(self):
@@ -2781,8 +2845,8 @@ class FabianBoard(Board):
     def set_all_dxf_entities_color(self, color):
         for i in range(len(self.entity_list)):
             self.set_entity_color(i, color)
-            self.show_entities = True
-            self.update_view()
+        self.show_entities = True
+        self.update_view()
 
     def mark_part(self, i, part_type, color=gv.mark_rect_color):
         self.selected_part = SelectedPart(index=i, part_type=part_type)
