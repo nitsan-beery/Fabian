@@ -369,13 +369,12 @@ class FabianBoard(Board):
         if self.work_mode == gv.work_mode_inp:
             select_part_menu.add_command(label="Entities", command=lambda: self.change_select_parts_mode(gv.part_type_entity))
             select_part_menu.add_command(label="Net lines", command=lambda: self.change_select_parts_mode(gv.part_type_net_line))
-            select_part_menu.add_command(label="all", command=lambda: self.change_select_parts_mode('all'))
+            select_part_menu.add_command(label="both", command=lambda: self.change_select_parts_mode('all'))
+            if self.work_mode == gv.work_mode_inp:
+                select_part_menu.add_command(label="Corners", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
             select_part_menu.add_separator()
         select_part_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_edge))
         select_part_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_point))
-        if self.work_mode == gv.work_mode_inp:
-            select_part_menu.add_command(label="Corners",
-                                     command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
         select_part_menu.add_separator()
         select_part_menu.add_command(label="Quit")
         mark_option_menu = tk.Menu(self.board, tearoff=0)
@@ -445,18 +444,19 @@ class FabianBoard(Board):
             menu.add_cascade(label='Elements', menu=show_elements_menu)
             menu.add_cascade(label='Entities', menu=show_entities_menu)
             menu.add_separator()
-            #menu.add_command(label="Set initial border nodes...", command=self.set_initial_border_nodes)
+            set_net_menu = tk.Menu(menu, tearoff=0)
+            if len(self.corner_list) == 4:
+                set_net_menu.add_command(label="Between corners",
+                                         command=lambda: self.handle_corners(gv.handle_corners_mode_set_net))
+                set_net_menu.add_command(label="Whole net", command=self.set_net)
+                menu.add_cascade(label='Set net', menu=set_net_menu)
+            else:
+                menu.add_command(label="Set net", command=self.set_net)
             if len(self.corner_list) > 0:
-                corners_menu = tk.Menu(menu, tearoff=0)
-                corners_menu.add_command(label="Clear",
+                menu.add_command(label="Clear corners",
                                          command=lambda: self.handle_corners(gv.handle_corners_mode_clear))
-                if len(self.corner_list) == 4:
-                    corners_menu.add_command(label="Set net",
-                                             command=lambda: self.handle_corners(gv.handle_corners_mode_set_net))
-                menu.add_cascade(label='Corners', menu=corners_menu)
-                menu.add_separator()
+            menu.add_command(label="Set initial border nodes...", command=self.set_initial_border_nodes)
             menu.add_command(label="Clear net", command=self.clear_net)
-            menu.add_command(label="Set net", command=self.set_net)
             menu.add_separator()
         menu.add_command(label="Quit")
         menu.post(key.x_root, key.y_root)
@@ -521,6 +521,7 @@ class FabianBoard(Board):
     def change_select_parts_mode(self, mode):
         self.remove_selected_part_mark()
         self.select_parts_mode = mode
+        self.mouse_select_mode = gv.mouse_select_mode_edge
 
     def handle_corners(self, mode):
         if mode == gv.handle_corners_mode_clear:
@@ -1622,7 +1623,7 @@ class FabianBoard(Board):
             next_node_index = self.get_node_index_from_hash(next_node_hash_index)
             nodes_outer_list.append(next_node_index)
         # debug
-        print(f'outer line: {nodes_outer_list}')
+        #print(f'outer line: {nodes_outer_list}')
         return nodes_outer_list
 
     # return list of unattached nodes with real index in list (not hash_index)
@@ -1785,10 +1786,10 @@ class FabianBoard(Board):
         middle_nodes_right = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2])
         middle_nodes_bottom = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[3])
         if len(middle_nodes_left) != len(middle_nodes_right):
-            print(f'mismatch number of nodes left and right {len(middle_nodes_left)}, {len(middle_nodes_right)}')
+            print(f'mismatch number of nodes left ({len(middle_nodes_left)}) and right ({len(middle_nodes_right)})')
             return False
         if len(middle_nodes_top) != len(middle_nodes_bottom):
-            print(f'mismatch number of nodes top and bottom {len(middle_nodes_top)}, {len(middle_nodes_bottom)}')
+            print(f'mismatch number of nodes top ({len(middle_nodes_top)}) and bottom ({len(middle_nodes_bottom)})')
             return False
         self.add_lines_between_2_node_list(middle_nodes_left, middle_nodes_right)
         self.add_lines_between_2_node_list(middle_nodes_bottom, middle_nodes_top)
@@ -2350,6 +2351,8 @@ class FabianBoard(Board):
     # add line from p1 to p2. split_middle_lines_percentage_left = % left of point to split the crossing middle lines
     # by default the line to add is the line created by user selected points
     def add_line(self, p1=None, p2=None, split_middle_lines_percentage_left=50.0):
+        if p1 is None and p2 is None:
+            self.keep_state()
         if p1 is None:
             p1 = self.new_line_edge[0]
         if p2 is None:
@@ -2358,7 +2361,6 @@ class FabianBoard(Board):
             return
         s_part_1 = self.new_line_original_part[0]
         s_part_2 = self.new_line_original_part[1]
-        self.keep_state()
         if self.work_mode == gv.work_mode_dxf:
             if self.mouse_select_mode == gv.mouse_select_mode_point:
                 entity_2 = self.entity_list[s_part_2.index]
@@ -2455,11 +2457,20 @@ class FabianBoard(Board):
             self.show_corners = True
 
     def add_corner_to_corner_list(self, corner):
-        if len(self.corner_list) < 4:
+        i = len(self.corner_list)
+        if i < 4:
             if not self.is_corner_in_list(corner):
                 self.keep_state()
                 self.corner_list.append(corner)
-                i = len(self.corner_list) - 1
+                if i > 0:
+                    hash_node1 = self.corner_list[-2].hash_node
+                    hash_node2 = self.corner_list[-1].hash_node
+                    middle_nodes = self.get_middle_nodes_between_node1_and_node_2(hash_node1, hash_node2)
+                    print(f'{len(middle_nodes)} middle nodes between corners {len(self.corner_list)-1} and {len(self.corner_list)}')
+                    if i == 3:
+                        hash_node1 = self.corner_list[0].hash_node
+                        middle_nodes = self.get_middle_nodes_between_node1_and_node_2(hash_node1, hash_node2)
+                        print(f'{len(middle_nodes)} middle nodes between corners 1 and 4')
                 self.show_corner(i)
 
     def is_corner_in_list(self, corner):
