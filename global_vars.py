@@ -23,8 +23,11 @@ min_split_percentage = 1
 max_split_side_percentage = 100-min_split_percentage
 max_split_middle_percentage = 100-2*min_split_percentage
 
+handle_corners_mode_clear = 'clear'
+handle_corners_mode_set_net = 'set_net'
 mouse_select_mode_edge = 'edge'
 mouse_select_mode_point = 'point'
+mouse_select_mode_corner = 'corner'
 work_mode_dxf = 'dxf'
 work_mode_inp = 'inp'
 part_type_entity = 'entity'
@@ -69,6 +72,8 @@ marked_net_line_color = 'orange'
 text_color = 'green'
 element_color = 'white'
 mark_rect_color = 'black'
+corner_color = '#0000FF'
+corner_text_color = corner_color
 
 # node exceptions
 unattached = 'unattached'

@@ -246,6 +246,23 @@ class SelectedPart(Part):
         self.index = index
 
 
+class Corner(Part):
+    def __init__(self, hash_node=0, color=gv.corner_color):
+        super().__init__(color)
+        self.hash_node = hash_node
+        self.board_text = None
+
+    def convert_into_tuple(self):
+        t = (self.hash_node, self.color)
+        return t
+
+    def get_data_from_tuple(self, t):
+        if len(t) < 2:
+            print(f"tuple doesn't match Corner type: {t}")
+        self.hash_node = t[0]
+        self.color = t[1]
+
+
 class FabianState:
     def __init__(self):
         self.entity_list = None
@@ -254,6 +271,7 @@ class FabianState:
         self.nodes_hash = {'0': 0}
         self.net_line_list = None
         self.element_list = None
+        self.corner_list = None
         self.mouse_select_mode = None
         self.work_mode = None
         self.select_parts_mode = None
@@ -262,6 +280,7 @@ class FabianState:
         self.show_elements = False
         self.show_node_number = gv.default_show_node_number
         self.show_net = True
+        self.show_corners = True
         self.scale = None
 
 

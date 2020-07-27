@@ -108,6 +108,18 @@ class Board:
         xRight, yBottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
         return self.board.create_oval(xLeft, yTop, xRight, yBottom, outline=outline_color)
 
+    #create circle center = Point(x, y)
+    def draw_square(self, center, length, outline_color=gv.default_color):
+        xLeft = center.x-length/2
+        xRight = center.x+length/2
+        yTop = center.y+length/2
+        yBottom = center.y-length/2
+        p1 = Point(xLeft, yTop)
+        p2 = Point(xRight, yTop)
+        p3 = Point(xRight, yBottom)
+        p4 = Point(xLeft, yBottom)
+        return self.draw_polygon([p1, p2, p3, p4], fill_color='', outline=outline_color)
+
     #create arc center = Point(x, y)
     def draw_arc(self, center, radius, start_angle, end_angle, outline_color=gv.default_color):
         xLeft, yTop = self.convert_xy_to_screen(center.x-radius, center.y+radius)
@@ -116,13 +128,13 @@ class Board:
                               style=tk.ARC, outline=outline_color)
 
     #create polygon out of Point(x, y) list
-    def draw_polygon(self, point_list, fill_color=gv.element_color):
+    def draw_polygon(self, point_list, fill_color=gv.element_color, outline=gv.default_color):
         xy_list = []
         for p in point_list:
             x, y = self.convert_xy_to_screen(p.x, p.y)
             xy_list.append(x)
             xy_list.append(y)
-        return self.board.create_polygon(xy_list, fill=fill_color)
+        return self.board.create_polygon(xy_list, fill=fill_color, outline=outline)
 
     def show_center(self):
         p1 = Point(-15, 0)

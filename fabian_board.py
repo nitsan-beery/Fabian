@@ -31,6 +31,7 @@ class FabianBoard(Board):
         self.nodes_hash = {"0": 0}
         self.net_line_list = []
         self.element_list = []
+        self.corner_list = []
         self.longitude = None
         self.mouse_select_mode = gv.default_mouse_select_mode
         self.work_mode = gv.default_work_mode
@@ -51,8 +52,10 @@ class FabianBoard(Board):
         self.show_elements = False
         self.show_node_number = gv.default_show_node_number
         self.show_net = True
+        self.show_corners = True
         self.progress_bar = None
         self.state = []
+        self.keep_state()
 
         self.board.bind('<Motion>', self.motion)
         self.board.bind('<Button-1>', self.mouse_1_pressed)
@@ -73,6 +76,7 @@ class FabianBoard(Board):
             self.nodes_hash = {"0": 0}
         self.net_line_list = []
         self.element_list = []
+        self.corner_list = []
         self.longitude = None
         self.mouse_select_mode = gv.default_mouse_select_mode
         self.work_mode = gv.default_work_mode
@@ -113,6 +117,10 @@ class FabianBoard(Board):
             element = Element()
             element.get_data_from_tuple(t)
             self.element_list.append(element)
+        for t in state.corner_list:
+            corner = Corner()
+            corner.get_data_from_tuple(t)
+            self.corner_list.append(corner)
         self.mouse_select_mode = state.mouse_select_mode
         self.work_mode = state.work_mode
         self.select_parts_mode = state.select_parts_mode
@@ -121,6 +129,7 @@ class FabianBoard(Board):
         self.show_elements = state.show_elements
         self.show_node_number = state.show_node_number
         self.show_net = state.show_net
+        self.show_corners = state.show_corners
         self.scale = state.scale
         self.state.pop(-1)
         self.update_view()
@@ -147,10 +156,15 @@ class FabianBoard(Board):
         for e in self.element_list:
             t = e.convert_into_tuple()
             element_list.append(t)
+        corner_list = []
+        for e in self.corner_list:
+            t = e.convert_into_tuple()
+            corner_list.append(t)
         state.entity_list = entity_list
         state.node_list = node_list
         state.net_line_list = net_list
         state.element_list = element_list
+        state.corner_list = corner_list
         state.mouse_select_mode = self.mouse_select_mode
         state.work_mode = self.work_mode
         state.select_parts_mode = self.select_parts_mode
@@ -159,6 +173,7 @@ class FabianBoard(Board):
         state.show_elements = self.show_elements
         state.show_node_number = self.show_node_number
         state.show_net = self.show_net
+        state.show_corners = self.show_corners
         state.scale = self.scale
         self.state.append(state)
 
@@ -189,12 +204,23 @@ class FabianBoard(Board):
                 self.new_line_edge[0] = p
                 self.split_selected_part(gv.split_mode_2_parts_by_point)
                 return
-        if self.mouse_select_mode == gv.mouse_select_mode_edge:
+        if self.mouse_select_mode == gv.mouse_select_mode_edge or self.mouse_select_mode == gv.mouse_select_mode_corner:
             d1 = p1.get_distance_to_point(Point(x, y))
             d2 = p2.get_distance_to_point(Point(x, y))
             p = p2
             if d1 < d2:
                 p = p1
+
+        if self.mouse_select_mode == gv.mouse_select_mode_corner:
+            corner = Corner()
+            node_hash_index = self.get_hash_index_of_node_with_point(p)
+            #debug
+            if node_hash_index is None:
+                print("can't find match node for corner")
+                return
+            corner.hash_node = node_hash_index
+            self.add_corner_to_corner_list(corner)
+            return
 
         # first point
         if self.new_line_edge[0] is None:
@@ -345,6 +371,7 @@ class FabianBoard(Board):
             select_part_menu.add_command(label="Net lines", command=lambda: self.change_select_parts_mode(gv.part_type_net_line))
             select_part_menu.add_command(label="all", command=lambda: self.change_select_parts_mode('all'))
             select_part_menu.add_separator()
+            select_part_menu.add_command(label="Corners", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
         select_part_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_edge))
         select_part_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_point))
         select_part_menu.add_separator()
@@ -372,6 +399,7 @@ class FabianBoard(Board):
         show_elements_menu = tk.Menu(menu, tearoff=0)
         show_elements_menu.add_command(label="Show", command=self.show_all_elements)
         show_elements_menu.add_command(label="Hide", command=self.hide_all_elements)
+
         menu.add_command(label="Undo", command=self.resume_state)
         menu.add_separator()
         menu.add_cascade(label='Select mode', menu=select_part_menu)
@@ -409,6 +437,15 @@ class FabianBoard(Board):
             if len(mark_list) > 1:
                 menu.add_command(label="Merge marked net lines", command=lambda: self.merge(True))
                 menu.add_command(label="Delete marked net lines", command=self.remove_marked_net_lines_from_list)
+                menu.add_separator()
+            if len(self.corner_list) > 0:
+                corners_menu = tk.Menu(menu, tearoff=0)
+                corners_menu.add_command(label="Clear",
+                                         command=lambda: self.handle_corners(gv.handle_corners_mode_clear))
+                if len(self.corner_list) == 4:
+                    corners_menu.add_command(label="Set net",
+                                             command=lambda: self.handle_corners(gv.handle_corners_mode_set_net))
+                menu.add_cascade(label='Corners', menu=corners_menu)
                 menu.add_separator()
             menu.add_cascade(label='Nodes', menu=show_node_menu)
             menu.add_cascade(label='Net lines', menu=net_menu)
@@ -480,6 +517,12 @@ class FabianBoard(Board):
     def change_select_parts_mode(self, mode):
         self.remove_selected_part_mark()
         self.select_parts_mode = mode
+
+    def handle_corners(self, mode):
+        if mode == gv.handle_corners_mode_clear:
+            self.clear_corner_list()
+        elif mode == gv.handle_corners_mode_set_net:
+            pass
 
     def motion(self, key):
         x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
@@ -1879,6 +1922,7 @@ class FabianBoard(Board):
             "nodes_hash": state.nodes_hash,
             "net_line_list": state.net_line_list,
             "element_list": state.element_list,
+            "corner_list": state.corner_list,
             "mouse_select_mode": state.mouse_select_mode,
             "work_mode": state.work_mode,
             "select_parts_mode": state.select_parts_mode,
@@ -1887,6 +1931,7 @@ class FabianBoard(Board):
             "show_elements": state.show_elements,
             "show_node_number": state.show_node_number,
             "show_net": state.show_net,
+            "show_corners": state.show_corners,
             "scale": state.scale
         }
         # debug
@@ -1957,6 +2002,7 @@ class FabianBoard(Board):
             state.nodes_hash = data.get("nodes_hash")
             state.net_line_list = data.get("net_line_list")
             state.element_list = data.get("element_list")
+            state.corner_list = data.get("corner_list")
             state.mouse_select_mode = data.get("mouse_select_mode")
             state.work_mode = data.get("work_mode")
             state.select_parts_mode = data.get("select_parts_mode")
@@ -1965,6 +2011,7 @@ class FabianBoard(Board):
             state.show_elements = data.get("show_elements")
             state.show_node_number = data.get("show_node_number")
             state.show_net = data.get("show_net")
+            state.show_corners = data.get("show_corners")
             state.scale = data.get("scale")
             self.state.append(state)
             self.resume_state()
@@ -2336,6 +2383,27 @@ class FabianBoard(Board):
                 return i
         return None
 
+    def clear_corner_list(self):
+        if len(self.corner_list) > 0:
+            self.keep_state()
+            self.hide_all_corners()
+            self.corner_list = []
+            self.show_corners = True
+
+    def add_corner_to_corner_list(self, corner):
+        if len(self.corner_list) < 4:
+            if not self.is_corner_in_list(corner):
+                self.keep_state()
+                self.corner_list.append(corner)
+                i = len(self.corner_list) - 1
+                self.show_corner(i)
+
+    def is_corner_in_list(self, corner):
+        for c in self.corner_list:
+            if c.hash_node == corner.hash_node:
+                return True
+        return False
+
     def add_line_to_net_list_by_line(self, net_line):
         if self.work_mode != gv.work_mode_inp:
             return
@@ -2554,6 +2622,40 @@ class FabianBoard(Board):
             self.show_node(i, self.show_node_number)
         self.show_nodes = True
         self.window_main.update()
+
+    # i = index in corner_list
+    def show_corner(self, i):
+        corner = self.corner_list[i]
+        if corner.board_part is None:
+            node_index = self.get_node_index_from_hash(corner.hash_node)
+            p = self.node_list[node_index].p
+            part = self.draw_square(p, 10/self.scale, gv.corner_color)
+            self.corner_list[i].board_part = part
+        if corner.board_text is None:
+            x, y = self.convert_xy_to_screen(p.x, p.y)
+            x += 8
+            y -= 8
+            self.corner_list[i].board_text = self.board.create_text(x, y, text=i+1, fill=gv.corner_text_color, justify=tk.RIGHT)
+
+    def hide_corner(self, i):
+        corner = self.corner_list[i]
+        if corner.board_part is not None:
+            self.board.delete(corner.board_part)
+            self.corner_list[i].board_part = None
+        if corner.board_text is not None:
+            self.board.delete(corner.board_text)
+            self.corner_list[i].board_text = None
+
+    def show_all_corners(self):
+        for i in range(len(self.corner_list)):
+            self.show_corner(i)
+        self.show_nodes = True
+        self.window_main.update()
+
+    def hide_all_corners(self):
+        for i in range(len(self.corner_list)):
+            self.hide_corner(i)
+        self.show_corners = False
 
     def show_entity(self, i):
         part = None
@@ -2787,6 +2889,7 @@ class FabianBoard(Board):
         show_entities = self.show_entities
         show_nodes = self.show_nodes
         show_net = self.show_net
+        show_corners = self.show_corners
         if self.show_entities or hide_all:
             self.hide_dxf_entities()
         if self.show_net or hide_all:
@@ -2795,10 +2898,13 @@ class FabianBoard(Board):
             self.hide_all_nodes()
         if self.show_elements or hide_all:
             self.hide_all_elements()
+        if self.show_corners or hide_all:
+            self.hide_all_corners()
         self.show_elements = show_elements
         self.show_entities = show_entities
         self.show_nodes = show_nodes
         self.show_net = show_net
+        self.show_corners = show_corners
         if self.show_elements:
             self.show_all_elements()
         if self.show_entities:
@@ -2807,6 +2913,8 @@ class FabianBoard(Board):
             self.show_all_nodes()
         if self.show_net:
             self.show_all_net_lines()            
+        if self.show_corners:
+            self.show_all_corners()
 
 
 def get_smallest_diff_angle(angle1, angle2):
