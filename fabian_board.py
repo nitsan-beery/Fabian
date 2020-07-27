@@ -16,9 +16,13 @@ class FabianBoard(Board):
         self.button_zoom_in = tk.Button(self.frame_2, text='Zoom In', command=lambda: self.zoom(4/3))
         self.button_zoom_out = tk.Button(self.frame_2, text='Zoom Out', command=lambda: self.zoom(3/4))
         self.button_center = tk.Button(self.frame_2, text='Center view', command=lambda: self.center_view())
+        # debug
+        self.button_print = tk.Button(self.frame_2, text='Print lines', command=self.print_line_list)
         self.button_zoom_in.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_zoom_out.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_center.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
+        # debug
+        self.button_print.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.board.config(bg=gv.board_bg_color)
 
         self.entity_list = []
@@ -229,13 +233,7 @@ class FabianBoard(Board):
             if self.new_line_edge[1] is None:
                 self.new_line_edge[1] = p
                 self.new_line_original_part[1] = self.selected_part
-                '''
-                p1 = self.new_line_edge[0]
-                p2 = self.new_line_edge[1]
-                s_part_start = self.new_line_original_part[0]
-                s_part_end = self.new_line_original_part[1]
-                '''
-                self.add_line()#p1, p2, s_part_start, s_part_end)
+                self.add_line()
             else:
                 self.board.delete(self.new_line_edge_mark[1])
                 self.new_line_edge_mark[1] = None
@@ -342,10 +340,11 @@ class FabianBoard(Board):
         work_mode_menu.add_separator()
         work_mode_menu.add_command(label="Quit")
         select_part_menu = tk.Menu(menu, tearoff=0)
-        select_part_menu.add_command(label="Entities", command=lambda: self.change_select_parts_mode(gv.part_type_entity))
-        select_part_menu.add_command(label="Net lines", command=lambda: self.change_select_parts_mode(gv.part_type_net_line))
-        select_part_menu.add_command(label="all", command=lambda: self.change_select_parts_mode('all'))
-        select_part_menu.add_separator()
+        if self.work_mode == gv.work_mode_inp:
+            select_part_menu.add_command(label="Entities", command=lambda: self.change_select_parts_mode(gv.part_type_entity))
+            select_part_menu.add_command(label="Net lines", command=lambda: self.change_select_parts_mode(gv.part_type_net_line))
+            select_part_menu.add_command(label="all", command=lambda: self.change_select_parts_mode('all'))
+            select_part_menu.add_separator()
         select_part_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_edge))
         select_part_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_point))
         select_part_menu.add_separator()
@@ -447,7 +446,7 @@ class FabianBoard(Board):
         if self.selected_part is not None:
             self.remove_selected_part_mark()
         self.remove_temp_line()
-        if mode.lower() == gv.work_mode_dxf:
+        if mode == gv.work_mode_dxf:
             if self.work_mode == gv.work_mode_dxf:
                 return
             self.show_nodes = False
@@ -457,7 +456,7 @@ class FabianBoard(Board):
             self.change_select_parts_mode(gv.part_type_entity)
             self.choose_mark_option(gv.mark_option_mark)
             self.set_all_dxf_entities_color(gv.default_color)
-        elif mode.lower() == gv.work_mode_inp:
+        elif mode == gv.work_mode_inp:
             if self.work_mode == gv.work_mode_inp:
                 return
             self.set_initial_net()
@@ -472,7 +471,7 @@ class FabianBoard(Board):
             self.change_select_parts_mode('all')
             self.choose_mark_option('quit')
         self.work_mode = mode
-        self.update_view()
+        self.update_view(True)
 
     def change_mouse_selection_mode(self, mode):
         self.remove_temp_line()
@@ -909,22 +908,16 @@ class FabianBoard(Board):
         else:
             if self.selected_part is None or self.selected_part.part_type != gv.part_type_entity:
                 return False
-            entity = self.entity_list[self.selected_part.index]
+            entity_index = self.selected_part.index
+            entity = self.entity_list[entity_index]
             entity_net_lines = self.get_lines_attached_to_entity(self.selected_part.index)
             if len(entity_net_lines) < 2:
                 return False
             entity_start_node = entity.nodes_list[0]
             entity_end_node = entity.nodes_list[-1]
             entity.nodes_list = self.get_nodes_attached_to_lines(entity_net_lines)
-            start_node = self.get_node_index_from_hash(entity_start_node)
-            end_node = self.get_node_index_from_hash(entity_end_node)
-            if start_node is not None and end_node is not None:
-                p1 = self.node_list[start_node].p
-                p2 = self.node_list[end_node].p
-                self.add_line_to_net_list(p1, p2)
-                self.net_line_list[-1].entity = self.selected_part.index
             self.remove_parts_from_list(entity_net_lines, gv.part_list_net_lines)
-            self.clear_lonely_nodes(entity.nodes_list)
+            self.add_line_to_net_list_by_nodes(entity_start_node, entity_end_node, entity_index)
             entity.nodes_list = [entity_start_node, entity_end_node]
             #debug
             #print('after merge')
@@ -945,7 +938,6 @@ class FabianBoard(Board):
         entity = self.net_line_list[p_list[0]].entity
         start_node = self.net_line_list[p_list[0]].start_node
         end_node = self.net_line_list[p_list[-1]].end_node
-        new_line = NetLine(start_node, end_node, entity)
         # get intermediate nodes
         n_list = []
         for i in range(len(p_list)-1):
@@ -953,7 +945,7 @@ class FabianBoard(Board):
             n_list.append(line.end_node)
         self.remove_parts_from_list(p_list, gv.part_list_net_lines)
         self.clear_lonely_nodes(n_list)
-        self.net_line_list.append(new_line)
+        self.add_line_to_net_list_by_nodes(start_node, end_node, entity)
         self.show_net_line(-1)
         return True
 
@@ -1179,10 +1171,10 @@ class FabianBoard(Board):
             end_hash_node = self.add_node_to_node_list(new_node)
             end_node = self.node_list[self.get_node_index_from_hash(end_hash_node)]
             end_node.attached_entities.append(part)
-            self.net_line_list.append(NetLine(start_hash_node, end_hash_node, part))
+            self.add_line_to_net_list_by_nodes(start_hash_node, end_hash_node, part)
             start_hash_node = end_hash_node
         if entity.shape == 'CIRCLE':
-            self.net_line_list.append(NetLine(start_hash_node, circle_first_node, part))
+            self.add_line_to_net_list_by_nodes(start_hash_node, circle_first_node, part)
         return True
 
     def split_net_line(self, part, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=gv.default_split_parts):
@@ -1219,17 +1211,26 @@ class FabianBoard(Board):
             start_node = end_node
         self.remove_parts_from_list([part], gv.part_list_net_lines)
         for j in range(len(new_lines)):
-            self.net_line_list.append(new_lines[j])
+            self.add_line_to_net_list_by_line(new_lines[j])
         return True
 
     # return all net lines crossed by line from p1 to p2
     # each line is tupled with mutual cross point
     def get_crossed_net_lines(self, p1, p2):
         net_lines_list = []
+        start_hash_node = self.get_hash_index_of_node_with_point(p1)
+        if start_hash_node is None:
+            start_hash_node = 0
+        end_hash_node = self.get_hash_index_of_node_with_point(p2)
+        if end_hash_node is None:
+            end_hash_node = 0
         if p1 is None or p2 is None:
             return net_lines_list
         for i in range(len(self.net_line_list)):
             p, hash_node = self.get_mutual_point_of_net_line_with_crossing_line(i, p1, p2)
+            if hash_node is not None:
+                if hash_node == start_hash_node or hash_node == end_hash_node:
+                    continue
             if p is not None:
                 net_lines_list.append((i, hash_node, p))
         return net_lines_list
@@ -1550,14 +1551,15 @@ class FabianBoard(Board):
         return node.attached_lines
 
     def mark_outer_lines(self):
-        n = self.get_bottom_left_node()
-        nodes_outer_list = [n]
+        n_hash = self.get_bottom_left_node()
+        n_index = self.get_node_index_from_hash(n_hash)
+        nodes_outer_list = [n_index]
         alfa = 0
         line = AttachedLine()
-        line.second_node = n
-        next_node_index = 0
-        while next_node_index != n and len(nodes_outer_list) <= len(self.net_line_list):
-            next_node_index, line = self.get_next_relevant_node(line.second_node, 0, limit_angle=False, prev_angle=alfa,
+        line.second_node = n_hash
+        next_node_hash_index = 0
+        while next_node_hash_index != n_hash and len(nodes_outer_list) <= len(self.net_line_list):
+            next_node_hash_index, line = self.get_next_relevant_node(line.second_node, 0, limit_angle=False, prev_angle=alfa,
                                                                 clockwise=True)
             if line is None:
                 print(f"can't set outer lines")
@@ -1565,7 +1567,10 @@ class FabianBoard(Board):
             line.is_outer_line = True
             self.net_line_list[line.line_index].is_outer_line = True
             alfa = line.angle_to_second_node
+            next_node_index = self.get_node_index_from_hash(next_node_hash_index)
             nodes_outer_list.append(next_node_index)
+        # debug
+        print(f'outer line: {nodes_outer_list}')
         return nodes_outer_list
 
     # return list of unattached nodes with real index in list (not hash_index)
@@ -1660,8 +1665,7 @@ class FabianBoard(Board):
             start_node = e.nodes_list[0]
             end_node = e.nodes_list[1]
             line_entity = i
-            line = NetLine(start_node, end_node, line_entity)
-            self.net_line_list.append(line)
+            self.net_line_list.append(NetLine(start_node, end_node, line_entity))
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
         self.hide_text_on_screen()
@@ -1679,12 +1683,13 @@ class FabianBoard(Board):
 
     # debug
     def print_line_list(self):
-        print('lines:')
+        print('\nlines:')
+        print(self.nodes_hash)
         for i in range(len(self.net_line_list)):
             line = self.net_line_list[i]
             start_node = self.get_node_index_from_hash(line.start_node)
             end_node = self.get_node_index_from_hash(line.end_node)
-            print(f'{i}: start node: {start_node}   end node: {end_node}   entity: {line.entity}')
+            print(f'{i}: start node: {start_node}  end node: {end_node}        start_hash: {line.start_node}   end_hash: {line.end_node}   entity: {line.entity}')
 
     # debug
     def print_elements(self, element_list):
@@ -1801,15 +1806,15 @@ class FabianBoard(Board):
             self.show_elements = True
             self.update_view()
             print(f'\nSUCCESS')
-            print(f'net created with {counter_r4_elements} R4 elements and {counter_r3_elements} R3 elements   {len(self.node_list-1)} nodes\n')
+            print(f'net created with {counter_r4_elements} R4 elements and {counter_r3_elements} R3 elements   {len(self.node_list)-1} nodes\n')
         # debug
         #self.print_nodes_expected_elements()
         #self.print_elements(self.element_list)
 
-    def save_inp(self):
+    def save_inp(self, file_name='Fabian'):
         self.create_net_element_list()
         filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./data files/", title="Select file",
-                                                initialfile='Fabian', defaultextension=".inp",
+                                                initialfile=file_name, defaultextension=".inp",
                                                 filetypes=(("inp files", "*.inp"), ("all files", "*.*")))
         if filename == '':
             return
@@ -1850,17 +1855,21 @@ class FabianBoard(Board):
         f.write(s)
 
     def save_as(self):
+        file_name = self.window_main.title()
+        dot_index = file_name.find('.')
+        if dot_index is not None:
+            file_name = file_name[:dot_index]
         menu = tk.Menu(self.board, tearoff=0)
-        menu.add_command(label="DATA", command=lambda: self.save_data())
-        menu.add_command(label="INP", command=lambda: self.save_inp())
-        menu.add_command(label="DXF", command=lambda: self.save_dxf())
+        menu.add_command(label="DATA", command=lambda: self.save_data(file_name))
+        menu.add_command(label="INP", command=lambda: self.save_inp(file_name))
+        menu.add_command(label="DXF", command=lambda: self.save_dxf(file_name))
         menu.add_separator()
         menu.add_command(label="Quit")
         x = self.frame_2.winfo_pointerx()
         y = self.frame_2.winfo_pointery()
         menu.post(x, y)
 
-    def save_data(self):
+    def save_data(self, file_name='Fabian'):
         self.keep_state()
         state = self.state[-1]
         data = {
@@ -1883,13 +1892,13 @@ class FabianBoard(Board):
         # debug
         #self.print_node_list()
         #self.print_line_list()
-        filename = self.save_json(data)
+        filename = self.save_json(data, file_name=file_name)
         if filename is not None:
             i = filename.rfind('/')
             title = filename[i+1:]
             self.window_main.title(title)
 
-    def save_dxf(self):
+    def save_dxf(self, file_name='Fabian'):
         doc = ezdxf.new('R2010')
         msp = doc.modelspace()
         for e in self.entity_list:
@@ -1899,9 +1908,8 @@ class FabianBoard(Board):
                 msp.add_arc((e.center.x, e.center.y), e.radius, e.arc_start_angle, e.arc_end_angle)
             elif e.shape == 'CIRCLE':
                 msp.add_circle((e.center.x, e.center.y), e.radius)
-        default_file_name = f'Fabian'
         filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./data files/", title="Select file",
-                                                initialfile=default_file_name, defaultextension=".dxf",
+                                                initialfile=file_name, defaultextension=".dxf",
                                                 filetypes=(("dxf files", "*.dxf"), ("all files", "*.*")))
         if filename == '':
             return
@@ -1964,8 +1972,43 @@ class FabianBoard(Board):
         self.center_view()
         self.update_view()
         # debug
+        #self.test()
         #self.print_node_list()
         #self.print_line_list()
+
+    def test(self):
+        self.show_nodes = False
+        self.show_entities = False
+        self.show_net = False
+        self.show_elements = False
+        mn1 = self.get_middle_nodes_between_node1_and_node_2(1, 4)
+        mn2 = self.get_middle_nodes_between_node1_and_node_2(2, 3)
+        n = len(mn1) + 1
+        for i in range(len(mn1)):
+            start_hash = mn1[i]
+            end_hash = mn2[i]
+            start_index = self.get_node_index_from_hash(start_hash)
+            end_index = self.get_node_index_from_hash(end_hash)
+            p1 = self.node_list[start_index].p
+            p2 = self.node_list[end_index].p
+            self.add_line(p1, p2, 100/n)
+            n -= 1
+        mn1 = self.get_middle_nodes_between_node1_and_node_2(1, 2)
+        mn2 = self.get_middle_nodes_between_node1_and_node_2(4, 3)
+        n = len(mn1) + 1
+        for i in range(len(mn1)):
+            start_hash = mn1[i]
+            end_hash = mn2[i]
+            start_index = self.get_node_index_from_hash(start_hash)
+            end_index = self.get_node_index_from_hash(end_hash)
+            p1 = self.node_list[start_index].p
+            p2 = self.node_list[end_index].p
+            self.add_line(p1, p2, 100/n)
+            n -= 1
+        self.show_nodes = True
+        self.show_entities = True
+        self.show_net = True
+        self.update_view()
 
     def set_scale(self, left, right):
         object_width = right - left
@@ -2193,20 +2236,17 @@ class FabianBoard(Board):
         if self.temp_line_mark is not None:
             self.board.delete(self.temp_line_mark)
 
-    # add line from p1 to p2. s_part_1 and s_part_2 holds part type (entity or net_line) and index in list
-    # split_middle_lines_percentage_left = % left of point to split the crossing middle lines
+    # add line from p1 to p2. split_middle_lines_percentage_left = % left of point to split the crossing middle lines
     # by default the line to add is the line created by user selected points
-    def add_line(self, p1=None, p2=None, s_part_1=None, s_part_2=None, split_middle_lines_percentage_left=50):
+    def add_line(self, p1=None, p2=None, split_middle_lines_percentage_left=50):
         if p1 is None:
             p1 = self.new_line_edge[0]
         if p2 is None:
             p2 = self.new_line_edge[1]
         if p2 is None:
             return
-        if s_part_1 is None:
-            s_part_1 = self.new_line_original_part[0]
-        if s_part_2 is None:
-            s_part_2 = self.new_line_original_part[1]
+        s_part_1 = self.new_line_original_part[0]
+        s_part_2 = self.new_line_original_part[1]
         self.keep_state()
         if self.work_mode == gv.work_mode_dxf:
             if self.mouse_select_mode == gv.mouse_select_mode_point:
@@ -2231,11 +2271,13 @@ class FabianBoard(Board):
                     p = self.node_list[-1].p
                 new_points.append(p)
                 i -= 1
+            # remove duplicate points
+            new_points = list(dict.fromkeys(new_points))
             new_points = sort_list_point_by_distance_from_p(new_points, p1)
             start_point = new_points[0]
             for i in range(1, len(new_points)):
                 end_point = new_points[i]
-                self.add_line_to_net_list(start_point, end_point)
+                self.add_line_to_net_list_by_points(start_point, end_point)
                 start_point = end_point
         self.remove_temp_line()
         self.update_view()
@@ -2294,15 +2336,42 @@ class FabianBoard(Board):
                 return i
         return None
 
-    def add_line_to_net_list(self, p1, p2):
+    def add_line_to_net_list_by_line(self, net_line):
         if self.work_mode != gv.work_mode_inp:
             return
-        start_node = self.add_node_to_node_list(Node(p1))
-        end_node = self.add_node_to_node_list(Node(p2))
-        line = NetLine(start_node, end_node)
-        self.net_line_list.append(line)
-        self.show_net_line(-1)
+        if not self.is_line_in_net_line_list(net_line):
+            self.net_line_list.append(net_line)
+            self.show_net_line(-1)
 
+    def add_line_to_net_list_by_nodes(self, start_hash_node, end_hash_node, entity=None):
+        line = NetLine(start_hash_node, end_hash_node, entity)
+        self.add_line_to_net_list_by_line(line)
+
+    def add_line_to_net_list_by_points(self, p1, p2, entity=None):
+        if p1 == p2:
+            # debug
+            print('trying to add line by points with p1 = p2')
+            return
+        start_hash_node = self.add_node_to_node_list(Node(p1))
+        end_hash_node = self.add_node_to_node_list(Node(p2))
+        line = NetLine(start_hash_node, end_hash_node, entity)
+        self.add_line_to_net_list_by_line(line)
+
+    def is_line_in_net_line_list(self, line):
+        if line.start_node is None or line.end_node is None:
+            # debug
+            print('line with None nodes in is_line_in_net_line_list')
+            return True
+        if line.start_node == line.end_node:
+            # debug
+            print('line with start_node = end_node in is_line_in_net_line_list')
+            return
+        for net_line in self.net_line_list:
+            line = NetLine()
+            if (line.start_node == net_line.start_node and line.end_node == net_line.end_node) or (line.start_node == net_line.end_node and line.end_node == net_line.start_node):
+                return True
+        return False
+    
     def add_line_to_entity_list(self, p1, p2):
         if self.work_mode != gv.work_mode_dxf:
             return
@@ -2352,7 +2421,7 @@ class FabianBoard(Board):
         end_node_index = self.get_node_index_from_hash(end_node_hash)
         if start_node_index is None or end_node_index is None:
             #debug
-            print('fix me find_nearest_net_line min_d_index')
+            print('line start or end nodes are None in find_nearest_net_line min_d_index')
             return None, None
         p1 = self.node_list[start_node_index].p
         p2 = self.node_list[end_node_index].p
@@ -2366,7 +2435,7 @@ class FabianBoard(Board):
             end_node_index = self.get_node_index_from_hash(end_node_hash)
             if start_node_index is None or end_node_index is None:
                 # debug
-                print('fix me find_nearest_net_line i loop')
+                print('line start or end nodes are None in loop find_nearest_net_line min_d_index')
                 return None, None
             p1 = self.node_list[start_node_index].p
             p2 = self.node_list[end_node_index].p
@@ -2531,7 +2600,7 @@ class FabianBoard(Board):
         end_node = self.get_node_index_from_hash(line.end_node)
         if start_node is None or end_node is None:
             #debug
-            print('fix me show_net_line edge nodes missing')
+            print('line start or end nodes are None in show_net_line')
             return
         p1 = self.node_list[start_node].p
         p2 = self.node_list[end_node].p
@@ -2604,6 +2673,7 @@ class FabianBoard(Board):
         self.hide_all_nodes()
         self.node_list = [Node()]
         self.nodes_hash = {'0': 0}
+        self.next_node_hash_index = 1
         self.net_line_list = []
 
     def set_all_dxf_entities_color(self, color):
@@ -2712,15 +2782,19 @@ class FabianBoard(Board):
         # debug
         print(f'set accuracy: 1/{int(math.pow(10, gv.accuracy))}')
 
-    def update_view(self):
+    def update_view(self, hide_all=False):
         show_elements = self.show_elements
         show_entities = self.show_entities
         show_nodes = self.show_nodes
         show_net = self.show_net
-        self.hide_dxf_entities()
-        self.hide_all_net_lines()
-        self.hide_all_nodes()
-        self.hide_all_elements()
+        if self.show_entities or hide_all:
+            self.hide_dxf_entities()
+        if self.show_net or hide_all:
+            self.hide_all_net_lines()
+        if self.show_nodes or hide_all:
+            self.hide_all_nodes()
+        if self.show_elements or hide_all:
+            self.hide_all_elements()
         self.show_elements = show_elements
         self.show_entities = show_entities
         self.show_nodes = show_nodes

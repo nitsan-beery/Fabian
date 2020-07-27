@@ -162,9 +162,8 @@ class Board:
         return data
 
     def save_json(self, data=None, my_dir="./data files/", file_name='Fabian'):
-        default_file_name = file_name
         filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir=my_dir, title="Select file",
-                                                initialfile=default_file_name, defaultextension=".json",
+                                                initialfile=file_name, defaultextension=".json",
                                                 filetypes=(("json files", "*.json"), ("all files", "*.*")))
         if filename == '' or data is None:
             return None
