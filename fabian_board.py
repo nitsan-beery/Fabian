@@ -440,6 +440,12 @@ class FabianBoard(Board):
                 menu.add_command(label="Merge marked net lines", command=lambda: self.merge(True))
                 menu.add_command(label="Delete marked net lines", command=self.remove_marked_net_lines_from_list)
                 menu.add_separator()
+            menu.add_cascade(label='Nodes', menu=show_node_menu)
+            menu.add_cascade(label='Net lines', menu=net_menu)
+            menu.add_cascade(label='Elements', menu=show_elements_menu)
+            menu.add_cascade(label='Entities', menu=show_entities_menu)
+            menu.add_separator()
+            #menu.add_command(label="Set initial border nodes...", command=self.set_initial_border_nodes)
             if len(self.corner_list) > 0:
                 corners_menu = tk.Menu(menu, tearoff=0)
                 corners_menu.add_command(label="Clear",
@@ -449,12 +455,6 @@ class FabianBoard(Board):
                                              command=lambda: self.handle_corners(gv.handle_corners_mode_set_net))
                 menu.add_cascade(label='Corners', menu=corners_menu)
                 menu.add_separator()
-            menu.add_cascade(label='Nodes', menu=show_node_menu)
-            menu.add_cascade(label='Net lines', menu=net_menu)
-            menu.add_cascade(label='Elements', menu=show_elements_menu)
-            menu.add_cascade(label='Entities', menu=show_entities_menu)
-            menu.add_separator()
-            menu.add_command(label="Set initial border nodes...", command=self.set_initial_border_nodes)
             menu.add_command(label="Clear net", command=self.clear_net)
             menu.add_command(label="Set net", command=self.set_net)
             menu.add_separator()
@@ -2499,7 +2499,6 @@ class FabianBoard(Board):
             print('line with start_node = end_node in is_line_in_net_line_list')
             return
         for net_line in self.net_line_list:
-            line = NetLine()
             if (line.start_node == net_line.start_node and line.end_node == net_line.end_node) or (line.start_node == net_line.end_node and line.end_node == net_line.start_node):
                 return True
         return False
