@@ -188,6 +188,8 @@ class FabianBoard(Board):
         if self.selected_part is not None:
             if self.selected_part.part_type == gv.part_type_entity:
                 e = self.entity_list[self.selected_part.index]
+                if e.shape == 'CIRCLE':
+                    return
                 p1 = e.left_bottom
                 p2 = e.right_up
                 d, p = self.get_distance_from_entity_and_nearest_point(Point(x, y), self.selected_part.index)
@@ -1235,9 +1237,9 @@ class FabianBoard(Board):
         node1 = self.node_list[start_node_index]
         node2 = self.node_list[end_node_index]
         shape = 'LINE'
-        is_opposite = False
         if line.entity is not None:
             shape = self.entity_list[line.entity].shape
+        start_node = line.start_node
         if shape == 'LINE':
             new_points = self.get_split_line_points(node1.p, node2.p, split_mode, split_additional_arg)
         elif shape == 'ARC' or shape == 'CIRCLE':
@@ -1250,12 +1252,9 @@ class FabianBoard(Board):
                 start_angle += 360
             if end_angle < start_angle:
                 start_angle, end_angle = end_angle, start_angle
-                is_opposite = True
+                start_node = line.end_node
             arc = Entity('ARC', reference_entity.center, reference_entity.radius, start_angle=start_angle, end_angle=end_angle)
             new_points = self.get_split_arc_points(arc, split_mode, split_additional_arg)
-        start_node = line.start_node
-        if is_opposite:
-            start_node = line.end_node
         for j in range(len(new_points) - 1):
             new_node = Node(new_points[j+1], entity=None)
             end_node = self.add_node_to_node_list(new_node)
