@@ -1123,7 +1123,6 @@ class FabianBoard(Board):
         return True
 
     def set_initial_border_nodes(self):
-        self.keep_state()
         choice = SetInitialNetDialog(self.window_main).show()
         if choice is not None:
             arc_max_angle = choice.get('arc_max_angle')
@@ -1131,20 +1130,13 @@ class FabianBoard(Board):
             circle_parts = choice.get('circle_parts')
         else:
             return
-        hash_bottom_left = self.get_bottom_left_node()
-        index_bottom_left = self.get_node_index_from_hash(hash_bottom_left)
-        bottom_left = self.node_list[index_bottom_left].p
-        hash_top_right = self.get_top_right_node()
-        index_top_right = self.get_node_index_from_hash(hash_top_right)
-        top_right = self.node_list[index_top_right].p
-        d_dxf = bottom_left.get_distance_to_point(top_right)
-        i = len(self.entity_list) - 1
-        while i >= 0:
+        self.reset_net()
+        self.set_initial_net()
+        for i in range(len(self.entity_list)):
             e = self.entity_list[i]
             if e.shape == 'CIRCLE':
                 angle = self.get_longitude() + 45
                 self.split_net_line_by_entity(i, gv.split_mode_by_angle, circle_parts, angle)
-                i -= 1
                 continue
             n = n_length = 0
             d = e.start.get_distance_to_point(e.end)
@@ -1160,7 +1152,6 @@ class FabianBoard(Board):
                 n = n_length
             if n > 1:
                 self.split_net_line_by_entity(i, gv.split_mode_evenly_n_parts, n)
-            i -= 1
         self.update_view()
 
     def split_all_circles(self, n=gv.default_split_circle_parts):
@@ -1200,7 +1191,6 @@ class FabianBoard(Board):
             return False
         old_lines = self.get_lines_attached_to_entity(part)
         entity = self.entity_list[part]
-        entity_nodes = self.get_nodes_attached_to_lines(old_lines)
         if entity.shape == 'CIRCLE':
             new_points = self.get_split_circle_points(entity, split_additional_arg, start)
             new_node = Node(new_points[0], entity=part)
@@ -1223,7 +1213,6 @@ class FabianBoard(Board):
             arc = self.entity_list[part]
             new_points = self.get_split_arc_points(arc, split_mode, split_additional_arg)
         self.remove_parts_from_list(old_lines, gv.part_list_net_lines)
-        self.clear_lonely_nodes(entity_nodes)
         for j in range(len(new_points) - 1):
             new_node = Node(new_points[j+1], entity=part)
             end_hash_node = self.add_node_to_node_list(new_node)
@@ -1985,7 +1974,7 @@ class FabianBoard(Board):
     def save_data(self, file_name='Fabian'):
         self.keep_state()
         state = self.state[-1]
-        state.pop(-1)
+        self.state.pop(-1)
         data = {
             "entity_list": state.entity_list,
             "node_list": state.node_list,
@@ -2100,7 +2089,7 @@ class FabianBoard(Board):
     def set_scale(self, left, right):
         object_width = right - left
         window_width = self.window_main.winfo_width()
-        self.scale = window_width/(object_width*2.5)
+        self.scale = window_width/(object_width*2)
 
     def center_view(self, set_scale=False):
         self.hide_text_on_screen()
@@ -2820,9 +2809,9 @@ class FabianBoard(Board):
     def reset_net(self, keep_state=False):
         if keep_state:
             self.keep_state()
-        self.hide_all_elements()
-        self.hide_all_net_lines()
-        self.hide_all_nodes()
+        self.hide_all_elements(keep_new_state=False)
+        self.hide_all_net_lines(keep_new_state=False)
+        self.hide_all_nodes(keep_new_state=False)
         self.node_list = [Node()]
         self.nodes_hash = {'0': 0}
         self.next_node_hash_index = 1
@@ -2878,6 +2867,8 @@ class FabianBoard(Board):
 
     def zoom(self, factor):
         self.hide_text_on_screen()
+        self.remove_temp_line()
+        self.remove_selected_part_mark()
         x, y = self.get_center_keyx_keyy()
         x, y = self.convert_keyx_keyy_to_xy(x, y)
         self.scale = round(self.scale*factor, 1)
