@@ -442,6 +442,7 @@ class FabianBoard(Board):
             if len(mark_list) > 1:
                 menu.add_command(label="Merge marked net lines", command=lambda: self.merge(True))
                 menu.add_command(label="Delete marked net lines", command=self.remove_marked_net_lines_from_list)
+                menu.add_command(label="Unmark all net lines", command=self.unmark_all_net_lines)
                 menu.add_separator()
             menu.add_cascade(label='Nodes', menu=show_node_menu)
             menu.add_cascade(label='Net lines', menu=net_menu)
@@ -1234,12 +1235,12 @@ class FabianBoard(Board):
         node1 = self.node_list[start_node_index]
         node2 = self.node_list[end_node_index]
         shape = 'LINE'
+        is_opposite = False
         if line.entity is not None:
             shape = self.entity_list[line.entity].shape
         if shape == 'LINE':
             new_points = self.get_split_line_points(node1.p, node2.p, split_mode, split_additional_arg)
         elif shape == 'ARC' or shape == 'CIRCLE':
-            is_opposite = False
             reference_entity = self.entity_list[line.entity]
             start_angle = reference_entity.center.get_alfa_to(node1.p)
             end_angle = reference_entity.center.get_alfa_to(node2.p)
@@ -2238,6 +2239,15 @@ class FabianBoard(Board):
             if e.is_marked:
                 e.is_marked = False
                 self.set_entity_color(i, gv.default_entity_color)
+            i += 1
+
+    def unmark_all_net_lines(self):
+        self.keep_state()
+        i = 0
+        for n in self.net_line_list:
+            if n.is_marked:
+                n.is_marked = False
+                self.set_net_line_color(i, gv.net_line_color)
             i += 1
 
     def remove_marked_net_lines_from_list(self):
