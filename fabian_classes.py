@@ -284,11 +284,11 @@ class FabianState:
         self.scale = None
 
 
-split_arc_and_line_choices_list = ['graduate n parts', 'n parts evenly', '2 different parts', 'graduate left right', '3 parts different middle part']
+split_arc_and_line_choices_list = ['n parts evenly', 'graduate n parts', '2 different parts', 'graduate left right', '3 parts different middle part']
 
 split_arc_and_line_mode_dictionary = {
-    split_arc_and_line_choices_list[0]: gv.split_mode_graduate_n_parts,
-    split_arc_and_line_choices_list[1]: gv.split_mode_evenly_n_parts,
+    split_arc_and_line_choices_list[0]: gv.split_mode_evenly_n_parts,
+    split_arc_and_line_choices_list[1]: gv.split_mode_graduate_n_parts,
     split_arc_and_line_choices_list[2]: gv.split_mode_2_parts_percentage_left,
     split_arc_and_line_choices_list[3]: gv.split_mode_graduate_percentage_left_right,
     split_arc_and_line_choices_list[4]: gv.split_mode_3_parts_percentage_middle
@@ -318,7 +318,7 @@ class SplitDialog(object):
 
         self.label_mode = tk.Label(self.frame_2, text='Split mode', padx=10)
         self.label_arg = tk.Label(self.frame_2, width=7, text='n')
-        self.label_left = tk.Label(self.frame_2, width=10, text='Left size (%)', padx=5)
+        self.label_left = tk.Label(self.frame_2, width=10, text='', padx=5)
 
         self.label_mode.grid(row=0, column=0, sticky='w')
         self.label_arg.grid(row=0, column=1)
@@ -326,7 +326,7 @@ class SplitDialog(object):
 
         self.split_choice_menu = ttk.Combobox(self.frame_2, width=25, values=split_arc_and_line_choices_list)
         self.entry_arg = tk.Entry(self.frame_2, width=3)
-        self.entry_left = tk.Entry(self.frame_2, state=tk.NORMAL, width=3)
+        self.entry_left = tk.Entry(self.frame_2, state=tk.DISABLED, width=3)
         self.split_choice_menu.grid(row=1, column=0, padx=10, pady=5)
         self.entry_arg.grid(row=1, column=1)
         self.entry_left.grid(row=1, column=2)
@@ -339,10 +339,11 @@ class SplitDialog(object):
         self.window.bind('<Key>', self.key)
         self.window.lift()
 
+        self.split_choice_menu.bind("<<ComboboxSelected>>", self.mode_selected)
+
         # set default values
         self.split_choice_menu.current(0)
-        self.split_choice_menu.bind("<<ComboboxSelected>>", self.mode_selected)
-        self.entry_arg.insert(0, default_graduate_n_parts)
+        self.entry_arg.insert(0, default_evenly_n_parts)
         self.entry_left.insert(0, default_graduate_left)
         self.entry_arg.focus_set()
         self.choice = None
@@ -602,6 +603,7 @@ class SplitCircleDialog(object):
         self.split_choice_menu.bind("<<ComboboxSelected>>", self.mode_selected)
         self.entry_angle.insert(0, '45')
         self.entry_parts.insert(0, '4')
+        self.entry_parts.focus_set()
         self.choice = None
 
     def mode_selected(self, key):
@@ -631,7 +633,9 @@ class SplitCircleDialog(object):
         except ValueError:
             print('choose a number for #parts')
             return
-
+        if parts < 3:
+            print('choose a number bigger than 2 for #parts')
+            return
         self.choice = {
             'angle': angle,
             'parts': parts

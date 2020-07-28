@@ -1063,6 +1063,7 @@ class FabianBoard(Board):
             elif split_mode == gv.split_mode_2_parts_by_point:
                 split_arg = self.new_line_edge[0]
                 self.remove_temp_line()
+        self.keep_state()
         self.split_part(s_part, split_mode, split_arg)
 
     def split_entity_by_point(self, s_part, p):
@@ -1190,13 +1191,9 @@ class FabianBoard(Board):
         if self.work_mode != gv.work_mode_inp:
             return False
         old_lines = self.get_lines_attached_to_entity(part)
+        self.remove_parts_from_list(old_lines, gv.part_list_net_lines)
         entity = self.entity_list[part]
-        if entity.shape == 'CIRCLE':
-            new_points = self.get_split_circle_points(entity, split_additional_arg, start)
-            new_node = Node(new_points[0], entity=part)
-            start_hash_node = self.add_node_to_node_list(new_node)
-            circle_first_node = start_hash_node
-        elif entity.shape == 'LINE':
+        if entity.shape == 'LINE':
             start_hash_node = entity.nodes_list[0]
             start_node_index = self.get_node_index_from_hash(start_hash_node)
             end_hash_node = entity.nodes_list[-1]
@@ -1207,12 +1204,15 @@ class FabianBoard(Board):
             p1 = self.node_list[start_node_index].p
             p2 = self.node_list[end_node_index].p
             new_points = self.get_split_line_points(p1, p2, split_mode, split_additional_arg)
-        # shape == 'ARC'
-        else:
+        elif entity.shape == 'ARC':
             start_hash_node = entity.nodes_list[0]
             arc = self.entity_list[part]
             new_points = self.get_split_arc_points(arc, split_mode, split_additional_arg)
-        self.remove_parts_from_list(old_lines, gv.part_list_net_lines)
+        elif entity.shape == 'CIRCLE':
+            new_points = self.get_split_circle_points(entity, split_additional_arg, start)
+            new_node = Node(new_points[0], entity=part)
+            start_hash_node = self.add_node_to_node_list(new_node)
+            circle_first_node = start_hash_node
         for j in range(len(new_points) - 1):
             new_node = Node(new_points[j+1], entity=part)
             end_hash_node = self.add_node_to_node_list(new_node)
@@ -1239,6 +1239,7 @@ class FabianBoard(Board):
         if shape == 'LINE':
             new_points = self.get_split_line_points(node1.p, node2.p, split_mode, split_additional_arg)
         elif shape == 'ARC' or shape == 'CIRCLE':
+            is_opposite = False
             reference_entity = self.entity_list[line.entity]
             start_angle = reference_entity.center.get_alfa_to(node1.p)
             end_angle = reference_entity.center.get_alfa_to(node2.p)
@@ -1248,9 +1249,12 @@ class FabianBoard(Board):
                 start_angle += 360
             if end_angle < start_angle:
                 start_angle, end_angle = end_angle, start_angle
+                is_opposite = True
             arc = Entity('ARC', reference_entity.center, reference_entity.radius, start_angle=start_angle, end_angle=end_angle)
             new_points = self.get_split_arc_points(arc, split_mode, split_additional_arg)
         start_node = line.start_node
+        if is_opposite:
+            start_node = line.end_node
         for j in range(len(new_points) - 1):
             new_node = Node(new_points[j+1], entity=None)
             end_node = self.add_node_to_node_list(new_node)
