@@ -420,6 +420,8 @@ class FabianBoard(Board):
             menu.add_command(label="Remove line", command=self.remove_temp_line)
             menu.add_separator()
         if self.selected_part is not None:
+            if self.new_line_edge[0] is not None:
+                menu.add_command(label="Split by point", command=lambda: self.split_selected_part(gv.split_mode_2_parts_by_point))
             menu.add_command(label="split", command=lambda: self.split_selected_part(gv.split_mode_evenly_n_parts))
             menu.add_command(label="split...", command=lambda: self.split_selected_part())
             if self.work_mode == gv.work_mode_inp and self.selected_part.part_type == gv.part_type_entity:
@@ -1093,29 +1095,45 @@ class FabianBoard(Board):
 
     # split entity_list[i] into n parts
     def split_entity(self, part=0, split_mode=gv.split_mode_evenly_n_parts, split_additional_arg=gv.default_split_parts):
-        # fix me
-        # currently only split_mode_evenly_n_parts is supported
         n = split_additional_arg
         e = self.entity_list[part]
         new_part_list = []
         if e.shape == 'ARC':
-            angle = (e.arc_end_angle-e.arc_start_angle) / n
-            start_angle = e.arc_start_angle
-            for m in range(n):
-                end_angle = start_angle + angle
-                arc = Entity(shape=e.shape, center=e.center, radius=e.radius, start_angle=start_angle, end_angle=end_angle)
+            if split_mode == gv.split_mode_2_parts_by_point:
+                n = 2
+                p = split_additional_arg
+                mid_angle = e.center.get_alfa_to(p)
+                arc = Entity(shape=e.shape, center=e.center, radius=e.radius, start_angle=e.arc_start_angle, end_angle=mid_angle)
                 new_part_list.append(arc)
-                start_angle = end_angle
+                arc = Entity(shape=e.shape, center=e.center, radius=e.radius, start_angle=mid_angle, end_angle=e.arc_end_angle)
+                new_part_list.append(arc)
+            # currently only split_mode_evenly_n_parts is supported
+            else:
+                angle = (e.arc_end_angle-e.arc_start_angle) / n
+                start_angle = e.arc_start_angle
+                for m in range(n):
+                    end_angle = start_angle + angle
+                    arc = Entity(shape=e.shape, center=e.center, radius=e.radius, start_angle=start_angle, end_angle=end_angle)
+                    new_part_list.append(arc)
+                    start_angle = end_angle
         elif e.shape == 'LINE':
-            alfa = e.start.get_alfa_to(e.end)*math.pi/180
-            d = e.start.get_distance_to_point(e.end)
-            step = d/n
-            start = e.start
-            for m in range(n):
-                end = Point(start.x + step * math.cos(alfa), start.y + step * math.sin(alfa))
-                line = Entity(shape='LINE', start=start, end=end)
+            if split_mode == gv.split_mode_2_parts_by_point:
+                n = 2
+                mid_point = split_additional_arg
+                line = Entity(shape='LINE', start=e.start, end=mid_point)
                 new_part_list.append(line)
-                start = end
+                line = Entity(shape='LINE', start=mid_point, end=e.end)
+                new_part_list.append(line)
+            else:
+                alfa = e.start.get_alfa_to(e.end)*math.pi/180
+                d = e.start.get_distance_to_point(e.end)
+                step = d/n
+                start = e.start
+                for m in range(n):
+                    end = Point(start.x + step * math.cos(alfa), start.y + step * math.sin(alfa))
+                    line = Entity(shape='LINE', start=start, end=end)
+                    new_part_list.append(line)
+                    start = end
         elif e.shape == 'CIRCLE':
             self.split_circle(part, split_mode, split_additional_arg)
             return True
@@ -1795,12 +1813,6 @@ class FabianBoard(Board):
         self.show_entities = show_entities
         self.show_net = show_net
         self.show_elements = show_elements
-        '''
-        i = len(self.state)
-        while(i > n_state):
-            self.state.pop(-1)
-            i -= 1
-        '''
         return True
 
     def add_lines_between_2_node_list(self, hash_node_list_1, hash_node_list_2):
@@ -1912,6 +1924,7 @@ class FabianBoard(Board):
             messagebox.showwarning("Warning", m)
         if m is None:
             print(f'\nSUCCESS')
+        if counter_r4_elements > 0 or counter_r3_elements > 0:
             print(f'net created with {counter_r4_elements} R4 elements and {counter_r3_elements} R3 elements   {len(self.node_list)-1} nodes\n')
         # debug
         #self.print_nodes_expected_elements()
@@ -2433,15 +2446,6 @@ class FabianBoard(Board):
             if not self.is_corner_in_list(corner):
                 self.keep_state()
                 self.corner_list.append(corner)
-                if i > 0:
-                    hash_node1 = self.corner_list[-2].hash_node
-                    hash_node2 = self.corner_list[-1].hash_node
-                    middle_nodes = self.get_middle_nodes_between_node1_and_node_2(hash_node1, hash_node2)
-                    print(f'{len(middle_nodes)} middle nodes between corners {len(self.corner_list)-1} and {len(self.corner_list)}')
-                    if i == 3:
-                        hash_node1 = self.corner_list[0].hash_node
-                        middle_nodes = self.get_middle_nodes_between_node1_and_node_2(hash_node1, hash_node2)
-                        print(f'{len(middle_nodes)} middle nodes between corners 1 and 4')
                 self.show_corner(i)
 
     def is_corner_in_list(self, corner):
