@@ -80,6 +80,12 @@ class Point:
                 alfa += 360
         return alfa
 
+    def get_middle_point(self, p):
+        mid_point = Point()
+        mid_point.x = (self.x + p.x) / 2
+        mid_point.y = (self.y + p.y) / 2
+        return mid_point
+
 # return new coordinates of Point p relative to Point new00 with rotation_angle
 def get_shifted_point(p, new00, rotation_angle):
     shifted_p = Point(p.x - new00.x, p.y - new00.y)

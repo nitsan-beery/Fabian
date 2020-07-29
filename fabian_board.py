@@ -22,7 +22,7 @@ class FabianBoard(Board):
         self.button_zoom_out.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_center.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         # debug
-        self.button_print.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
+        #self.button_print.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.board.config(bg=gv.board_bg_color)
 
         self.entity_list = []
@@ -376,8 +376,6 @@ class FabianBoard(Board):
             select_part_menu.add_command(label="Entities", command=lambda: self.change_select_parts_mode(gv.part_type_entity))
             select_part_menu.add_command(label="Net lines", command=lambda: self.change_select_parts_mode(gv.part_type_net_line))
             select_part_menu.add_command(label="both", command=lambda: self.change_select_parts_mode('all'))
-            if self.work_mode == gv.work_mode_inp:
-                select_part_menu.add_command(label="Corners", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
             select_part_menu.add_separator()
         select_part_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_edge))
         select_part_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_point))
@@ -453,17 +451,19 @@ class FabianBoard(Board):
             menu.add_cascade(label='Elements', menu=show_elements_menu)
             menu.add_cascade(label='Entities', menu=show_entities_menu)
             menu.add_separator()
-            set_net_menu = tk.Menu(menu, tearoff=0)
             if len(self.corner_list) == 4:
-                set_net_menu.add_command(label="Between corners",
-                                         command=lambda: self.handle_corners(gv.handle_corners_mode_set_net))
-                set_net_menu.add_command(label="Whole net", command=self.set_net)
-                menu.add_cascade(label='Set net', menu=set_net_menu)
+                set_corner_net_menu = tk.Menu(menu, tearoff=0)
+                set_corner_net_menu.add_command(label="Both sides", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_both))
+                set_corner_net_menu.add_command(label="1 -> 4      2 -> 3", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_left_right))
+                set_corner_net_menu.add_command(label="1 -> 2      4 -> 3", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_bottom_top))
+                menu.add_cascade(label="Set net between corners", menu=set_corner_net_menu)
             else:
-                menu.add_command(label="Set net", command=self.set_net)
+                menu.add_command(label="Set Corners", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
             if len(self.corner_list) > 0:
                 menu.add_command(label="Clear corners",
                                          command=lambda: self.handle_corners(gv.handle_corners_mode_clear))
+                menu.add_separator()
+            menu.add_command(label="Set net", command=self.set_net)
             menu.add_command(label="Set initial border nodes...", command=self.set_initial_border_nodes)
             menu.add_command(label="Clear net", command=self.clear_net)
             menu.add_separator()
@@ -533,14 +533,15 @@ class FabianBoard(Board):
         if self.mouse_select_mode == gv.mouse_select_mode_corner:
             self.mouse_select_mode = gv.mouse_select_mode_edge
 
-    def handle_corners(self, mode):
+    def handle_corners(self, mode, arg=gv.corners_set_net_both):
         if mode == gv.handle_corners_mode_clear:
             self.clear_corner_list(True)
         elif mode == gv.handle_corners_mode_set_net:
             self.keep_state()
-            changed = self.set_net_between_corners()
+            changed = self.set_net_between_corners(arg)
             if changed:
                 self.clear_corner_list(by_menu=False)
+                self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
                 self.update_view()
             else:
                 self.state.pop(-1)
@@ -611,6 +612,18 @@ class FabianBoard(Board):
         alfa = p1.get_alfa_to(p2) * math.pi / 180
         d = p1.get_distance_to_point(p2)
         start = p1
+        # if mode is split_mode_2_parts_percentage_side_by_point, check for valid point
+        if split_mode == gv.split_mode_2_parts_percentage_side_by_point:
+            if not isinstance(split_arg, tuple):
+                split_mode = gv.split_mode_2_parts_percentage_left
+            elif len(split_arg) < 2:
+                split_mode = gv.split_mode_2_parts_percentage_left
+            elif split_arg[1] is None:
+                split_arg = split_arg[0]
+                split_mode = gv.split_mode_2_parts_percentage_left
+            elif not isinstance(split_arg[1], Point):
+                split_arg = split_arg[0]
+                split_mode = gv.split_mode_2_parts_percentage_left
         if split_mode == gv.split_mode_evenly_n_parts:
             n = split_arg
             step = d / n
@@ -626,6 +639,17 @@ class FabianBoard(Board):
             percentage_left = split_arg
             if p2.is_smaller_x_smaller_y(p1):
                 percentage_left = 100-percentage_left
+            d = d * percentage_left / 100
+            new_point = Point(start.x + d * math.cos(alfa), start.y + d * math.sin(alfa))
+            point_list.append(new_point)
+            point_list.append(p2)
+        elif split_mode == gv.split_mode_2_parts_percentage_side_by_point:
+            percentage_left = split_arg[0]
+            reference_point = split_arg[1]
+            d1 = p1.get_distance_to_point(reference_point)
+            d2 = p2.get_distance_to_point(reference_point)
+            if d2 < d1:
+                percentage_left = 100 - percentage_left
             d = d * percentage_left / 100
             new_point = Point(start.x + d * math.cos(alfa), start.y + d * math.sin(alfa))
             point_list.append(new_point)
@@ -1782,40 +1806,36 @@ class FabianBoard(Board):
 
     # the terms left-right-top-bottom assume that self.corner_list[0] is the bottom left corner and 2-4 order clockwise
     # net will start with horizontal lines (left-right) and then split them with vertical lines
-    def set_net_between_corners(self):
+    def set_net_between_corners(self, mode=gv.corners_set_net_both):
         if len(self.corner_list) < 4:
             return False
-#        n_state = len(self.state)
-        show_elements = self.show_elements
-        show_entities = self.show_entities
-        show_nodes = self.show_nodes
-        show_net = self.show_net
-        self.show_nodes = False
-        self.show_entities = False
-        self.show_net = False
-        self.show_elements = False
         hash_node = []
+        p = []
         for i in range(len(self.corner_list)):
             hash_node.append(self.corner_list[i].hash_node)
-        middle_nodes_left = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[1])
-        middle_nodes_top = self.get_middle_nodes_between_node1_and_node_2(hash_node[1], hash_node[2])
-        middle_nodes_right = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2])
-        middle_nodes_bottom = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[3])
-        if len(middle_nodes_left) != len(middle_nodes_right):
-            print(f'mismatch number of nodes left ({len(middle_nodes_left)}) and right ({len(middle_nodes_right)})')
+            node_index = self.get_node_index_from_hash(hash_node[-1])
+            p.append(self.node_list[node_index].p)
+        p_1_2 = p[0].get_middle_point(p[1])
+        p_1_4 = p[0].get_middle_point(p[3])
+        middle_nodes_1_2 = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[1])
+        middle_nodes_2_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[1], hash_node[2])
+        middle_nodes_4_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2])
+        middle_nodes_1_4 = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[3])
+        if mode != gv.corners_set_net_bottom_top and len(middle_nodes_1_2) != len(middle_nodes_4_3):
+            print(f'mismatch number of nodes left ({len(middle_nodes_1_2)}) and right ({len(middle_nodes_4_3)})')
             return False
-        if len(middle_nodes_top) != len(middle_nodes_bottom):
-            print(f'mismatch number of nodes top ({len(middle_nodes_top)}) and bottom ({len(middle_nodes_bottom)})')
+        if mode != gv.corners_set_net_left_right and len(middle_nodes_2_3) != len(middle_nodes_1_4):
+            print(f'mismatch number of nodes top ({len(middle_nodes_2_3)}) and bottom ({len(middle_nodes_1_4)})')
             return False
-        self.add_lines_between_2_node_list(middle_nodes_left, middle_nodes_right)
-        self.add_lines_between_2_node_list(middle_nodes_bottom, middle_nodes_top)
-        self.show_nodes = show_nodes
-        self.show_entities = show_entities
-        self.show_net = show_net
-        self.show_elements = show_elements
+        if mode == gv.corners_set_net_left_right or mode == gv.corners_set_net_both:
+            self.add_lines_between_2_node_list(middle_nodes_1_2, middle_nodes_4_3, p_1_4)
+        if mode == gv.corners_set_net_bottom_top or mode == gv.corners_set_net_both:
+            self.add_lines_between_2_node_list(middle_nodes_1_4, middle_nodes_2_3, p_1_2)
         return True
 
-    def add_lines_between_2_node_list(self, hash_node_list_1, hash_node_list_2):
+    # reference_point is to make sure that middle lines will be split in the correct order
+    # (left - right or right - left) according to distance from reference_point
+    def add_lines_between_2_node_list(self, hash_node_list_1, hash_node_list_2, reference_point):
         if hash_node_list_1 is None or hash_node_list_2 is None:
             return
         if len(hash_node_list_1) != len(hash_node_list_2):
@@ -1828,7 +1848,7 @@ class FabianBoard(Board):
             end_index = self.get_node_index_from_hash(end_hash)
             p1 = self.node_list[start_index].p
             p2 = self.node_list[end_index].p
-            self.add_line(p1, p2, 100/n)
+            self.add_line(p1, p2, 100/n, reference_point)
             n -= 1
 
     def set_net(self):
@@ -1992,6 +2012,7 @@ class FabianBoard(Board):
         self.keep_state()
         state = self.state[-1]
         self.state.pop(-1)
+        winfo_geometry = self.window_main.winfo_geometry()
         data = {
             "entity_list": state.entity_list,
             "node_list": state.node_list,
@@ -2009,7 +2030,8 @@ class FabianBoard(Board):
             "show_node_number": state.show_node_number,
             "show_net": state.show_net,
             "show_corners": state.show_corners,
-            "scale": state.scale
+            "scale": state.scale,
+            "winfo_geometry": winfo_geometry
         }
         # debug
         #self.print_node_list()
@@ -2092,6 +2114,9 @@ class FabianBoard(Board):
             state.scale = data.get("scale")
             self.state.append(state)
             self.resume_state()
+        winfo_geometry = data.get("winfo_geometry")
+        self.window_main.geometry(winfo_geometry)
+        self.window_main.update()
         self.set_accuracy()
         self.center_view()
         self.update_view()
@@ -2335,9 +2360,10 @@ class FabianBoard(Board):
         if self.temp_line_mark is not None:
             self.board.delete(self.temp_line_mark)
 
-    # add line from p1 to p2. split_middle_lines_percentage_left = % left of point to split the crossing middle lines
+    # add line from p1 to p2. split_middle_lines_side_percentage = way to split the crossing middle lines. by default
+    # percentage from left. if reference_point is not None, side to split is nearest to reference_point
     # by default the line to add is the line created by user selected points
-    def add_line(self, p1=None, p2=None, split_middle_lines_percentage_left=50.0):
+    def add_line(self, p1=None, p2=None, split_middle_lines_side_percentage=50.0, reference_point=None):
         if p1 is None:
             p1 = self.new_line_edge[0]
         if p2 is None:
@@ -2365,7 +2391,8 @@ class FabianBoard(Board):
                 hash_node = item[1]
                 p = item[2]
                 if hash_node is None:
-                    self.split_net_line(line, gv.split_mode_2_parts_percentage_left, split_middle_lines_percentage_left)
+                    arg = (split_middle_lines_side_percentage, reference_point)
+                    self.split_net_line(line, gv.split_mode_2_parts_percentage_side_by_point, arg)
                     p = self.node_list[-1].p
                 new_points.append(p)
                 i -= 1

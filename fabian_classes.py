@@ -601,7 +601,7 @@ class SplitCircleDialog(object):
         # set default values
         self.split_choice_menu.current(0)
         self.split_choice_menu.bind("<<ComboboxSelected>>", self.mode_selected)
-        self.entry_angle.insert(0, '45')
+        self.entry_angle.insert(0, '0')
         self.entry_parts.insert(0, '4')
         self.entry_parts.focus_set()
         self.choice = None

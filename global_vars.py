@@ -8,7 +8,7 @@ BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 max_nodes_to_create_element = 4
 
 default_split_parts = 2
-default_split_circle_parts = 8
+default_split_circle_parts = 18
 max_arc_angle_for_net_line = 36
 # length relative to length of object measured from bottom-left to right-up
 max_line_length_for_net_line = 0.6
@@ -25,6 +25,9 @@ max_split_middle_percentage = 100-2*min_split_percentage
 
 handle_corners_mode_clear = 'clear'
 handle_corners_mode_set_net = 'set_net'
+corners_set_net_both = 'both'
+corners_set_net_left_right = 'left-right'
+corners_set_net_bottom_top = 'bottom_top'
 mouse_select_mode_edge = 'edge'
 mouse_select_mode_point = 'point'
 mouse_select_mode_corner = 'corner'
@@ -44,6 +47,7 @@ clear_mode = 'clear'
 split_mode_evenly_n_parts = 'evenly_n_parts'
 split_mode_2_parts_by_point = '2_parts_by_point'
 split_mode_2_parts_percentage_left = '2_parts_percentage_left'
+split_mode_2_parts_percentage_side_by_point = '2_parts_percentage_side_by_point'
 split_mode_3_parts_percentage_middle = '3_parts_percentage_middle'
 split_mode_graduate_n_parts = 'graduate_n_parts'
 split_mode_graduate_percentage_left_right = 'graduate_percentage_left_right'
