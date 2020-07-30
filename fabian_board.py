@@ -1561,7 +1561,7 @@ class FabianBoard(Board):
         return exception_list
 
     # return hash index of the node that can make an element counter clockwise (default) or clockwise
-    def get_next_relevant_node(self, current_node_hash_index, prev_node_hash_index, limit_angle=True, prev_angle=None, clockwise=False):
+    def get_next_relevant_node(self, current_node_hash_index, prev_node_hash_index, prev_angle=None, clockwise=False):
         current_node_index = self.get_node_index_from_hash(current_node_hash_index)
         prev_node_index = self.get_node_index_from_hash(prev_node_hash_index)
         attached_line_list = self.node_list[current_node_index].attached_lines
@@ -1571,20 +1571,15 @@ class FabianBoard(Board):
         prev_node = self.node_list[prev_node_index]
         if prev_angle is None:
             prev_angle = prev_node.p.get_alfa_to(current_node.p)
-        next_node_hash_indx = None
+        next_node_hash_index = None
         net_line = None
         min_angle_to_create_elelment = gv.angle_diff_accuracy
         max_angle_to_create_elelment = 360 - gv.angle_diff_accuracy
-        if limit_angle:
-            min_angle_to_create_elelment = gv.min_angle_to_create_element
-            max_angle_to_create_elelment = gv.max_angle_to_create_element
         best_angle = max_angle_to_create_elelment
         if clockwise:
             min_angle_to_create_elelment, max_angle_to_create_elelment = (360 - max_angle_to_create_elelment), (360 - min_angle_to_create_elelment)
             best_angle = min_angle_to_create_elelment
         for l in attached_line_list:
-            if not l.is_available:
-                continue
             node_hash_index = l.second_node
             if node_hash_index == prev_node_hash_index:
                 continue
@@ -1605,9 +1600,9 @@ class FabianBoard(Board):
                 replace_best_angle = True
             if replace_best_angle:
                 best_angle = diff_angle
-                next_node_hash_indx = node_hash_index
+                next_node_hash_index = node_hash_index
                 net_line = l
-        return next_node_hash_indx, net_line
+        return next_node_hash_index, net_line
 
     def show_progress_bar(self, max_counter=100):
         self.progress_bar = ttk.Progressbar(self.frame_1, orient=tk.HORIZONTAL, length=300, mode='determinate', maximum=max_counter)
@@ -1665,7 +1660,7 @@ class FabianBoard(Board):
         line.second_node = n_hash
         next_node_hash_index = 0
         while next_node_hash_index != n_hash and len(nodes_outer_list) <= len(self.net_line_list):
-            next_node_hash_index, line = self.get_next_relevant_node(line.second_node, 0, limit_angle=False, prev_angle=alfa,
+            next_node_hash_index, line = self.get_next_relevant_node(line.second_node, 0, prev_angle=alfa,
                                                                 clockwise=True)
             if line is None:
                 print(f"can't set outer lines")
