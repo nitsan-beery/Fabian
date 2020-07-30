@@ -1528,9 +1528,7 @@ class FabianBoard(Board):
             '''
             check and fix me!!!
             '''
-            start_line = i
-            second_inner_line = node.attached_lines[(i+1) % num_lines]
-            second_inner_line.is_available = False
+            start_line = (i+1) % num_lines
         prev_line = node.attached_lines[start_line]
         angle = prev_line.angle_to_second_node
         for i in range(lines_to_check):
@@ -1658,66 +1656,7 @@ class FabianBoard(Board):
         self.set_lines_attached_to_node(node_hash_index)
         return node.attached_lines
 
-    def check_incomplete_nodes(self, incomplete_node_list):
-        if len(incomplete_node_list) < 1:
-            return
-        '''
-        # check incomplete nodes only on DXF borders (nodes on entities)
-        i = len(incomplete_node_list) - 1
-        while i >= 0:
-            node_index = self.get_node_index_from_hash(incomplete_node_list[i])
-            node = self.node_list[node_index]
-            if len(node.attached_entities) < 1:
-                incomplete_node_list.pop(i)
-            i -= 1
-            '''
-        while len(incomplete_node_list) > 0:
-            start_hash_node = incomplete_node_list[0]
-            tmp_list = []
-            current_hash_node = start_hash_node
-            next_hash_node = -1
-            while next_hash_node != start_hash_node and len(incomplete_node_list) > 0:
-                node_index = self.get_node_index_from_hash(current_hash_node)
-                node = self.node_list[node_index]
-                found_next = False
-                for al in node.attached_lines:
-                    if al.second_node in incomplete_node_list:# and al.second_node != prev_hash_node:
-                        next_hash_node = al.second_node
-                        found_next = True
-                        break
-                if found_next:
-                    tmp_list.append(next_hash_node)
-                    current_hash_node = next_hash_node
-                    incomplete_node_list.remove(next_hash_node)
-                else:
-                    break
-            # closed loop
-            if tmp_list[-1] == start_hash_node:
-                n = len(tmp_list)
-                if n < 3:
-                    break
-                hash_minus_2 = tmp_list[-2]
-                hash_minus_1 = tmp_list[-1]
-                node_index_minus_2 = self.get_node_index_from_hash(hash_minus_2)
-                node_index_minus_1 = self.get_node_index_from_hash(hash_minus_1)
-                node_minus_2 = self.node_list[node_index_minus_2]
-                node_minus_1 = self.node_list[node_index_minus_1]
-                for i in range(n):
-                    hash_node = tmp_list[i]
-                    node_index = self.get_node_index_from_hash(hash_node)
-                    node = self.node_list[node_index]
-                    node.exceptions.remove(gv.expected_elements_not_complete)
-                    angle1 = node_minus_1.p.get_alfa_to(node_minus_2.p)
-                    angle2 = node_minus_1.p.get_alfa_to(node.p)
-                    diff_angle = get_smallest_diff_angle(angle1, angle2)
-                    if diff_angle > gv.max_angle_to_create_element and gv.too_wide_angle in node_minus_1.exceptions:
-                        node_minus_1.exceptions.remove(gv.too_wide_angle)
-                    elif diff_angle < gv.min_angle_to_create_element and gv.too_steep_angle in node_minus_1.exceptions:
-                        node_minus_1.exceptions.remove(gv.too_steep_angle)
-                    node_minus_2 = node_minus_1
-                    node_minus_1 = node
-
-    def mark_outer_lines(self):
+    def mark_border_lines(self):
         n_hash = self.get_bottom_left_node()
         n_index = self.get_node_index_from_hash(n_hash)
         nodes_outer_list = [n_index]
@@ -1738,6 +1677,80 @@ class FabianBoard(Board):
             nodes_outer_list.append(next_node_index)
         # debug
         #print(f'outer line: {nodes_outer_list}')
+        inner_border_nodes = []
+        for i in range(len(self.net_line_list)):
+            net_line = self.net_line_list[i]
+            if net_line.entity is not None and net_line.border_type != gv.line_border_type_outer:
+                net_line.border_type = gv.line_border_type_inner
+                inner_border_nodes.append(net_line.start_node)
+                inner_border_nodes.append(net_line.end_node)
+        if len(inner_border_nodes) == 0:
+            return
+        # remove duplicate nodes
+        inner_border_nodes = list(dict.fromkeys(inner_border_nodes))
+        while len(inner_border_nodes) > 0:
+            inner_border_nodes = self.set_inner_attached_lines(inner_border_nodes)
+
+    def set_inner_attached_lines(self, inner_border_nodes):
+        if len(inner_border_nodes) == 0:
+            return inner_border_nodes
+        # find lowest node
+        lowest_index = 0
+        lowest_hash = inner_border_nodes[lowest_index]
+        lowest_node_index = self.get_node_index_from_hash(lowest_hash)
+        lowest_p = self.node_list[lowest_node_index].p
+        for i in range(len(inner_border_nodes)):
+            node_index = self.get_node_index_from_hash(inner_border_nodes[i])
+            p = self.node_list[node_index].p
+            if p.is_smaller_x_smaller_y(lowest_p, by_x=False):
+                lowest_p = p
+                lowest_index = i
+                lowest_hash = inner_border_nodes[lowest_index]
+                lowest_node_index = self.get_node_index_from_hash(lowest_hash)
+        # set lowest nodes attached line
+        lowest_node = self.node_list[lowest_node_index]
+        inner_attached_line = 0
+        lowest_angle = 359
+        for i in range(len(lowest_node.attached_lines)):
+            al = lowest_node.attached_lines[i]
+            if al.angle_to_second_node < lowest_angle:
+                inner_attached_line = i
+                lowest_angle = al.angle_to_second_node
+                next_inner_node = al.second_node
+        lowest_node.attached_lines[inner_attached_line].border_type = gv.line_border_type_inner
+        lowest_node.attached_lines[inner_attached_line].is_available = False
+        inner_border_nodes.pop(lowest_index)
+        while next_inner_node is not None and len(inner_border_nodes) > 0:
+            node_index = self.get_node_index_from_hash(next_inner_node)
+            node = self.node_list[node_index]
+            inner_border_nodes.remove(next_inner_node)
+            next_inner_node = None
+            for i in range(len(node.attached_lines)):
+                al = node.attached_lines[i]
+                if al.second_node in inner_border_nodes:
+                    net_line_index = self.get_index_of_line_with_nodes(node.hash_index, al.second_node)
+                    if net_line_index is None:
+                        #debug
+                        print(f'attached line between {node.hash_index} and {al.second_node} no match net line')
+                        continue
+                    else:
+                        net_line = self.net_line_list[net_line_index]
+                        if net_line.border_type != gv.line_border_type_inner:
+                            continue
+                    al.is_available = False
+                    al.border_type = gv.line_border_type_inner
+                    next_inner_node = al.second_node
+                    break
+        return inner_border_nodes
+
+    def get_index_of_line_with_nodes(self, node_hash_1, node_hash_2):
+        for i in range(len(self.net_line_list)):
+            line = self.net_line_list[i]
+            if line.start_node == node_hash_1 and line.end_node == node_hash_2:
+                return i
+            if line.start_node == node_hash_2 and line.end_node == node_hash_1:
+                return i
+        return None
 
     # return list of unattached nodes with real index in list (not hash_index)
     def get_unattached_nodes(self, set_nodes_lines=True):
@@ -1932,7 +1945,7 @@ class FabianBoard(Board):
 
     def set_nodes_attached_lines_and_exception(self):
         self.set_all_nodes_attached_line_list()
-        self.mark_outer_lines()
+        self.mark_border_lines()
         #debug
         #print(nodes_outer_list)
         self.set_all_nodes_expected_elements_and_exceptions()
@@ -2008,8 +2021,6 @@ class FabianBoard(Board):
         self.element_list = element_list
         # debug
         #self.print_nodes_expected_elements()
-        #incompleted_nodes = self.get_exception_nodes(gv.expected_elements_not_complete)
-        #self.check_incomplete_nodes(incompleted_nodes)
         exception_nodes = self.get_exception_nodes()
         m = None
         if len(exception_nodes) > 0:
