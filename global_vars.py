@@ -53,9 +53,9 @@ split_mode_graduate_n_parts = 'graduate_n_parts'
 split_mode_graduate_percentage_left_right = 'graduate_percentage_left_right'
 split_mode_by_longitude = 'by_longitude'
 split_mode_by_angle = 'by_angle'
-net_line_border_type_none = 'none'
-net_line_border_type_outer = 'outer'
-net_line_border_type_inner = 'inner'
+line_border_type_none = 'none'
+line_border_type_outer = 'outer'
+line_border_type_inner = 'inner'
 
 default_mouse_select_mode = mouse_select_mode_edge
 default_work_mode = work_mode_dxf

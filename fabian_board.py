@@ -501,7 +501,7 @@ class FabianBoard(Board):
                 return
             self.show_nodes = False
             self.show_net = False
-            self.show_corners = False
+            self.clear_corner_list(False)
             self.show_elements = False
             self.show_entities = True
             self.change_select_parts_mode(gv.part_type_entity)
@@ -1485,49 +1485,68 @@ class FabianBoard(Board):
         if num_lines < 2:
             node.exceptions.append(gv.unattached)
             node.expected_elements = 0
+            node.exceptions.append(gv.unattached)
+            return
+        num_outer_lines = 0
+        num_inner_lines = 0
+        for al in node.attached_lines:
+            if self.net_line_list[al.line_index].border_type == gv.line_border_type_outer:
+                num_outer_lines += 1
+            if self.net_line_list[al.line_index].border_type == gv.line_border_type_inner:
+                num_inner_lines += 1
+        if num_outer_lines + num_inner_lines == 0:
+            node.expected_elements = len(node.attached_lines)
+        elif num_outer_lines == 2 or num_inner_lines == 2:
+            node.expected_elements = len(node.attached_lines)-1
+            lines_to_check -= 1
         else:
-            num_outer_lines = 0
-            for al in node.attached_lines:
-                if self.net_line_list[al.line_index].is_outer_line:
-                    num_outer_lines += 1
-            if num_outer_lines == 0:
-                node.expected_elements = len(node.attached_lines)
-            elif num_outer_lines == 2:
-                node.expected_elements = len(node.attached_lines)-1
-                lines_to_check -= 1
-            else:
-                # debug
-                #m = f'unexpected number of outer lines in set_node_expected_elements_and_exceptions'
+            # debug
+            #m = f'unexpected number of outer lines in set_node_expected_elements_and_exceptions'
+            #print(m)
+            return
+        if num_outer_lines == 2:
+            for i in range(len(node.attached_lines)):
+                if node.attached_lines[i].border_type == gv.line_border_type_outer:
+                    break
+            if not node.attached_lines[i].border_type == gv.line_border_type_outer:
+                #m = f"can't find the outer line in node: {n}"
                 #print(m)
                 return
-            if num_outer_lines == 2:
-                for i in range(len(node.attached_lines)):
-                    if node.attached_lines[i].is_outer_line:
-                        break
-                if not node.attached_lines[i].is_outer_line:
-                    #m = f"can't find the outer line in node: {n}"
-                    #print(m)
-                    return
-                # skeep angle between 2 outer lines
-                start_line = i
-                second_outer_line = node.attached_lines[(i-1) % num_lines]
-                second_outer_line.is_available = False
-            prev_line = node.attached_lines[start_line]
-            angle = prev_line.angle_to_second_node
-            for i in range(lines_to_check):
-                prev_angle = angle
-                line = node.attached_lines[(i+start_line+1) % num_lines]
-                angle = line.angle_to_second_node
-                if angle < prev_angle:
-                    angle += 360
-                diff_angle = round(angle - prev_angle, gv.accuracy)
-                if diff_angle < gv.min_angle_to_create_element:
-                    prev_line.is_available = False
-                    node.exceptions.append(gv.too_steep_angle)
-                elif diff_angle > gv.max_angle_to_create_element:
-                    prev_line.is_available = False
-                    node.exceptions.append(gv.too_wide_angle)
-                prev_line = line
+            # skeep angle between 2 outer lines
+            start_line = i
+            second_outer_line = node.attached_lines[i-1]
+            second_outer_line.is_available = False
+        if num_inner_lines == 2:
+            for i in range(len(node.attached_lines)):
+                if node.attached_lines[i].border_type == gv.line_border_type_inner:
+                    break
+            if not node.attached_lines[i].border_type == gv.line_border_type_inner:
+                #m = f"can't find the outer line in node: {n}"
+                #print(m)
+                return
+            # skeep angle between 2 inner lines
+            '''
+            check and fix me!!!
+            '''
+            start_line = i
+            second_inner_line = node.attached_lines[(i+1) % num_lines]
+            second_inner_line.is_available = False
+        prev_line = node.attached_lines[start_line]
+        angle = prev_line.angle_to_second_node
+        for i in range(lines_to_check):
+            prev_angle = angle
+            line = node.attached_lines[(i+start_line+1) % num_lines]
+            angle = line.angle_to_second_node
+            if angle < prev_angle:
+                angle += 360
+            diff_angle = round(angle - prev_angle, gv.accuracy)
+            if diff_angle < gv.min_angle_to_create_element:
+                prev_line.is_available = False
+                node.exceptions.append(gv.too_steep_angle)
+            elif diff_angle > gv.max_angle_to_create_element:
+                prev_line.is_available = False
+                node.exceptions.append(gv.too_wide_angle)
+            prev_line = line
 
     def define_new_entity_color(self, entity):
         if self.work_mode == gv.work_mode_inp:
@@ -1697,7 +1716,6 @@ class FabianBoard(Board):
                         node_minus_1.exceptions.remove(gv.too_steep_angle)
                     node_minus_2 = node_minus_1
                     node_minus_1 = node
-                print('a')
 
     def mark_outer_lines(self):
         n_hash = self.get_bottom_left_node()
@@ -1713,8 +1731,8 @@ class FabianBoard(Board):
             if line is None:
                 print(f"can't set outer lines")
                 return
-            line.is_outer_line = True
-            self.net_line_list[line.line_index].is_outer_line = True
+            line.border_type = gv.line_border_type_outer
+            self.net_line_list[line.line_index].border_type = gv.line_border_type_outer
             alfa = line.angle_to_second_node
             next_node_index = self.get_node_index_from_hash(next_node_hash_index)
             nodes_outer_list.append(next_node_index)
@@ -2525,9 +2543,8 @@ class FabianBoard(Board):
         if len(self.corner_list) > 0:
             if by_menu:
                 self.keep_state()
-            self.hide_all_corners()
+            self.hide_all_corners(keep_new_state=False)
             self.corner_list = []
-            self.show_corners = True
 
     def add_corner_to_corner_list(self, corner):
         i = len(self.corner_list)

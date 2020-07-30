@@ -167,7 +167,7 @@ class Node(Part):
 
 
 class NetLine(Part):
-    def __init__(self, start_node=None, end_node=None, entity=None, color=gv.net_line_color, border_type=gv.net_line_border_type_none):
+    def __init__(self, start_node=None, end_node=None, entity=None, color=gv.net_line_color, border_type=gv.line_border_type_none):
         super().__init__(color)
         self.start_node = start_node
         self.end_node = end_node
@@ -218,15 +218,15 @@ class Element(Part):
 
 
 class AttachedLine:
-    def __init__(self, line_index=None, second_node=0, angle_to_second_node=0, is_outer_line=False, is_available=True):
+    def __init__(self, line_index=None, second_node=0, angle_to_second_node=0, border_type=gv.line_border_type_none, is_available=True):
         self.line_index = line_index
         self.second_node = second_node
         self.angle_to_second_node = angle_to_second_node
-        self.is_outer_line = is_outer_line
+        self.border_type = border_type
         self.is_available = is_available
 
     def convert_into_tuple(self):
-        t = (self.line_index, self.second_node, self.angle_to_second_node, self.is_outer_line, self.is_available)
+        t = (self.line_index, self.second_node, self.angle_to_second_node, self.border_type, self.is_available)
         return t
 
     def get_data_from_tuple(self, t):
