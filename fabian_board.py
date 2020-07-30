@@ -585,12 +585,10 @@ class FabianBoard(Board):
         node_hash_index = self.add_node_to_node_list(start_node)
         e.add_node_to_entity_nodes_list(node_hash_index)
         node = self.node_list[self.get_node_index_from_hash(node_hash_index)]
-        node.attached_entities.append(i)
         end_node = Node(e.end, entity=i)
         node_hash_index = self.add_node_to_node_list(end_node)
         e.add_node_to_entity_nodes_list(node_hash_index)
         node = self.node_list[self.get_node_index_from_hash(node_hash_index)]
-        node.attached_entities.append(i)
 
     def get_split_circle_points(self, circle, parts, start_angle, end_angle=None):
         point_list = []
@@ -1261,8 +1259,6 @@ class FabianBoard(Board):
         for j in range(len(new_points) - 1):
             new_node = Node(new_points[j+1], entity=part)
             end_hash_node = self.add_node_to_node_list(new_node)
-            end_node = self.node_list[self.get_node_index_from_hash(end_hash_node)]
-            end_node.attached_entities.append(part)
             self.add_line_to_net_list_by_nodes(start_hash_node, end_hash_node, part)
             start_hash_node = end_hash_node
         if entity.shape == 'CIRCLE':
@@ -1298,7 +1294,7 @@ class FabianBoard(Board):
             arc = Entity('ARC', reference_entity.center, reference_entity.radius, start_angle=start_angle, end_angle=end_angle)
             new_points = self.get_split_arc_points(arc, split_mode, split_additional_arg)
         for j in range(len(new_points) - 1):
-            new_node = Node(new_points[j+1], entity=None)
+            new_node = Node(new_points[j+1], entity=line.entity)
             end_node = self.add_node_to_node_list(new_node)
             new_lines.append(NetLine(start_node, end_node, line.entity))
             start_node = end_node
@@ -1524,7 +1520,7 @@ class FabianBoard(Board):
                 angle = line.angle_to_second_node
                 if angle < prev_angle:
                     angle += 360
-                diff_angle = angle - prev_angle
+                diff_angle = round(angle - prev_angle, gv.accuracy)
                 if diff_angle < gv.min_angle_to_create_element:
                     prev_line.is_available = False
                     node.exceptions.append(gv.too_steep_angle)
@@ -1539,11 +1535,11 @@ class FabianBoard(Board):
         else:
             self.entity_list[entity].color = gv.default_entity_color
 
-    # return the hash key of the exception nodes
-    def get_exception_nodes(self):
+    # return the hash key of the nodes with specific exception, or all exceptions (default)
+    def get_exception_nodes(self, exception='all'):
         exception_list = []
         for i in range(1, len(self.node_list)):
-            if len(self.node_list[i].exceptions) > 0:
+            if (exception == 'all' and len(self.node_list[i].exceptions) > 0) or exception in self.node_list[i].exceptions:
                 exception_list.append(self.node_list[i].hash_index)
         return exception_list
 
@@ -1643,6 +1639,66 @@ class FabianBoard(Board):
         self.set_lines_attached_to_node(node_hash_index)
         return node.attached_lines
 
+    def check_incomplete_nodes(self, incomplete_node_list):
+        if len(incomplete_node_list) < 1:
+            return
+        '''
+        # check incomplete nodes only on DXF borders (nodes on entities)
+        i = len(incomplete_node_list) - 1
+        while i >= 0:
+            node_index = self.get_node_index_from_hash(incomplete_node_list[i])
+            node = self.node_list[node_index]
+            if len(node.attached_entities) < 1:
+                incomplete_node_list.pop(i)
+            i -= 1
+            '''
+        while len(incomplete_node_list) > 0:
+            start_hash_node = incomplete_node_list[0]
+            tmp_list = []
+            current_hash_node = start_hash_node
+            next_hash_node = -1
+            while next_hash_node != start_hash_node and len(incomplete_node_list) > 0:
+                node_index = self.get_node_index_from_hash(current_hash_node)
+                node = self.node_list[node_index]
+                found_next = False
+                for al in node.attached_lines:
+                    if al.second_node in incomplete_node_list:# and al.second_node != prev_hash_node:
+                        next_hash_node = al.second_node
+                        found_next = True
+                        break
+                if found_next:
+                    tmp_list.append(next_hash_node)
+                    current_hash_node = next_hash_node
+                    incomplete_node_list.remove(next_hash_node)
+                else:
+                    break
+            # closed loop
+            if tmp_list[-1] == start_hash_node:
+                n = len(tmp_list)
+                if n < 3:
+                    break
+                hash_minus_2 = tmp_list[-2]
+                hash_minus_1 = tmp_list[-1]
+                node_index_minus_2 = self.get_node_index_from_hash(hash_minus_2)
+                node_index_minus_1 = self.get_node_index_from_hash(hash_minus_1)
+                node_minus_2 = self.node_list[node_index_minus_2]
+                node_minus_1 = self.node_list[node_index_minus_1]
+                for i in range(n):
+                    hash_node = tmp_list[i]
+                    node_index = self.get_node_index_from_hash(hash_node)
+                    node = self.node_list[node_index]
+                    node.exceptions.remove(gv.expected_elements_not_complete)
+                    angle1 = node_minus_1.p.get_alfa_to(node_minus_2.p)
+                    angle2 = node_minus_1.p.get_alfa_to(node.p)
+                    diff_angle = get_smallest_diff_angle(angle1, angle2)
+                    if diff_angle > gv.max_angle_to_create_element and gv.too_wide_angle in node_minus_1.exceptions:
+                        node_minus_1.exceptions.remove(gv.too_wide_angle)
+                    elif diff_angle < gv.min_angle_to_create_element and gv.too_steep_angle in node_minus_1.exceptions:
+                        node_minus_1.exceptions.remove(gv.too_steep_angle)
+                    node_minus_2 = node_minus_1
+                    node_minus_1 = node
+                print('a')
+
     def mark_outer_lines(self):
         n_hash = self.get_bottom_left_node()
         n_index = self.get_node_index_from_hash(n_hash)
@@ -1664,7 +1720,6 @@ class FabianBoard(Board):
             nodes_outer_list.append(next_node_index)
         # debug
         #print(f'outer line: {nodes_outer_list}')
-        return nodes_outer_list
 
     # return list of unattached nodes with real index in list (not hash_index)
     def get_unattached_nodes(self, set_nodes_lines=True):
@@ -1859,7 +1914,7 @@ class FabianBoard(Board):
 
     def set_nodes_attached_lines_and_exception(self):
         self.set_all_nodes_attached_line_list()
-        nodes_outer_list = self.mark_outer_lines()
+        self.mark_outer_lines()
         #debug
         #print(nodes_outer_list)
         self.set_all_nodes_expected_elements_and_exceptions()
@@ -1922,7 +1977,12 @@ class FabianBoard(Board):
                             self.node_list[element_node].expected_elements -= 1
                     else:
                         exception_element_list.append(element)
-            self.node_list[i].attached_lines = []
+                    #node.attached_lines[j].is_available = False
+            if node.expected_elements > 0:
+                node.exceptions.append(gv.expected_elements_not_complete)
+            for al in node.attached_lines:
+                al.is_available = False
+            #self.node_list[i].attached_lines = []
             self.progress_bar['value'] += 1
             self.frame_1.update_idletasks()
         self.hide_text_on_screen()
@@ -1930,6 +1990,8 @@ class FabianBoard(Board):
         self.element_list = element_list
         # debug
         #self.print_nodes_expected_elements()
+        #incompleted_nodes = self.get_exception_nodes(gv.expected_elements_not_complete)
+        #self.check_incomplete_nodes(incompleted_nodes)
         exception_nodes = self.get_exception_nodes()
         m = None
         if len(exception_nodes) > 0:

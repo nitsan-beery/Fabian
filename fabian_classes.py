@@ -128,7 +128,7 @@ class Node(Part):
             point = Point()
         self.p = point
         self.hash_index = 0
-        self.attached_entities = []
+        self.is_on_entity = entity is not None
         self.attached_lines = []
         self.expected_elements = 0
         self.exceptions = []
@@ -148,7 +148,7 @@ class Node(Part):
         attached_lines = []
         for al in self.attached_lines:
             attached_lines.append(al.convert_into_tuple())
-        t = (self.p.convert_into_tuple(), self.hash_index, self.attached_entities, attached_lines)
+        t = (self.p.convert_into_tuple(), self.hash_index, self.is_on_entity, attached_lines)
         return t
 
     def get_data_from_tuple(self, t):
@@ -157,7 +157,7 @@ class Node(Part):
             return
         self.p.get_data_from_tuple(t[0])
         self.hash_index = t[1]
-        self.attached_entities = t[2]
+        self.is_on_entity = t[2]
         attached_lines = t[3]
         self.attached_lines = []
         for t in attached_lines:
@@ -167,12 +167,12 @@ class Node(Part):
 
 
 class NetLine(Part):
-    def __init__(self, start_node=None, end_node=None, entity=None, color=gv.net_line_color, is_outer_line=False):
+    def __init__(self, start_node=None, end_node=None, entity=None, color=gv.net_line_color, border_type=gv.net_line_border_type_none):
         super().__init__(color)
         self.start_node = start_node
         self.end_node = end_node
         self.entity = entity
-        self.is_outer_line = is_outer_line
+        self.border_type = border_type
 
     def is_equal(self, line):
         t1 = self.start_node == line.start_node and self.end_node == line.end_node
@@ -186,7 +186,7 @@ class NetLine(Part):
         return False
 
     def convert_into_tuple(self):
-        t = (self.start_node, self.end_node, self.entity, self.color, self.is_marked, self.is_outer_line)
+        t = (self.start_node, self.end_node, self.entity, self.color, self.is_marked, self.border_type)
         return t
 
     def get_data_from_tuple(self, t):
@@ -198,7 +198,7 @@ class NetLine(Part):
         self.entity = t[2]
         self.color = t[3]
         self.is_marked = t[4]
-        self.is_outer_line = t[5]
+        self.border_type = t[5]
 
 
 class Element(Part):
