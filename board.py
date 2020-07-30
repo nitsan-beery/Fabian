@@ -1,8 +1,4 @@
-import tkinter as tk
-from tkinter import filedialog
-import json
-import global_vars as gv
-from point import *
+from file_handlng import *
 
 
 class Board:
@@ -26,8 +22,8 @@ class Board:
             self.frame_2 = tk.Frame(self.window_main)
             self.frame_2.pack(fill='both', side='bottom', expand=tk.NO, pady=5)
 
-            self.button_load = tk.Button(self.frame_2, text='Load', command=lambda: self.load_json())
-            self.button_save = tk.Button(self.frame_2, text='Save', command=lambda: self.save_json())
+            self.button_load = tk.Button(self.frame_2, text='Load', command=lambda: load_json(self.window_main))
+            self.button_save = tk.Button(self.frame_2, text='Save', command=lambda: save_json(self.window_main))
             self.button_load.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
             self.button_save.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
 
@@ -139,10 +135,10 @@ class Board:
     def show_center(self):
         p1 = Point(-15, 0)
         p2 = Point(15, 0)
-        self.create_line(p1, p2)
+        self.draw_line(p1, p2)
         p1 = Point(0, 15)
         p2 = Point(0, -15)
-        self.create_line(p1, p2)
+        self.draw_line(p1, p2)
 
     def mouse_wheel(self, key):
         self.hide_text_on_screen()
@@ -162,24 +158,4 @@ class Board:
             self.board.yview('scroll', -1, 'units')
         elif key.keycode == 40:
             self.board.yview('scroll', 1, 'units')
-
-    def load_json(self, filename=None, my_dir="./data files/"):
-        if filename is None:
-            filename = filedialog.askopenfilename(parent=self.window_main, initialdir=my_dir, title="Select file",
-                                                       filetypes=(("json files", "*.json"), ("all files", "*.*")))
-            if filename == '':
-                return
-        with open(filename, "r") as json_file:
-            data = json.load(json_file)
-        return data
-
-    def save_json(self, data=None, my_dir="./data files/", file_name='Fabian'):
-        filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir=my_dir, title="Select file",
-                                                initialfile=file_name, defaultextension=".json",
-                                                filetypes=(("json files", "*.json"), ("all files", "*.*")))
-        if filename == '' or data is None:
-            return None
-        with open(filename, "w") as json_file:
-            json.dump(data, json_file, indent=2, separators=(",", ":"))
-        return filename
 

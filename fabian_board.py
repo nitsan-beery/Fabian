@@ -1,5 +1,4 @@
 from board import *
-from fabian_classes import *
 from file_handlng import *
 import ezdxf
 import math
@@ -185,28 +184,29 @@ class FabianBoard(Board):
         if self.selected_part is None:
             self.temp_rect_start_point = Point(x, y)
             return
-        if self.selected_part is not None:
-            if self.selected_part.part_type == gv.part_type_entity:
-                e = self.entity_list[self.selected_part.index]
-                if e.shape == 'CIRCLE':
-                    return
-                p1 = e.left_bottom
-                p2 = e.right_up
-                d, p = self.get_distance_from_entity_and_nearest_point(Point(x, y), self.selected_part.index)
-            elif self.selected_part.part_type == gv.part_type_net_line:
-                line = self.net_line_list[self.selected_part.index]
-                node_index = self.get_node_index_from_hash(line.start_node)
-                node_1 = self.node_list[node_index]
-                node_index = self.get_node_index_from_hash(line.end_node)
-                node_2 = self.node_list[node_index]
-                p1 = node_1.p
-                p2 = node_2.p
-                d, p = self.get_distance_from_line_and_nearest_point(Point(x, y), p1, p2)
-            if self.mouse_select_mode == gv.mouse_select_mode_point and self.work_mode == gv.work_mode_inp:
-                self.new_line_edge[0] = p
-                self.keep_state()
-                self.split_selected_part(gv.split_mode_2_parts_by_point)
+        # slected part is not None
+        if self.selected_part.part_type == gv.part_type_entity:
+            e = self.entity_list[self.selected_part.index]
+            if e.shape == 'CIRCLE':
                 return
+            p1 = e.left_bottom
+            p2 = e.right_up
+            d, p = self.get_distance_from_entity_and_nearest_point(Point(x, y), self.selected_part.index)
+        # self.selected_part.part_type == gv.part_type_net_line
+        else:
+            line = self.net_line_list[self.selected_part.index]
+            node_index = self.get_node_index_from_hash(line.start_node)
+            node_1 = self.node_list[node_index]
+            node_index = self.get_node_index_from_hash(line.end_node)
+            node_2 = self.node_list[node_index]
+            p1 = node_1.p
+            p2 = node_2.p
+            d, p = self.get_distance_from_line_and_nearest_point(Point(x, y), p1, p2)
+        if self.mouse_select_mode == gv.mouse_select_mode_point and self.work_mode == gv.work_mode_inp:
+            self.new_line_edge[0] = p
+            self.keep_state()
+            self.split_selected_part(gv.split_mode_2_parts_by_point)
+            return
         if self.mouse_select_mode == gv.mouse_select_mode_edge or self.mouse_select_mode == gv.mouse_select_mode_corner:
             d1 = p1.get_distance_to_point(Point(x, y))
             d2 = p2.get_distance_to_point(Point(x, y))
@@ -271,7 +271,7 @@ class FabianBoard(Board):
                 self.new_line_edge_mark[1] = None
                 self.board.delete(self.new_line_mark)
                 self.new_line_mark = None
-                self.new_line_original_part = None
+                self.new_line_original_part = [None, None]
                 if self.new_line_edge[1] != p:
                     self.new_line_edge[1] = p
                     self.new_line_edge_mark[1] = self.draw_circle(p, gv.edge_line_mark_radius / self.scale)
@@ -1218,7 +1218,8 @@ class FabianBoard(Board):
             start_hash_node = entity.nodes_list[0]
             arc = self.entity_list[part]
             new_points = self.get_split_arc_points(arc, split_mode, split_additional_arg)
-        elif entity.shape == 'CIRCLE':
+        # entity.shape == 'CIRCLE'
+        else:
             new_points = self.get_split_circle_points(entity, split_additional_arg, start)
             new_node = Node(new_points[0], entity=part)
             start_hash_node = self.add_node_to_node_list(new_node)
@@ -1247,7 +1248,8 @@ class FabianBoard(Board):
         start_node = line.start_node
         if shape == 'LINE':
             new_points = self.get_split_line_points(node1.p, node2.p, split_mode, split_additional_arg)
-        elif shape == 'ARC' or shape == 'CIRCLE':
+        # shape == 'ARC' or shape == 'CIRCLE'
+        else:
             reference_entity = self.entity_list[line.entity]
             start_angle = reference_entity.center.get_alfa_to(node1.p)
             end_angle = reference_entity.center.get_alfa_to(node2.p)
@@ -1800,7 +1802,7 @@ class FabianBoard(Board):
         print('nodes:')
         for i in range(1, len(self.node_list)):
             n = self.node_list[i]
-            print(f'{i}: {n.p.convert_into_tuple()}   entity: {n.entity}')
+            print(f'{i}: {n.p.convert_into_tuple()}')
 
     # debug
     def print_line_list(self):
@@ -1923,6 +1925,7 @@ class FabianBoard(Board):
                 new_element_nodes = [fist_node]
                 prev_node_hash_index = self.node_list[fist_node].hash_index
                 # try to set a new element starting from node[i] to next_node
+                next_node_index = -1
                 while node_hash_index is not None:
                     node_index = self.get_node_index_from_hash(node_hash_index)
                     new_element_nodes.append(node_index)
@@ -1987,49 +1990,6 @@ class FabianBoard(Board):
         #self.print_nodes_expected_elements()
         #self.print_elements(self.element_list)
 
-    def save_inp(self, file_name='Fabian'):
-        self.create_net_element_list()
-        filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./data files/", title="Select file",
-                                                initialfile=file_name, defaultextension=".inp",
-                                                filetypes=(("inp files", "*.inp"), ("all files", "*.*")))
-        if filename == '':
-            return
-        f = open(filename, 'w')
-        f.write('*Node\n')
-        for i in range(1, len(self.node_list)):
-            n = self.node_list[i]
-            s = f'{i},    {n.p.x}, {n.p.y}, 0\n'
-            f.write(s)
-        element_3_list = []
-        element_4_list = []
-        for i in range(len(self.element_list)):
-            e = self.element_list[i]
-            if len(e.nodes) == 3:
-                element_3_list.append(e.nodes)
-            else:
-                element_4_list.append(e.nodes)
-        element_index = 1
-        if len(element_3_list) > 0:
-            f.write('*Element, type=R3D3\n')
-            for i in range(len(element_3_list)):
-                e = element_3_list[i]
-                self.write_element_to_file(f, element_index, e)
-                element_index += 1
-        if len(element_4_list) > 0:
-            f.write('*Element, type=R3D4\n')
-            for i in range(len(element_4_list)):
-                e = element_4_list[i]
-                self.write_element_to_file(f, element_index, e)
-                element_index += 1
-        f.close()
-
-    def write_element_to_file(self, f, index, e):
-        s = f'{index},    '
-        for j in range(len(e)-1):
-            s += f'{e[j]}, '
-        s += f'{e[-1]}\n'
-        f.write(s)
-
     def save_as(self):
         file_name = self.window_main.title()
         dot_index = file_name.find('.')
@@ -2038,83 +1998,29 @@ class FabianBoard(Board):
         menu = tk.Menu(self.board, tearoff=0)
         menu.add_command(label="DATA", command=lambda: self.save_data(file_name))
         menu.add_command(label="INP", command=lambda: self.save_inp(file_name))
-        menu.add_command(label="DXF", command=lambda: self.save_dxf(file_name))
+        menu.add_command(label="DXF", command=lambda: save_dxf(self.window_main, file_name, self.entity_list))
         menu.add_separator()
         menu.add_command(label="Quit")
         x = self.frame_2.winfo_pointerx()
         y = self.frame_2.winfo_pointery()
         menu.post(x, y)
 
+    def save_inp(self, file_name='Fabian'):
+        self.create_net_element_list()
+        self.show_elements = True
+        self.update_view()
+        save_inp(self.window_main, file_name, self.node_list, self.element_list)
+
     def save_data(self, file_name='Fabian'):
         self.keep_state()
         state = self.state[-1]
         self.state.pop(-1)
-        winfo_geometry = self.window_main.winfo_geometry()
-        data = {
-            "entity_list": state.entity_list,
-            "node_list": state.node_list,
-            "next_node_hash_index": state.next_node_hash_index,
-            "nodes_hash": state.nodes_hash,
-            "net_line_list": state.net_line_list,
-            "element_list": state.element_list,
-            "corner_list": state.corner_list,
-            "mouse_select_mode": state.mouse_select_mode,
-            "work_mode": state.work_mode,
-            "select_parts_mode": state.select_parts_mode,
-            "show_entities": state.show_entities,
-            "show_nodes": state.show_nodes,
-            "show_elements": state.show_elements,
-            "show_node_number": state.show_node_number,
-            "show_net": state.show_net,
-            "show_corners": state.show_corners,
-            "scale": state.scale,
-            "winfo_geometry": winfo_geometry
-        }
-        # debug
-        #self.print_node_list()
-        #self.print_line_list()
-        filename = self.save_json(data, file_name=file_name)
-        if filename is not None:
-            i = filename.rfind('/')
-            title = filename[i+1:]
-            self.window_main.title(title)
-
-    def save_dxf(self, file_name='Fabian'):
-        doc = ezdxf.new('R2010')
-        msp = doc.modelspace()
-        for e in self.entity_list:
-            if e.shape == 'LINE':
-                msp.add_line((e.start.x, e.start.y), (e.end.x, e.end.y))
-            elif e.shape == 'ARC':
-                msp.add_arc((e.center.x, e.center.y), e.radius, e.arc_start_angle, e.arc_end_angle)
-            elif e.shape == 'CIRCLE':
-                msp.add_circle((e.center.x, e.center.y), e.radius)
-        filename = filedialog.asksaveasfilename(parent=self.window_main, initialdir="./data files/", title="Select file",
-                                                initialfile=file_name, defaultextension=".dxf",
-                                                filetypes=(("dxf files", "*.dxf"), ("all files", "*.*")))
-        if filename == '':
-            return
-        i = filename.rfind('/')
-        title = filename[i+1:]
-        self.window_main.title(title)
-        doc.saveas(filename)
+        save_data(self.window_main, file_name, state)
 
     def load(self):
-        filename = filedialog.askopenfilename(parent=self.window_main, initialdir="./data files/",
-                                              title="Select file",
-                                              filetypes=(("Json files", "*.json"), ("DXF files", "*.dxf"), ("all files", "*.*")))
-        if filename == '':
-            return
-        self.reset_board()
-        i = filename.rfind('.')
-        filetype = filename[i+1:].lower()
-        i = filename.rfind('/')
-        title = filename[i+1:]
-        self.window_main.title(title)
+        filetype, arg = load(self.window_main)
         if filetype == 'dxf':
-            doc = ezdxf.readfile(filename)
-            self.entity_list = convert_doc_to_entity_list(doc)
-            print(f'\n{len(self.entity_list)} Entities in {filetype} file')
+            self.entity_list = arg
             d_list = self.get_duplicated_entities()
             self.hide_text_on_screen()
             if len(d_list) > 0:
@@ -2129,41 +2035,16 @@ class FabianBoard(Board):
             self.center_view(True)
             self.change_work_mode(gv.work_mode_dxf)
         elif filetype == 'json':
-            print('\nnew data file')
-            data = self.load_json(filename=filename)
-            state = FabianState()
-            state.entity_list = data.get("entity_list")
-            state.node_list = data.get("node_list")
-            state.next_node_hash_index = data.get("next_node_hash_index")
-            state.nodes_hash = data.get("nodes_hash")
-            state.net_line_list = data.get("net_line_list")
-            state.element_list = data.get("element_list")
-            state.corner_list = data.get("corner_list")
-            state.mouse_select_mode = data.get("mouse_select_mode")
-            state.work_mode = data.get("work_mode")
-            state.select_parts_mode = data.get("select_parts_mode")
-            state.show_entities = data.get("show_entities")
-            state.show_nodes = data.get("show_nodes")
-            state.show_elements = data.get("show_elements")
-            state.show_node_number = data.get("show_node_number")
-            state.show_net = data.get("show_net")
-            state.show_corners = data.get("show_corners")
-            state.scale = data.get("scale")
+            state = arg
             self.state.append(state)
             self.resume_state()
-            winfo_geometry = data.get("winfo_geometry")
-            self.window_main.geometry(winfo_geometry)
         self.window_main.update()
         self.set_accuracy()
         self.center_view()
         self.update_view()
         # debug
-        #self.test()
         #self.print_node_list()
         #self.print_line_list()
-
-    def test(self):
-        pass
 
     def set_scale(self, left, right):
         object_width = right - left
