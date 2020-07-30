@@ -1,5 +1,6 @@
 from board import *
 from fabian_classes import *
+from file_handlng import *
 import ezdxf
 import math
 from tkinter import messagebox, ttk
@@ -1648,6 +1649,11 @@ class FabianBoard(Board):
         # remove duplicate nodes
         inner_border_nodes = list(dict.fromkeys(inner_border_nodes))
         while len(inner_border_nodes) > 0:
+            if len(inner_border_nodes) < 3:
+                m = f'There are open inner entities. remove or fix before INP mode'
+                messagebox.showwarning("Warning", m)
+                print(m)
+                return
             inner_border_nodes = self.set_inner_attached_lines(inner_border_nodes)
 
     def set_inner_attached_lines(self, inner_border_nodes):
@@ -2130,7 +2136,7 @@ class FabianBoard(Board):
         self.window_main.title(title)
         if filetype == 'dxf':
             doc = ezdxf.readfile(filename)
-            self.convert_doc_to_entity_list(doc)
+            self.entity_list = convert_doc_to_entity_list(doc)
             print(f'\n{len(self.entity_list)} Entities in {filetype} file')
             d_list = self.get_duplicated_entities()
             self.hide_text_on_screen()
@@ -2168,8 +2174,8 @@ class FabianBoard(Board):
             state.scale = data.get("scale")
             self.state.append(state)
             self.resume_state()
-        winfo_geometry = data.get("winfo_geometry")
-        self.window_main.geometry(winfo_geometry)
+            winfo_geometry = data.get("winfo_geometry")
+            self.window_main.geometry(winfo_geometry)
         self.window_main.update()
         self.set_accuracy()
         self.center_view()
@@ -2972,30 +2978,6 @@ class FabianBoard(Board):
             return
         self.board.delete(self.selected_part.board_part)
         self.selected_part = None
-
-    def convert_doc_to_entity_list(self, doc=None):
-        if doc is None:
-            return
-        msp = doc.modelspace()
-        for shape in shapes:
-            for dxf_entity in msp.query(shape):
-                e = None
-                if shape == 'LINE':
-                    p1 = Point(dxf_entity.dxf.start[0], dxf_entity.dxf.start[1])
-                    p2 = Point(dxf_entity.dxf.end[0], dxf_entity.dxf.end[1])
-                    e = Entity(shape='LINE', start=p1, end=p2)
-                elif shape == 'CIRCLE':
-                    center = Point(dxf_entity.dxf.center[0], dxf_entity.dxf.center[1])
-                    radius = dxf_entity.dxf.radius
-                    e = Entity(shape='CIRCLE', center=center, radius=radius)
-                elif shape == 'ARC':
-                    center = Point(dxf_entity.dxf.center[0], dxf_entity.dxf.center[1])
-                    radius = dxf_entity.dxf.radius
-                    start_angle = dxf_entity.dxf.start_angle % 360
-                    end_angle = dxf_entity.dxf.end_angle
-                    e = Entity(shape='ARC', center=center, radius=radius, start_angle=start_angle, end_angle=end_angle)
-                if e is not None:
-                    self.entity_list.append(e)
 
     def zoom(self, factor):
         self.hide_text_on_screen()
