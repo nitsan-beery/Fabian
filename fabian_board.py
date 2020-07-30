@@ -1831,14 +1831,12 @@ class FabianBoard(Board):
 
     # debug
     def print_elements(self, element_list):
-        print('elements:')
         for i in range(len(element_list)):
             e = element_list[i]
             print(f'{i+1}: {e.nodes}')
 
     # debug
     def print_nodes_exceptions(self, node_list):
-        print('Exception nodes:')
         for hash_index in node_list:
             n = self.get_node_index_from_hash(hash_index)
             print(f'{n}: {self.node_list[n].exceptions}')
@@ -1911,6 +1909,11 @@ class FabianBoard(Board):
 
     # element list with index of node_list (not hash)
     def create_net_element_list(self):
+        self.hide_all_elements()
+        element_list = []
+        exception_element_list = []
+        counter_r3_elements = 0
+        counter_r4_elements = 0
         self.set_nodes_attached_lines_and_exception()
         unattaced_list = self.get_unattached_nodes(False)
         if len(unattaced_list) > 0:
@@ -1922,10 +1925,6 @@ class FabianBoard(Board):
         #self.print_node_list()
         #self.print_line_list()
         #self.print_nodes_expected_elements()
-        element_list = []
-        exception_element_list = []
-        counter_r3_elements = 0
-        counter_r4_elements = 0
         # iterate all nodes
         for i in range(1, len(self.node_list)):
             node = self.node_list[i]
@@ -1948,8 +1947,11 @@ class FabianBoard(Board):
                     next_node_index = self.get_node_index_from_hash(next_node_hash_index)
                     if line is not None:
                         if not line.is_available:
+                            next_node_index = -1
                             break
                         line.is_available = False
+                    if next_node_index is None:
+                        break
                     if next_node_index == fist_node:
                         break
                     prev_node_hash_index = node_hash_index
@@ -2951,6 +2953,7 @@ class FabianBoard(Board):
         self.nodes_hash = {'0': 0}
         self.next_node_hash_index = 1
         self.net_line_list = []
+        self.element_list = []
 
     def mark_part(self, i, part_type, color=gv.mark_rect_color):
         self.selected_part = SelectedPart(index=i, part_type=part_type)
