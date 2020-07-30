@@ -1451,61 +1451,30 @@ class FabianBoard(Board):
         node = self.node_list[n]
         node.exceptions = []
         num_lines = len(node.attached_lines)
-        lines_to_check = num_lines
-        start_line = 0
         if num_lines < 2:
             node.exceptions.append(gv.unattached)
             node.expected_elements = 0
             node.exceptions.append(gv.unattached)
             return
-        num_outer_lines = 0
-        num_inner_lines = 0
+        num_border_lines = 0
         for al in node.attached_lines:
-            if self.net_line_list[al.line_index].border_type == gv.line_border_type_outer:
-                num_outer_lines += 1
-            if self.net_line_list[al.line_index].border_type == gv.line_border_type_inner:
-                num_inner_lines += 1
-        if num_outer_lines + num_inner_lines == 0:
-            node.expected_elements = len(node.attached_lines)
-        elif num_outer_lines == 2 or num_inner_lines == 2:
-            node.expected_elements = len(node.attached_lines)-1
-            lines_to_check -= 1
-        else:
+            if al.border_type != gv.line_border_type_none:
+                num_border_lines += 1
+        node.expected_elements = len(node.attached_lines) - int(num_border_lines / 2)
+        if num_border_lines == 1 or num_border_lines == 3:
             # debug
-            #m = f'unexpected number of outer lines in set_node_expected_elements_and_exceptions'
-            #print(m)
+            m = f'unexpected number of border lines in set_node_expected_elements_and_exceptions node {n}'
+            print(m)
             return
-        if num_outer_lines == 2:
-            for i in range(len(node.attached_lines)):
-                if node.attached_lines[i].border_type == gv.line_border_type_outer:
-                    break
-            if not node.attached_lines[i].border_type == gv.line_border_type_outer:
-                #m = f"can't find the outer line in node: {n}"
-                #print(m)
-                return
-            # skeep angle between 2 outer lines
-            start_line = i
-            second_outer_line = node.attached_lines[i-1]
-            second_outer_line.is_available = False
-        if num_inner_lines == 2:
-            for i in range(len(node.attached_lines)):
-                if node.attached_lines[i].border_type == gv.line_border_type_inner:
-                    break
-            if not node.attached_lines[i].border_type == gv.line_border_type_inner:
-                #m = f"can't find the outer line in node: {n}"
-                #print(m)
-                return
-            # skeep angle between 2 inner lines
-            '''
-            check and fix me!!!
-            '''
-            start_line = (i+1) % num_lines
-        prev_line = node.attached_lines[start_line]
+        prev_line = node.attached_lines[0]
         angle = prev_line.angle_to_second_node
-        for i in range(lines_to_check):
+        for i in range(num_lines):
             prev_angle = angle
-            line = node.attached_lines[(i+start_line+1) % num_lines]
+            line = node.attached_lines[(i+1) % num_lines]
             angle = line.angle_to_second_node
+            if not prev_line.is_available:
+                prev_line = line
+                continue
             if angle < prev_angle:
                 angle += 360
             diff_angle = round(angle - prev_angle, gv.accuracy)
@@ -1635,6 +1604,14 @@ class FabianBoard(Board):
             alfa = line.angle_to_second_node
             next_node_index = self.get_node_index_from_hash(next_node_hash_index)
             nodes_outer_list.append(next_node_index)
+        # mark relevant attached lines as unavailale
+        for node_index in nodes_outer_list:
+            node = self.node_list[node_index]
+            for al in node.attached_lines:
+                net_line = self.net_line_list[al.line_index]
+                if net_line.border_type == gv.line_border_type_outer and al.border_type != gv.line_border_type_outer:
+                    al.is_available = False
+                    al.border_type = gv.line_border_type_outer
         # debug
         #print(f'outer line: {nodes_outer_list}')
         inner_border_nodes = []
@@ -1674,48 +1651,48 @@ class FabianBoard(Board):
                 lowest_node_index = self.get_node_index_from_hash(lowest_hash)
         # set lowest nodes attached line
         lowest_node = self.node_list[lowest_node_index]
-        inner_attached_line = 0
+        inner_attached_line = -1
         lowest_angle = 359
         for i in range(len(lowest_node.attached_lines)):
             al = lowest_node.attached_lines[i]
+            if self.net_line_list[al.line_index].border_type != gv.line_border_type_inner:
+                continue
             if al.angle_to_second_node < lowest_angle:
                 inner_attached_line = i
                 lowest_angle = al.angle_to_second_node
                 next_inner_node = al.second_node
+        if inner_attached_line < 0:
+            print(f"can't find inner line in lowest inner node")
+            return None
         lowest_node.attached_lines[inner_attached_line].border_type = gv.line_border_type_inner
         lowest_node.attached_lines[inner_attached_line].is_available = False
         inner_border_nodes.pop(lowest_index)
+        removed_nodes = [lowest_node_index]
         while next_inner_node is not None and len(inner_border_nodes) > 0:
             node_index = self.get_node_index_from_hash(next_inner_node)
             node = self.node_list[node_index]
             inner_border_nodes.remove(next_inner_node)
+            removed_nodes.append(node_index)
             next_inner_node = None
             for i in range(len(node.attached_lines)):
                 al = node.attached_lines[i]
                 if al.second_node in inner_border_nodes:
-                    net_line_index = self.get_index_of_line_with_nodes(node.hash_index, al.second_node)
-                    if net_line_index is None:
-                        #debug
-                        print(f'attached line between {node.hash_index} and {al.second_node} no match net line')
+                    net_line = self.net_line_list[al.line_index]
+                    if net_line.border_type != gv.line_border_type_inner:
                         continue
-                    else:
-                        net_line = self.net_line_list[net_line_index]
-                        if net_line.border_type != gv.line_border_type_inner:
-                            continue
                     al.is_available = False
                     al.border_type = gv.line_border_type_inner
                     next_inner_node = al.second_node
                     break
-        return inner_border_nodes
+        # mark relevant attached lines as unavailale
+        for node_index in removed_nodes:
+            node = self.node_list[node_index]
+            for al in node.attached_lines:
+                net_line = self.net_line_list[al.line_index]
+                if net_line.border_type == gv.line_border_type_inner and al.border_type != gv.line_border_type_inner:
+                    al.border_type = gv.line_border_type_inner
 
-    def get_index_of_line_with_nodes(self, node_hash_1, node_hash_2):
-        for i in range(len(self.net_line_list)):
-            line = self.net_line_list[i]
-            if line.start_node == node_hash_1 and line.end_node == node_hash_2:
-                return i
-            if line.start_node == node_hash_2 and line.end_node == node_hash_1:
-                return i
-        return None
+        return inner_border_nodes
 
     # return list of unattached nodes with real index in list (not hash_index)
     def get_unattached_nodes(self, set_nodes_lines=True):
