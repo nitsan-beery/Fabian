@@ -2010,7 +2010,9 @@ class FabianBoard(Board):
                         exception_element_list.append(element)
                     #node.attached_lines[j].is_available = False
             if node.expected_elements > 0:
-                node.exceptions.append(gv.expected_elements_not_complete)
+                pass
+                # optional
+                # node.exceptions.append(gv.expected_elements_not_complete)
             for al in node.attached_lines:
                 al.is_available = False
             #self.node_list[i].attached_lines = []
