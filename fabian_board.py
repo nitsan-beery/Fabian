@@ -536,6 +536,7 @@ class FabianBoard(Board):
         if mode == gv.work_mode_dxf:
             if self.work_mode == gv.work_mode_dxf:
                 return
+            self.reset_net()
             self.show_nodes = False
             self.show_net = False
             self.clear_corner_list(False)
@@ -543,6 +544,7 @@ class FabianBoard(Board):
             self.show_entities = True
             self.change_select_parts_mode(gv.part_type_entity)
             self.set_all_entities_color(gv.default_entity_color)
+            self.center_view(True)
         elif mode == gv.work_mode_inp:
             if self.work_mode == gv.work_mode_inp:
                 return
@@ -2028,28 +2030,36 @@ class FabianBoard(Board):
                 pass
                 # optional
                 # print('no duplicated entities')
-            self.center_view(True)
+            # enable the change work mode to operate
+            self.work_mode = gv.work_mode_inp
             self.change_work_mode(gv.work_mode_dxf)
         elif filetype == 'json':
             state = arg
             self.state.append(state)
             self.resume_state()
+            self.window_main.update()
+            self.center_view()
+            self.set_accuracy()
+            self.update_view()
         elif filetype == 'inp':
-            self.reset_net()
             if self.work_mode != gv.work_mode_dxf:
                 return
             node_list = arg[0]
             net_line_list = arg[1]
-            for node in node_list:
-                self.add_node_to_node_list(node)
+            if len(net_line_list) > 0:
+                self.keep_state()
+            node_hash_index_list = {"0": 0}
+            for i in range(len(node_list)):
+                node = node_list[i]
+                node_hash_index = self.add_node_to_node_list(node)
+                node_hash_index_list[str(i+1)] = node_hash_index
             for net_line in net_line_list:
-                self.add_line_to_net_list_by_line(net_line)
+                start_node = node_hash_index_list.get(str(net_line.start_node))
+                end_node = node_hash_index_list.get(str(net_line.end_node))
+                self.add_line_to_net_list_by_nodes(start_node, end_node)
             self.show_net = True
             self.show_nodes = False
-        self.window_main.update()
-        self.center_view()
-        self.set_accuracy()
-        self.update_view()
+            self.update_view()
         # debug
         #self.print_node_list()
         #self.print_line_list()
@@ -2931,3 +2941,4 @@ class FabianBoard(Board):
             self.show_all_net_lines()            
         if self.show_corners:
             self.show_all_corners()
+        self.window_main.update()
