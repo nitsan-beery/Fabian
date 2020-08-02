@@ -167,7 +167,8 @@ class Node(Part):
 
 
 class NetLine(Part):
-    def __init__(self, start_node=None, end_node=None, entity=None, color=gv.net_line_color, border_type=gv.line_border_type_none):
+    def __init__(self, start_node=None, end_node=None, entity=None, color=gv.net_line_color,
+                 border_type=gv.line_border_type_none):
         super().__init__(color)
         self.start_node = start_node
         self.end_node = end_node
@@ -218,7 +219,8 @@ class Element(Part):
 
 
 class AttachedLine:
-    def __init__(self, line_index=None, second_node=0, angle_to_second_node=0, border_type=gv.line_border_type_none, is_available=True):
+    def __init__(self, line_index=None, second_node=0, angle_to_second_node=0, border_type=gv.line_border_type_none,
+                 is_available=True):
         self.line_index = line_index
         self.second_node = second_node
         self.angle_to_second_node = angle_to_second_node
@@ -235,7 +237,7 @@ class AttachedLine:
         self.line_index = t[0]
         self.second_node = t[1]
         self.angle_to_second_node = t[2]
-        self.is_outer_line = t[3]
+        self.border_type = t[3]
         self.is_available = t[4]
 
 
@@ -284,7 +286,8 @@ class FabianState:
         self.scale = None
 
 
-split_arc_and_line_choices_list = ['n parts evenly', 'graduate n parts', '2 different parts', 'graduate left right', '3 parts different middle part']
+split_arc_and_line_choices_list = ['n parts evenly', 'graduate n parts', '2 different parts', 'graduate left right',
+                                   '3 parts different middle part']
 
 split_arc_and_line_mode_dictionary = {
     split_arc_and_line_choices_list[0]: gv.split_mode_evenly_n_parts,
@@ -637,11 +640,11 @@ class SplitCircleDialog(object):
             print('choose a number bigger than 2 for #parts')
             return
         self.choice = {
+            'split_mode': split_mode,
             'angle': angle,
             'parts': parts
         }
         self.window.destroy()
-
 
     def show(self):
         self.window.deiconify()
@@ -651,5 +654,3 @@ class SplitCircleDialog(object):
     def key(self, event):
         if event.keycode == 13:
             self.get_choice()
-
-

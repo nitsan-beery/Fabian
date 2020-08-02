@@ -120,8 +120,8 @@ def save_data(parent, file_name, state):
         "winfo_geometry": winfo_geometry
     }
     # debug
-    #self.print_node_list()
-    #self.print_line_list()
+    # self.print_node_list()
+    # self.print_line_list()
     filename = save_json(parent, data, file_name=file_name)
     if filename is not None:
         i = filename.rfind('/')
@@ -151,9 +151,9 @@ def save_dxf(parent, file_name, entity_list):
 
 
 def load(parent):
-    filename = filedialog.askopenfilename(parent=parent, initialdir="./data files/",
-                                          title="Select file",
-                                          filetypes=(("Json files", "*.json"), ("DXF files", "*.dxf"), ("all files", "*.*")))
+    filename = filedialog.askopenfilename(parent=parent, initialdir="./data files/", title="Select file",
+                                          filetypes=(("Json files", "*.json"), ("DXF files", "*.dxf"),
+                                                     ("INP files", "*.inp"), ("all files", "*.*")))
     if filename == '':
         return None, None
     arg = None
@@ -191,6 +191,36 @@ def load(parent):
         winfo_geometry = data.get("winfo_geometry")
         parent.geometry(winfo_geometry)
         arg = state
+    elif filetype == 'inp':
+        f = open(filename, 'r')
+        node_list = []
+        net_line_list = []
+        line = ''
+        while line.lower() != '*node':
+            line = f.readline().strip('\n')
+        while line is not None:
+            line = f.readline().strip('\n')
+            if line[:8].lower() == '*element':
+                break
+            words = line.split(',')
+            x = float(words[1])
+            y = float(words[2])
+            p = Point(x, y)
+            node = Node(p)
+            node_list.append(node)
+        while line != '':
+            line = f.readline().strip('\n')
+            words = line.split(',')
+            if len(words) < 4:
+                continue
+            words.pop(0)
+            n = len(words)
+            for i in range(n):
+                start_node = int(words[i])
+                end_node = int(words[(i+1) % n])
+                net_line = NetLine(start_node, end_node)
+                net_line_list.append(net_line)
+        f.close()
+        arg = (node_list, net_line_list)
+
     return filetype, arg
-
-

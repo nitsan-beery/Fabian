@@ -1,4 +1,4 @@
-from file_handlng import *
+from file_handling import *
 
 
 class Board:
@@ -38,7 +38,6 @@ class Board:
 
         self.board.bind('<MouseWheel>', self.mouse_wheel)
         self.window_main.bind('<Key>', self.key)
-
 
     # scroll view to x, y in canvas coordinates
     def set_screen_position(self, x, y):
@@ -92,38 +91,38 @@ class Board:
             self.board.delete(self.text_on_screen)
             self.text_on_screen = None
 
-    #create line between Points() p1 and p2 with xy coordinates
+    # create line between Points() p1 and p2 with xy coordinates
     def draw_line(self, p1, p2, color=gv.default_color):
         x1, y1 = self.convert_xy_to_screen(p1.x, p1.y)
         x2, y2 = self.convert_xy_to_screen(p2.x, p2.y)
         return self.board.create_line(x1, y1, x2, y2, fill=color)
 
-    #create circle center = Point(x, y)
+    # create circle center = Point(x, y)
     def draw_circle(self, center, radius, outline_color=gv.default_color):
-        xLeft, yTop = self.convert_xy_to_screen(center.x-radius, center.y+radius)
-        xRight, yBottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
-        return self.board.create_oval(xLeft, yTop, xRight, yBottom, outline=outline_color)
+        x_left, y_top = self.convert_xy_to_screen(center.x-radius, center.y+radius)
+        x_right, y_bottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
+        return self.board.create_oval(x_left, y_top, x_right, y_bottom, outline=outline_color)
 
-    #create circle center = Point(x, y)
+    # create circle center = Point(x, y)
     def draw_square(self, center, length, outline_color=gv.default_color):
-        xLeft = center.x-length/2
-        xRight = center.x+length/2
-        yTop = center.y+length/2
-        yBottom = center.y-length/2
-        p1 = Point(xLeft, yTop)
-        p2 = Point(xRight, yTop)
-        p3 = Point(xRight, yBottom)
-        p4 = Point(xLeft, yBottom)
+        x_left = center.x-length/2
+        x_right = center.x+length/2
+        y_top = center.y+length/2
+        y_bottom = center.y-length/2
+        p1 = Point(x_left, y_top)
+        p2 = Point(x_right, y_top)
+        p3 = Point(x_right, y_bottom)
+        p4 = Point(x_left, y_bottom)
         return self.draw_polygon([p1, p2, p3, p4], fill_color='', outline=outline_color)
 
-    #create arc center = Point(x, y)
+    # create arc center = Point(x, y)
     def draw_arc(self, center, radius, start_angle, end_angle, outline_color=gv.default_color):
-        xLeft, yTop = self.convert_xy_to_screen(center.x-radius, center.y+radius)
-        xRight, yBottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
-        return self.board.create_arc(xLeft, yTop, xRight, yBottom, start=start_angle, extent=(end_angle-start_angle),
-                              style=tk.ARC, outline=outline_color)
+        x_left, y_top = self.convert_xy_to_screen(center.x-radius, center.y+radius)
+        x_right, y_bottom = self.convert_xy_to_screen(center.x+radius, center.y-radius)
+        return self.board.create_arc(x_left, y_top, x_right, y_bottom, start=start_angle,
+                                     extent=(end_angle-start_angle), style=tk.ARC, outline=outline_color)
 
-    #create polygon out of Point(x, y) list
+    # create polygon out of Point(x, y) list
     def draw_polygon(self, point_list, fill_color=gv.element_color, outline=gv.default_color):
         xy_list = []
         for p in point_list:
@@ -158,4 +157,3 @@ class Board:
             self.board.yview('scroll', -1, 'units')
         elif key.keycode == 40:
             self.board.yview('scroll', 1, 'units')
-

@@ -9,7 +9,7 @@ class Point:
         self.y = y
 
     def is_equal(self, p):
-        if p == None:
+        if p is None:
             return False
         return round(self.x, gv.accuracy) == round(p.x, gv.accuracy) and \
                round(self.y, gv.accuracy) == round(p.y, gv.accuracy)
@@ -48,13 +48,13 @@ class Point:
 
     def get_data_from_tuple(self, t):
         if len(t) < 2:
-            print(f"tuple doesn't match Point type: {t}")
+            print(f"tuple does not match Point type: {t}")
             return
         self.x = t[0]
         self.y = t[1]
 
     def get_distance_to_point(self, p):
-        return math.sqrt(pow(self.x-p.x, 2) + pow(self.y-p.y, 2))
+        return math.sqrt(pow(self.x - p.x, 2) + pow(self.y - p.y, 2))
 
     # return the angle vector to Point p (degrees), None if p == self
     def get_alfa_to(self, p):
@@ -86,6 +86,7 @@ class Point:
         mid_point.y = (self.y + p.y) / 2
         return mid_point
 
+
 # return new coordinates of Point p relative to Point new00 with rotation_angle
 def get_shifted_point(p, new00, rotation_angle):
     shifted_p = Point(p.x - new00.x, p.y - new00.y)
@@ -94,10 +95,11 @@ def get_shifted_point(p, new00, rotation_angle):
         return point_zero
     r = shifted_p.get_distance_to_point(point_zero)
     alfa = point_zero.get_alfa_to(shifted_p) + rotation_angle
-    alfa = alfa*math.pi/180
-    shifted_p.x = math.cos(alfa)*r
-    shifted_p.y = math.sin(alfa)*r
+    alfa = alfa * math.pi / 180
+    shifted_p.x = math.cos(alfa) * r
+    shifted_p.y = math.sin(alfa) * r
     return shifted_p
+
 
 # if sort by x return left --> right points. if left == right return bottom --> up
 # else: return bottom --> up. if bottom == up return left --> right
@@ -136,5 +138,3 @@ def sort_list_point_by_distance_from_p(point_list, p):
     for item in d_list:
         sorted_list.append(item[0])
     return sorted_list
-
-
