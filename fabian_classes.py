@@ -273,6 +273,7 @@ class FabianState:
         self.nodes_hash = {'0': 0}
         self.net_line_list = None
         self.element_list = None
+        self.merged_element_list = []
         self.corner_list = None
         self.mouse_select_mode = None
         self.work_mode = None

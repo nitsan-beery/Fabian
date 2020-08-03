@@ -56,7 +56,6 @@ class FabianBoard(Board):
         self.show_corners = True
         self.progress_bar = None
         self.state = []
-        self.keep_state()
 
         self.board.bind('<Motion>', self.motion)
         self.board.bind('<Button-1>', self.mouse_1_pressed)
@@ -119,6 +118,10 @@ class FabianBoard(Board):
             element = Element()
             element.get_data_from_tuple(t)
             self.element_list.append(element)
+        for t in state.merged_element_list:
+            element = Element()
+            element.get_data_from_tuple(t)
+            self.merged_element_list.append(element)
         for t in state.corner_list:
             corner = Corner()
             corner.get_data_from_tuple(t)
@@ -158,6 +161,10 @@ class FabianBoard(Board):
         for e in self.element_list:
             t = e.convert_into_tuple()
             element_list.append(t)
+        merged_element_list = []
+        for e in self.merged_element_list:
+            t = e.convert_into_tuple()
+            merged_element_list.append(t)
         corner_list = []
         for e in self.corner_list:
             t = e.convert_into_tuple()
@@ -166,6 +173,7 @@ class FabianBoard(Board):
         state.node_list = node_list
         state.net_line_list = net_list
         state.element_list = element_list
+        state.merged_element_list = merged_element_list
         state.corner_list = corner_list
         state.mouse_select_mode = self.mouse_select_mode
         state.work_mode = self.work_mode
@@ -288,7 +296,7 @@ class FabianBoard(Board):
                             new_element.nodes.append(n)
                         new_element_list.append(new_element)
                     self.add_inp_net(new_node_list, new_element_list)
-                    self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
+                    self.mouse_select_mode = gv.mouse_select_mode_edge
                 else:
                     print('choose reference point on INP net (white parts)')
                 self.remove_temp_line()
@@ -382,10 +390,6 @@ class FabianBoard(Board):
             select_part_menu.add_separator()
         select_part_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_edge))
         select_part_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_point))
-        if self.work_mode == gv.work_mode_dxf and len(self.net_line_list) > 0:
-            select_part_menu.add_command(label="Copy net",
-                                 command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_copy_net))
-
         select_part_menu.add_separator()
         select_part_menu.add_command(label="Quit")
         mark_option_menu = tk.Menu(self.board, tearoff=0)
@@ -451,8 +455,9 @@ class FabianBoard(Board):
                     menu.add_command(label="Delete NON marked entities", command=self.remove_non_marked_entities_from_list)
                 menu.add_separator()
                 if len(self.net_line_list) > 0:
-                    net_menu.add_command(label="Merge", command=self.merge_net)
-                    menu.add_cascade(label='Net', menu=net_menu)
+                    menu.add_command(label="Copy net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_copy_net))
+                    menu.add_command(label="Merge net", command=self.merge_net)
+                    menu.add_cascade(label='Show net', menu=net_menu)
                     menu.add_separator()
         elif self.work_mode == gv.work_mode_inp:
             mark_list = self.get_marked_parts(gv.part_list_net_lines)
@@ -563,26 +568,24 @@ class FabianBoard(Board):
             self.state.pop(-1)
 
     def change_work_mode(self, mode):
+        if mode == self.work_mode:
+            return
         if self.selected_part is not None:
             self.remove_selected_part_mark()
         self.remove_temp_line()
-        self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
+        self.keep_state()
+        self.mouse_select_mode = gv.mouse_select_mode_edge
         self.choose_mark_option(gv.mark_option_mark)
         if mode == gv.work_mode_dxf:
-            if self.work_mode == gv.work_mode_dxf:
-                return
             self.reset_net()
             self.show_nodes = False
             self.show_net = False
             self.clear_corner_list(False)
             self.show_elements = False
             self.show_entities = True
-            self.change_select_parts_mode(gv.part_type_entity)
+            self.select_parts_mode = gv.part_type_entity
             self.set_all_entities_color(gv.default_entity_color)
-            self.center_view(True)
         elif mode == gv.work_mode_inp:
-            if self.work_mode == gv.work_mode_inp:
-                return
             self.set_initial_net()
             tmp_list = self.get_unattached_nodes(True)
             if len(tmp_list) == 0:
@@ -594,21 +597,23 @@ class FabianBoard(Board):
             self.show_nodes = True
             self.show_net = True
             self.show_corners = True
-            self.change_select_parts_mode('all')
+            self.select_parts_mode = 'all'
             self.choose_mark_option('quit')
         self.work_mode = mode
         self.update_view()
 
     def change_mouse_selection_mode(self, mode):
         self.remove_temp_line()
-        self.mouse_select_mode = mode
+        if self.mouse_select_mode != mode:
+            self.mouse_select_mode = mode
         if mode == gv.mouse_select_mode_copy_net:
             self.select_parts_mode = gv.part_type_net_line
 
     def change_select_parts_mode(self, mode):
         self.remove_selected_part_mark()
-        self.select_parts_mode = mode
-        self.mouse_select_mode = gv.mouse_select_mode_edge
+        if mode != self.select_parts_mode:
+            self.select_parts_mode = mode
+            self.mouse_select_mode = gv.mouse_select_mode_edge
 
     def handle_corners(self, mode, arg=gv.corners_set_net_both):
         if mode == gv.handle_corners_mode_clear:
@@ -618,7 +623,7 @@ class FabianBoard(Board):
             changed = self.set_net_between_corners(arg)
             if changed:
                 self.clear_corner_list(by_menu=False)
-                self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
+                self.mouse_select_mode = gv.mouse_select_mode_edge
                 self.update_view()
             else:
                 self.state.pop(-1)
@@ -1935,10 +1940,13 @@ class FabianBoard(Board):
             n -= 1
 
     def merge_net(self):
-        self.element_list = self.merged_element_list
-        self.update_view()
+        if len(self.element_list) != len(self.merged_element_list):
+            self.keep_state()
+            self.element_list = self.merged_element_list
+            self.update_view()
 
     def set_net(self):
+        self.keep_state()
         self.create_net_element_list()
         self.show_elements = True
         self.show_net = True
@@ -2076,14 +2084,27 @@ class FabianBoard(Board):
         state = self.state[-1]
         self.state.pop(-1)
         x, y = self.get_screen_position()
-        screen_position = Point(x, y).convert_into_tuple()
         save_data(self.window_main, file_name, state)
 
     def load(self):
         filetype, arg = load(self.window_main)
         if filetype is None:
             return
-        self.board.delete('all')
+        if filetype == 'inp':
+            if self.work_mode != gv.work_mode_dxf:
+                return
+            node_list = arg[0]
+            element_list = arg[1]
+            if len(element_list) > 0:
+                self.keep_state()
+            self.add_inp_net(node_list, element_list)
+            self.element_list = element_list
+            self.show_net = True
+            self.show_elements = True
+            self.show_nodes = False
+            self.update_view()
+            return
+        self.reset_board()
         if filetype == 'dxf':
             self.entity_list = arg
             d_list = self.get_duplicated_entities()
@@ -2101,33 +2122,25 @@ class FabianBoard(Board):
             # enable the change work mode to operate
             self.work_mode = gv.work_mode_inp
             self.change_work_mode(gv.work_mode_dxf)
+            self.center_view(True)
+            self.update_view()
+            self.state = []
         elif filetype == 'json':
             state = arg
             self.state.append(state)
             self.resume_state()
-            self.merged_element_list = self.element_list
             self.window_main.update()
             self.center_view()
             self.set_accuracy()
-            self.update_view()
-        elif filetype == 'inp':
-            if self.work_mode != gv.work_mode_dxf:
-                return
-            node_list = arg[0]
-            element_list = arg[1]
-            if len(element_list) > 0:
-                self.keep_state()
-            self.add_inp_net(node_list, element_list)
-            self.element_list = element_list
-            self.show_net = True
-            self.show_elements = True
-            self.show_nodes = False
             self.update_view()
         # debug
         #self.print_node_list()
         #self.print_line_list()
 
     def add_inp_net(self, node_list, element_list):
+        c = len(self.element_list)
+        self.show_text_on_screen('creating net elements')
+        self.show_progress_bar(c)
         node_hash_index_list = {"0": 0}
         for i in range(len(node_list)):
             node = node_list[i]
@@ -2139,9 +2152,14 @@ class FabianBoard(Board):
             element_nodes[0] = node_hash_index_list.get(str(element_nodes[0]))
             for i in range(1, n):
                 element_nodes[i] = node_hash_index_list.get(str(element_nodes[i]))
-                self.add_line_to_net_list_by_nodes(element_nodes[i - 1], element_nodes[i])
-            self.add_line_to_net_list_by_nodes(element_nodes[i], element_nodes[0])
+                self.add_line_to_net_list_by_nodes(element_nodes[i - 1], element_nodes[i], show_new_line=False)
+            self.add_line_to_net_list_by_nodes(element_nodes[-1], element_nodes[0], show_new_line=False)
             self.merged_element_list.append(element)
+            self.progress_bar['value'] += 1
+            self.frame_1.update_idletasks()
+        self.hide_text_on_screen()
+        self.hide_progress_bar()
+        self.update_view()
 
     def set_scale(self, left, right):
         object_width = right - left
@@ -2499,27 +2517,28 @@ class FabianBoard(Board):
                 return True
         return False
 
-    def add_line_to_net_list_by_line(self, net_line):
+    def add_line_to_net_list_by_line(self, net_line, show_new_line=True):
         if not self.is_line_in_net_line_list(net_line):
             self.net_line_list.append(net_line)
-            self.show_net_line(-1)
+            if show_new_line:
+                self.show_net_line(-1)
 
-    def add_line_to_net_list_by_nodes(self, start_hash_node, end_hash_node, entity=None):
+    def add_line_to_net_list_by_nodes(self, start_hash_node, end_hash_node, entity=None, show_new_line=True):
         if start_hash_node == end_hash_node:
             # debug
             print(f'trying to add line by nodes with start_hash_node = end_hash_node {end_hash_node}')
             return
         line = NetLine(start_hash_node, end_hash_node, entity)
-        self.add_line_to_net_list_by_line(line)
+        self.add_line_to_net_list_by_line(line, show_new_line)
 
-    def add_line_to_net_list_by_points(self, p1, p2, entity=None):
+    def add_line_to_net_list_by_points(self, p1, p2, entity=None, show_new_line=True):
         if p1 == p2:
             # debug
             print(f'trying to add line by points with p1 = p2 ({p1.x}, {p1.y})')
             return
         start_hash_node = self.add_node_to_node_list(Node(p1))
         end_hash_node = self.add_node_to_node_list(Node(p2))
-        line = NetLine(start_hash_node, end_hash_node, entity)
+        line = NetLine(start_hash_node, end_hash_node, entity, show_new_line)
         self.add_line_to_net_list_by_line(line)
 
     def is_line_in_net_line_list(self, line):
