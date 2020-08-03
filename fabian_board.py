@@ -457,7 +457,7 @@ class FabianBoard(Board):
                 if len(self.net_line_list) > 0:
                     menu.add_command(label="Copy net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_copy_net))
                     menu.add_command(label="Merge net", command=self.merge_net)
-                    menu.add_cascade(label='Show net', menu=net_menu)
+                    menu.add_cascade(label='Show / Hide', menu=net_menu)
                     menu.add_separator()
         elif self.work_mode == gv.work_mode_inp:
             mark_list = self.get_marked_parts(gv.part_list_net_lines)
@@ -2138,14 +2138,22 @@ class FabianBoard(Board):
         #self.print_line_list()
 
     def add_inp_net(self, node_list, element_list):
-        c = len(self.element_list)
-        self.show_text_on_screen('creating net elements')
+        self.hide_all_elements(False)
+        c = len(node_list)
+        self.show_text_on_screen('adding nodes')
         self.show_progress_bar(c)
         node_hash_index_list = {"0": 0}
         for i in range(len(node_list)):
             node = node_list[i]
             node_hash_index = self.add_node_to_node_list(node)
             node_hash_index_list[str(i + 1)] = node_hash_index
+            self.progress_bar['value'] += 1
+            self.frame_1.update_idletasks()
+        self.hide_text_on_screen()
+        self.hide_progress_bar()
+        c = len(element_list)
+        self.show_text_on_screen('creating net elements')
+        self.show_progress_bar(c)
         for element in element_list:
             element_nodes = element.nodes
             n = len(element_nodes)
@@ -2538,8 +2546,8 @@ class FabianBoard(Board):
             return
         start_hash_node = self.add_node_to_node_list(Node(p1))
         end_hash_node = self.add_node_to_node_list(Node(p2))
-        line = NetLine(start_hash_node, end_hash_node, entity, show_new_line)
-        self.add_line_to_net_list_by_line(line)
+        line = NetLine(start_hash_node, end_hash_node, entity)
+        self.add_line_to_net_list_by_line(line, show_new_line)
 
     def is_line_in_net_line_list(self, line):
         if line.start_node is None or line.end_node is None:
