@@ -194,7 +194,7 @@ def load(parent):
     elif filetype == 'inp':
         f = open(filename, 'r')
         node_list = []
-        net_line_list = []
+        element_list = []
         line = ''
         while line.lower() != '*node':
             line = f.readline().strip('\n')
@@ -215,12 +215,12 @@ def load(parent):
                 continue
             words.pop(0)
             n = len(words)
+            element = Element()
             for i in range(n):
-                start_node = int(words[i])
-                end_node = int(words[(i+1) % n])
-                net_line = NetLine(start_node, end_node)
-                net_line_list.append(net_line)
+                node = int(words[i])
+                element.nodes.append(node)
+            element_list.append(element)
         f.close()
-        arg = (node_list, net_line_list)
+        arg = (node_list, element_list)
 
     return filetype, arg
