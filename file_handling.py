@@ -48,6 +48,8 @@ def convert_doc_to_entity_list(doc=None):
                 start_angle = dxf_entity.dxf.start_angle % 360
                 end_angle = dxf_entity.dxf.end_angle
                 e = Entity(shape='ARC', center=center, radius=radius, start_angle=start_angle, end_angle=end_angle)
+            else:
+                print(f"unknown shape '{shape}' in DXF file")
             if e is not None:
                 entity_list.append(e)
     return entity_list

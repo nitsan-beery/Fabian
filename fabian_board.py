@@ -240,7 +240,7 @@ class FabianBoard(Board):
             self.new_line_edge[0] = p
             self.new_line_edge_mark[0] = self.draw_circle(p, gv.edge_line_mark_radius/self.scale)
             self.new_line_original_part[0] = self.selected_part
-            if self.mouse_select_mode == gv.mouse_select_mode_copy_net:
+            if self.mouse_select_mode == gv.mouse_select_mode_copy_net or self.mouse_select_mode == gv.mouse_select_mode_move_net:
                 self.select_parts_mode = gv.part_type_entity
             return
         # remove selection of first point
@@ -273,7 +273,7 @@ class FabianBoard(Board):
         else:
             self.board.delete(self.temp_line_mark)
             #  copy net
-            if self.mouse_select_mode == gv.mouse_select_mode_copy_net:
+            if self.mouse_select_mode == gv.mouse_select_mode_copy_net or self.mouse_select_mode == gv.mouse_select_mode_move_net:
                 inp_node_list = self.get_nodes_in_element_list()
                 reference_node = self.get_hash_index_of_node_with_point(self.new_line_edge[0])
                 if reference_node in inp_node_list:
@@ -295,6 +295,8 @@ class FabianBoard(Board):
                             n = tmp_hash.get(str(node))
                             new_element.nodes.append(n)
                         new_element_list.append(new_element)
+                    if self.mouse_select_mode == gv.mouse_select_mode_move_net:
+                        self.reset_net()
                     self.add_inp_net(new_node_list, new_element_list)
                     self.mouse_select_mode = gv.mouse_select_mode_edge
                 else:
@@ -456,6 +458,7 @@ class FabianBoard(Board):
                 menu.add_separator()
                 if len(self.net_line_list) > 0:
                     menu.add_command(label="Copy net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_copy_net))
+                    menu.add_command(label="Move net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_move_net))
                     menu.add_command(label="Merge net", command=self.merge_net)
                     menu.add_cascade(label='Show / Hide', menu=net_menu)
                     menu.add_separator()
@@ -606,7 +609,7 @@ class FabianBoard(Board):
         self.remove_temp_line()
         if self.mouse_select_mode != mode:
             self.mouse_select_mode = mode
-        if mode == gv.mouse_select_mode_copy_net:
+        if mode == gv.mouse_select_mode_copy_net or mode == gv.mouse_select_mode_move_net:
             self.select_parts_mode = gv.part_type_net_line
 
     def change_select_parts_mode(self, mode):
