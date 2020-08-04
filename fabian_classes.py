@@ -1,4 +1,5 @@
 from point import *
+from general_functions import *
 import tkinter as tk
 from tkinter import ttk
 
@@ -10,6 +11,79 @@ class Part:
         self.is_marked = False
         self.board_part = None
         self.color = color
+
+
+class InpNet:
+    def __init__(self):
+        self.node_list = []
+        self.elements = []
+        self.lines = []
+
+    def reset(self):
+        self.node_list = []
+        self.lines = []
+        self.elements = []
+
+    def set_lines(self):
+        for element in self.elements:
+            element_nodes = element.nodes
+            n = len(element_nodes)
+            for i in range(n):
+                line = NetLine(element_nodes[i]-1, element_nodes[(i + 1) % n]-1, color=gv.inp_line_color)
+                if not is_line_in_net_line_list(line, self.lines):
+                    self.lines.append(line)
+
+    def set_net(self, node_list, element_list):
+        self.node_list = node_list
+        self.elements = element_list
+        self.set_lines()
+
+    def get_shifted_net(self, diff_x, diff_y):
+        new_inp_net = InpNet()
+        for node in self.node_list:
+            p = Point(node.p.x + diff_x, node.p.y + diff_y)
+            new_node = Node(p)
+            new_inp_net.node_list.append(new_node)
+        new_inp_net.elements = self.elements.copy()
+        new_inp_net.lines = self.lines.copy()
+        return new_inp_net
+
+    def convert_into_tuple(self):
+        node_list = []
+        lines = []
+        elements = []
+        for node in self.node_list:
+            t = node.convert_into_tuple()
+            node_list.append(t)
+        for line in self.lines:
+            t = line.convert_into_tuple()
+            lines.append(t)
+        for element in self.elements:
+            t = element.convert_into_tuple()
+            elements.append(t)
+        t = (node_list.copy(), lines.copy(), elements.copy())
+        return t
+
+    def get_data_from_tuple(self, t):
+        if len(t) < 3:
+            print(f"tuple doesn't match InpNet type: {t}")
+            return
+        self.reset()
+        node_list = t[0]
+        lines = t[1]
+        elements = t[2]
+        for t in node_list:
+            node = Node()
+            node.get_data_from_tuple(t)
+            self.node_list.append(node)
+        for t in lines:
+            line = NetLine()
+            line.get_data_from_tuple(t)
+            self.lines.append(line)
+        for t in elements:
+            element = Element()
+            element.get_data_from_tuple(t)
+            self.elements.append(element)
 
 
 class Entity(Part):
@@ -148,7 +222,7 @@ class Node(Part):
         attached_lines = []
         for al in self.attached_lines:
             attached_lines.append(al.convert_into_tuple())
-        t = (self.p.convert_into_tuple(), self.hash_index, self.is_on_entity, attached_lines)
+        t = (self.p.convert_into_tuple(), self.hash_index, self.is_on_entity, attached_lines.copy())
         return t
 
     def get_data_from_tuple(self, t):
@@ -208,7 +282,7 @@ class Element(Part):
         self.nodes = []
 
     def convert_into_tuple(self):
-        t = (self.nodes, self.color)
+        t = (self.nodes.copy(), self.color)
         return t
 
     def get_data_from_tuple(self, t):
@@ -216,6 +290,13 @@ class Element(Part):
             print(f"tuple doesn't match Element type: {t}")
         self.nodes = t[0]
         self.color = t[1]
+
+
+def get_shifted_element(reference_element, shift_value):
+    shifted_element = Element()
+    for node in reference_element.nodes:
+        shifted_element.nodes.append(node + shift_value)
+    return shifted_element
 
 
 class AttachedLine:
@@ -273,8 +354,8 @@ class FabianState:
         self.nodes_hash = {'0': 0}
         self.net_line_list = None
         self.element_list = None
-        self.merged_element_list = []
         self.corner_list = None
+        self.inp_nets = None
         self.mouse_select_mode = None
         self.work_mode = None
         self.select_parts_mode = None
@@ -284,6 +365,7 @@ class FabianState:
         self.show_node_number = gv.default_show_node_number
         self.show_net = True
         self.show_corners = True
+        self.show_inps = True
         self.scale = None
 
 

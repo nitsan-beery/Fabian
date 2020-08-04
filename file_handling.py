@@ -109,6 +109,7 @@ def save_data(parent, file_name, state):
         "net_line_list": state.net_line_list,
         "element_list": state.element_list,
         "corner_list": state.corner_list,
+        "inp_nets": state.inp_nets,
         "mouse_select_mode": state.mouse_select_mode,
         "work_mode": state.work_mode,
         "select_parts_mode": state.select_parts_mode,
@@ -118,6 +119,7 @@ def save_data(parent, file_name, state):
         "show_node_number": state.show_node_number,
         "show_net": state.show_net,
         "show_corners": state.show_corners,
+        "show_inps": state.show_inps,
         "scale": state.scale,
         "winfo_geometry": winfo_geometry
     }
@@ -180,6 +182,7 @@ def load(parent):
         state.net_line_list = data.get("net_line_list")
         state.element_list = data.get("element_list")
         state.corner_list = data.get("corner_list")
+        state.inp_nets = data.get("inp_nets")
         state.mouse_select_mode = data.get("mouse_select_mode")
         state.work_mode = data.get("work_mode")
         state.select_parts_mode = data.get("select_parts_mode")
@@ -189,6 +192,7 @@ def load(parent):
         state.show_node_number = data.get("show_node_number")
         state.show_net = data.get("show_net")
         state.show_corners = data.get("show_corners")
+        state.show_inps = data.get("show_inps")
         state.scale = data.get("scale")
         winfo_geometry = data.get("winfo_geometry")
         parent.geometry(winfo_geometry)
