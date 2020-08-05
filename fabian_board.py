@@ -2102,8 +2102,6 @@ class FabianBoard(Board):
         if filetype is None:
             return
         if filetype == 'inp':
-            if self.work_mode != gv.work_mode_dxf:
-                return
             node_list = arg[0]
             element_list = arg[1]
             if len(element_list) > 0:
@@ -2162,11 +2160,11 @@ class FabianBoard(Board):
         self.add_inp_net(merged_node_list, merged_elements)
 
     def add_inp_net(self, node_list, element_list):
-        self.show_net = False
-        self.show_inps = False
-        self.show_elements = False
         new_inp = InpNet()
         if self.work_mode == gv.work_mode_dxf:
+            self.show_net = False
+            self.show_inps = False
+            self.show_elements = False
             self.reset_net(keep_state=False)
             c = len(node_list)
             self.show_text_on_screen('adding nodes')
