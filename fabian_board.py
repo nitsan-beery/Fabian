@@ -1870,6 +1870,8 @@ class FabianBoard(Board):
         self.show_progress_bar(c)
         for i in range(c):
             e = self.entity_list[i]
+            if e.shape == 'CIRCLE':
+                continue
             self.set_entity_edge_nodes(i)
             start_node = e.nodes_list[0]
             end_node = e.nodes_list[1]

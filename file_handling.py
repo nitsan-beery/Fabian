@@ -165,7 +165,8 @@ def load(parent):
     filetype = filename[i+1:].lower()
     i = filename.rfind('/')
     title = filename[i+1:]
-    parent.title(title)
+    if filetype != 'inp':
+        parent.title(title)
     if filetype == 'dxf':
         doc = ezdxf.readfile(filename)
         entity_list = convert_doc_to_entity_list(doc)
