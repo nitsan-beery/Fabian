@@ -24,19 +24,15 @@ class InpNet:
         self.lines = []
         self.elements = []
 
-    def set_lines(self):
-        for element in self.elements:
-            element_nodes = element.nodes
-            n = len(element_nodes)
-            for i in range(n):
-                line = NetLine(element_nodes[i]-1, element_nodes[(i + 1) % n]-1, color=gv.inp_line_color)
-                if not is_line_in_net_line_list(line, self.lines):
-                    self.lines.append(line)
-
-    def set_net(self, node_list, element_list):
+    def set_nodes_and_elements(self, node_list, element_list):
         self.node_list = node_list
         self.elements = element_list
-        self.set_lines()
+
+    def get_total_nodes(self):
+        counter = 0
+        for element in self.elements:
+            counter += len(element.nodes)
+        return counter
 
     def get_shifted_net(self, diff_x, diff_y):
         new_inp_net = InpNet()

@@ -456,7 +456,7 @@ class FabianBoard(Board):
                     menu.add_command(label="Copy net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_copy_net))
                     menu.add_command(label="Move net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_move_net))
                     menu.add_command(label="Merge net", command=self.merge_inp_nets)
-                    menu.add_cascade(label='Show / Hide', menu=show_inp_menu)
+                    menu.add_cascade(label='INP net', menu=show_inp_menu)
                     menu.add_separator()
         elif self.work_mode == gv.work_mode_inp:
             mark_list = self.get_marked_parts(gv.part_list_net_lines)
@@ -474,8 +474,8 @@ class FabianBoard(Board):
             if len(self.corner_list) == 4:
                 set_corner_net_menu = tk.Menu(menu, tearoff=0)
                 set_corner_net_menu.add_command(label="Both sides (1 -> 4 first)", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_both))
-                set_corner_net_menu.add_command(label="1 -> 4      2 -> 3", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_left_right))
-                set_corner_net_menu.add_command(label="1 -> 2      4 -> 3", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_bottom_top))
+                set_corner_net_menu.add_command(label="1 -> 4", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_left_right))
+                set_corner_net_menu.add_command(label="1 -> 2", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_bottom_top))
                 menu.add_cascade(label="Set net between corners", menu=set_corner_net_menu)
             else:
                 menu.add_command(label="Set Corners", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
@@ -2191,12 +2191,12 @@ class FabianBoard(Board):
                 self.add_line_to_net_list_by_nodes(element_nodes[-1], element_nodes[0], show_new_line=False)
                 self.progress_bar['value'] += 1
                 self.frame_1.update_idletasks()
-            self.element_list = element_list
-            node_list = self.node_list[1:]
-            new_inp.set_net(node_list.copy(), element_list.copy())
-            self.inp_nets.append(new_inp)
             self.hide_text_on_screen()
             self.hide_progress_bar()
+            self.element_list = element_list
+            node_list = self.node_list[1:]
+            self.set_inp_net(new_inp, node_list, element_list)
+            self.inp_nets.append(new_inp)
             self.show_net = True
             self.show_elements = True
             self.show_inps = True
@@ -2204,9 +2204,26 @@ class FabianBoard(Board):
         # inp mode
         else:
             pass
-            new_inp.set_net(node_list.copy(), element_list.copy())
+            self.set_inp_net(new_inp, node_list, element_list)
             self.inp_nets.append(new_inp)
             self.show_inp(-1)
+
+    def set_inp_net(self, inp_net, node_list, element_list):
+        inp_net.set_nodes_and_elements(node_list.copy(), element_list.copy())
+        c = inp_net.get_total_nodes()
+        self.show_text_on_screen('setting inp net')
+        self.show_progress_bar(c)
+        for element in inp_net.elements:
+            element_nodes = element.nodes
+            n = len(element_nodes)
+            for i in range(n):
+                line = NetLine(element_nodes[i]-1, element_nodes[(i + 1) % n]-1, color=gv.inp_line_color)
+                if not is_line_in_net_line_list(line, inp_net.lines):
+                    inp_net.lines.append(line)
+                self.progress_bar['value'] += 1
+                self.frame_1.update_idletasks()
+        self.hide_text_on_screen()
+        self.hide_progress_bar()
 
     def set_scale(self, left, right):
         object_width = right - left
