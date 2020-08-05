@@ -276,7 +276,8 @@ class FabianBoard(Board):
         else:
             self.board.delete(self.temp_line_mark)
             #  copy or move net
-            if self.mouse_select_mode == gv.mouse_select_mode_copy_net or self.mouse_select_mode == gv.mouse_select_mode_move_net:
+            if self.mouse_select_mode == gv.mouse_select_mode_copy_net or \
+                    self.mouse_select_mode == gv.mouse_select_mode_move_net or self.mouse_select_mode == gv.mouse_select_mode_turn_net:
                 if len(self.inp_nets) < 1:
                     self.remove_temp_line()
                     return
@@ -289,8 +290,13 @@ class FabianBoard(Board):
                     new_inp_net = InpNet()
                     new_inp_net.node_list = self.inp_nets[-1].node_list.copy()
                     new_inp_net.elements = self.inp_nets[-1].elements.copy()
-                    new_inp_net = new_inp_net.get_shifted_net(diff_x, diff_y)
-                    if self.mouse_select_mode == gv.mouse_select_mode_move_net:
+                    if self.mouse_select_mode == gv.mouse_select_mode_turn_net:
+                        new_inp_net = new_inp_net.get_turned_net(self.new_line_edge[0], p)
+                        self.select_parts_mode = gv.part_type_entity
+                    # copy or move
+                    else:
+                        new_inp_net = new_inp_net.get_shifted_net(diff_x, diff_y)
+                    if self.mouse_select_mode != gv.mouse_select_mode_copy_net:
                         self.hide_inp(-1)
                         self.inp_nets.pop(-1)
                     self.add_inp_net(new_inp_net.node_list, new_inp_net.elements)
@@ -455,6 +461,7 @@ class FabianBoard(Board):
                 if len(self.net_line_list) > 0:
                     menu.add_command(label="Copy net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_copy_net))
                     menu.add_command(label="Move net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_move_net))
+                    menu.add_command(label="Turn net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_turn_net))
                     menu.add_command(label="Merge net", command=self.merge_inp_nets)
                     menu.add_cascade(label='INP net', menu=show_inp_menu)
                     menu.add_separator()
@@ -631,7 +638,7 @@ class FabianBoard(Board):
         self.remove_temp_line()
         if self.mouse_select_mode != mode:
             self.mouse_select_mode = mode
-        if mode == gv.mouse_select_mode_copy_net or mode == gv.mouse_select_mode_move_net:
+        if mode == gv.mouse_select_mode_copy_net or mode == gv.mouse_select_mode_move_net or mode == gv.mouse_select_mode_turn_net:
             self.select_parts_mode = gv.part_type_net_line
 
     def change_select_parts_mode(self, mode):
@@ -1369,7 +1376,9 @@ class FabianBoard(Board):
                 net_lines_list.append((i, hash_node, p))
         return net_lines_list
 
-    # return mutual point of self.net_line_list[net_line] with crossing line p1-p2, None if there isn't
+    # return
+    # first parameter: mutual point of self.net_line_list[net_line] with crossing line p1-p2, None if there isn't
+    # second parameter: existing node with mutual point, None if there isn't
     def get_mutual_point_of_net_line_with_crossing_line(self, net_line, p1, p2):
         net_line = self.net_line_list[net_line]
         start_node_index = get_index_from_hash(self.nodes_hash, net_line.start_node)

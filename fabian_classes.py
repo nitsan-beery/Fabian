@@ -44,6 +44,23 @@ class InpNet:
         new_inp_net.lines = self.lines.copy()
         return new_inp_net
 
+    def get_turned_net(self, p1, p2):
+        if p1 == p2:
+            return self
+        new_inp_net = InpNet()
+        angle = p1.get_alfa_to(p2)
+        for node in self.node_list:
+            p = get_shifted_point(node.p, p1, -angle)
+            p.y = -p.y
+            p = get_shifted_point(p, Point(0, 0), angle)
+            p.x += p1.x
+            p.y += p1.y
+            new_node = Node(p)
+            new_inp_net.node_list.append(new_node)
+        new_inp_net.elements = self.elements.copy()
+        new_inp_net.lines = self.lines.copy()
+        return new_inp_net
+
     def convert_into_tuple(self):
         node_list = []
         lines = []
