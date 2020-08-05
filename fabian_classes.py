@@ -13,16 +13,19 @@ class Part:
         self.color = color
 
 
+class InpRotationPoint(Part):
+    def __init__(self, reference_point=None, color=gv.inp_rotation_point_color):
+        super().__init__(color)
+        self.reference_point = reference_point
+        self.second_board_part = None
+
+
 class InpNet:
     def __init__(self):
         self.node_list = []
         self.elements = []
         self.lines = []
-
-    def reset(self):
-        self.node_list = []
-        self.lines = []
-        self.elements = []
+        self.rotation_point = None
 
     def set_nodes_and_elements(self, node_list, element_list):
         self.node_list = node_list
@@ -44,7 +47,7 @@ class InpNet:
         new_inp_net.lines = self.lines.copy()
         return new_inp_net
 
-    def get_turned_net(self, p1, p2):
+    def get_fliped_net(self, p1, p2):
         if p1 == p2:
             return self
         new_inp_net = InpNet()
@@ -55,6 +58,20 @@ class InpNet:
             p = get_shifted_point(p, Point(0, 0), angle)
             p.x += p1.x
             p.y += p1.y
+            new_node = Node(p)
+            new_inp_net.node_list.append(new_node)
+        new_inp_net.elements = self.elements.copy()
+        new_inp_net.lines = self.lines.copy()
+        return new_inp_net
+
+    def get_rotated_net(self, angle):
+        if self.rotation_point is None or angle == 0:
+            return self
+        new_inp_net = InpNet()
+        for node in self.node_list:
+            p = get_shifted_point(node.p, self.rotation_point.reference_point, angle)
+            p.x += self.rotation_point.reference_point.x
+            p.y += self.rotation_point.reference_point.y
             new_node = Node(p)
             new_inp_net.node_list.append(new_node)
         new_inp_net.elements = self.elements.copy()
@@ -81,7 +98,6 @@ class InpNet:
         if len(t) < 3:
             print(f"tuple doesn't match InpNet type: {t}")
             return
-        self.reset()
         node_list = t[0]
         lines = t[1]
         elements = t[2]

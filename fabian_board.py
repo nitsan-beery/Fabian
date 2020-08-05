@@ -194,8 +194,10 @@ class FabianBoard(Board):
         if self.temp_rect_mark is not None:
             self.board.delete(self.temp_rect_mark)
         x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
+        mouse_point = Point(x, y)
+        p1 = p2 = mouse_point
         if self.selected_part is None:
-            self.temp_rect_start_point = Point(x, y)
+            self.temp_rect_start_point = mouse_point
             return
         # slected part is not None
         if self.selected_part.part_type == gv.part_type_entity:
@@ -206,7 +208,7 @@ class FabianBoard(Board):
             p2 = e.right_up
             d, p = self.get_distance_from_entity_and_nearest_point(Point(x, y), self.selected_part.index)
         # self.selected_part.part_type == gv.part_type_net_line
-        else:
+        elif self.selected_part.part_type == gv.part_type_net_line:
             line = self.net_line_list[self.selected_part.index]
             node_index = get_index_from_hash(self.nodes_hash, line.start_node)
             node_1 = self.node_list[node_index]
@@ -221,8 +223,8 @@ class FabianBoard(Board):
             self.split_selected_part(gv.split_mode_2_parts_by_point)
             return
         if self.mouse_select_mode != gv.mouse_select_mode_point:
-            d1 = p1.get_distance_to_point(Point(x, y))
-            d2 = p2.get_distance_to_point(Point(x, y))
+            d1 = p1.get_distance_to_point(mouse_point)
+            d2 = p2.get_distance_to_point(mouse_point)
             p = p2
             if d1 < d2:
                 p = p1
@@ -240,10 +242,16 @@ class FabianBoard(Board):
 
         # first point
         if self.new_line_edge[0] is None:
+            if self.mouse_select_mode == gv.mouse_select_mode_rotate_net and self.inp_nets[-1].rotation_point is None:
+                self.inp_nets[-1].rotation_point = InpRotationPoint(p)
+                self.show_inp_rotation_point()
+                return
             self.new_line_edge[0] = p
             self.new_line_edge_mark[0] = self.draw_circle(p, gv.edge_line_mark_radius/self.scale)
             self.new_line_original_part[0] = self.selected_part
-            if self.mouse_select_mode == gv.mouse_select_mode_copy_net or self.mouse_select_mode == gv.mouse_select_mode_move_net:
+            if self.mouse_select_mode == gv.mouse_select_mode_copy_net or \
+                    self.mouse_select_mode == gv.mouse_select_mode_move_net or \
+                    self.mouse_select_mode == gv.mouse_select_mode_rotate_net:
                 self.select_parts_mode = gv.part_type_entity
             return
         # remove selection of first point
@@ -272,12 +280,14 @@ class FabianBoard(Board):
                                                                     self.new_line_edge[0].is_equal(p2)):
             return
 
-        # valid second point - add line or copy net
+        # valid second point - add line or handle net
         else:
             self.board.delete(self.temp_line_mark)
-            #  copy or move net
+            #  handle net
             if self.mouse_select_mode == gv.mouse_select_mode_copy_net or \
-                    self.mouse_select_mode == gv.mouse_select_mode_move_net or self.mouse_select_mode == gv.mouse_select_mode_turn_net:
+                    self.mouse_select_mode == gv.mouse_select_mode_move_net or \
+                    self.mouse_select_mode == gv.mouse_select_mode_flip_net or \
+                    self.mouse_select_mode == gv.mouse_select_mode_rotate_net:
                 if len(self.inp_nets) < 1:
                     self.remove_temp_line()
                     return
@@ -290,9 +300,15 @@ class FabianBoard(Board):
                     new_inp_net = InpNet()
                     new_inp_net.node_list = self.inp_nets[-1].node_list.copy()
                     new_inp_net.elements = self.inp_nets[-1].elements.copy()
-                    if self.mouse_select_mode == gv.mouse_select_mode_turn_net:
-                        new_inp_net = new_inp_net.get_turned_net(self.new_line_edge[0], p)
-                        self.select_parts_mode = gv.part_type_entity
+                    if self.mouse_select_mode == gv.mouse_select_mode_flip_net:
+                        new_inp_net = new_inp_net.get_fliped_net(self.new_line_edge[0], p)
+                    elif self.mouse_select_mode == gv.mouse_select_mode_rotate_net:
+                        new_inp_net.rotation_point = self.inp_nets[-1].rotation_point
+                        angle1 = self.inp_nets[-1].rotation_point.reference_point.get_alfa_to(self.new_line_edge[0])
+                        angle2 = self.inp_nets[-1].rotation_point.reference_point.get_alfa_to(p)
+                        rotation_angle = angle2 - angle1
+                        new_inp_net = new_inp_net.get_rotated_net(rotation_angle)
+                        self.clear_inp_rotation_point()
                     # copy or move
                     else:
                         new_inp_net = new_inp_net.get_shifted_net(diff_x, diff_y)
@@ -301,6 +317,7 @@ class FabianBoard(Board):
                         self.inp_nets.pop(-1)
                     self.add_inp_net(new_inp_net.node_list, new_inp_net.elements)
                     self.mouse_select_mode = gv.mouse_select_mode_edge
+                    self.select_parts_mode = gv.part_type_entity
                 else:
                     print('choose reference point on INP net (white parts)')
                 self.remove_temp_line()
@@ -458,11 +475,16 @@ class FabianBoard(Board):
                     menu.add_command(label="Delete marked entities", command=self.remove_marked_entities_from_list)
                     menu.add_command(label="Delete NON marked entities", command=self.remove_non_marked_entities_from_list)
                 menu.add_separator()
-                if len(self.net_line_list) > 0:
+                if len(self.inp_nets) > 0:
                     menu.add_command(label="Copy net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_copy_net))
                     menu.add_command(label="Move net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_move_net))
-                    menu.add_command(label="Turn net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_turn_net))
-                    menu.add_command(label="Merge net", command=self.merge_inp_nets)
+                    menu.add_command(label="Flip net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_flip_net))
+                    if self.inp_nets[-1].rotation_point is not None:
+                        menu.add_command(label="Clear reference point", command=self.clear_inp_rotation_point)
+                    else:
+                        menu.add_command(label="Rotate net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_rotate_net))
+                    if len(self.inp_nets) > 1:
+                        menu.add_command(label="Merge nets", command=self.merge_inp_nets)
                     menu.add_cascade(label='INP net', menu=show_inp_menu)
                     menu.add_separator()
         elif self.work_mode == gv.work_mode_inp:
@@ -638,7 +660,10 @@ class FabianBoard(Board):
         self.remove_temp_line()
         if self.mouse_select_mode != mode:
             self.mouse_select_mode = mode
-        if mode == gv.mouse_select_mode_copy_net or mode == gv.mouse_select_mode_move_net or mode == gv.mouse_select_mode_turn_net:
+        if mode != gv.mouse_select_mode_rotate_net:
+            self.clear_inp_rotation_point()
+        if mode == gv.mouse_select_mode_copy_net or mode == gv.mouse_select_mode_move_net or \
+                mode == gv.mouse_select_mode_flip_net or mode == gv.mouse_select_mode_rotate_net:
             self.select_parts_mode = gv.part_type_net_line
 
     def change_select_parts_mode(self, mode):
@@ -2929,6 +2954,27 @@ class FabianBoard(Board):
         if line.board_part is not None:
             self.board.delete(line.board_part)
             line.board_part = None
+
+    def show_inp_rotation_point(self):
+        if len(self.inp_nets) < 1:
+            return
+        inp_net = self.inp_nets[-1]
+        if inp_net.rotation_point is not None and inp_net.rotation_point.reference_point is not None and inp_net.rotation_point.board_part is None:
+            self.keep_state()
+            inp_net.rotation_point.board_part = self.draw_circle(inp_net.rotation_point.reference_point, 3/self.scale, inp_net.rotation_point.color)
+            inp_net.rotation_point.second_board_part = self.draw_circle(inp_net.rotation_point.reference_point, 6/self.scale, inp_net.rotation_point.color)
+
+    def clear_inp_rotation_point(self):
+        if len(self.inp_nets) < 1:
+            return
+        inp_net = self.inp_nets[-1]
+        if inp_net.rotation_point is not None:
+            if inp_net.rotation_point.board_part is not None:
+                self.keep_state()
+                self.board.delete(inp_net.rotation_point.board_part)
+            if inp_net.rotation_point.second_board_part is not None:
+                self.board.delete(inp_net.rotation_point.second_board_part)
+        inp_net.rotation_point = None
 
     def show_inp(self, inp_index):
         if inp_index > len(self.inp_nets) - 1:
