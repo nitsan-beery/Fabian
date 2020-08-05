@@ -2166,8 +2166,6 @@ class FabianBoard(Board):
         self.show_inps = False
         self.show_elements = False
         new_inp = InpNet()
-        new_inp.set_net(node_list.copy(), element_list.copy())
-        self.inp_nets.append(new_inp)
         if self.work_mode == gv.work_mode_dxf:
             self.reset_net(keep_state=False)
             c = len(node_list)
@@ -2196,6 +2194,9 @@ class FabianBoard(Board):
                 self.progress_bar['value'] += 1
                 self.frame_1.update_idletasks()
             self.element_list = element_list
+            node_list = self.node_list[1:]
+            new_inp.set_net(node_list.copy(), element_list.copy())
+            self.inp_nets.append(new_inp)
             self.hide_text_on_screen()
             self.hide_progress_bar()
             self.show_net = True
@@ -2205,6 +2206,8 @@ class FabianBoard(Board):
         # inp mode
         else:
             pass
+            new_inp.set_net(node_list.copy(), element_list.copy())
+            self.inp_nets.append(new_inp)
             self.show_inp(-1)
 
     def set_scale(self, left, right):
