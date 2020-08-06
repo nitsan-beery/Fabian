@@ -57,12 +57,16 @@ class FabianBoard(Board):
         self.show_inps = True
         self.progress_bar = None
         self.state = []
+        self.redo_state = []
 
         self.board.bind('<Motion>', self.motion)
         self.board.bind('<Button-1>', self.mouse_1_pressed)
         self.board.bind('<B1-Motion>', self.mouse_1_motion)
         self.board.bind('<ButtonRelease-1>', self.mouse_1_released)
         self.board.bind('<Button-3>', self.mouse_3_pressed)
+
+        self.window_main.bind('<Control-z>', self.undo)
+        self.window_main.bind('<Control-y>', self.redo)
 
     def reset_board(self, empty_node_list=False, center_screen_position=True, reset_state=True):
         self.board.delete('all')
@@ -95,6 +99,24 @@ class FabianBoard(Board):
         self.progress_bar = None
         if reset_state:
             self.state = []
+
+    def undo(self, key=None):
+        if len(self.state) > 0:
+            self.keep_state()
+            if len(self.redo_state) == gv.max_state_stack:
+                self.redo_state.pop(0)
+            state = self.state[-1]
+            self.redo_state.append(state)
+            self.state.pop(-1)
+        self.resume_state()
+
+    def redo(self, key=None):
+        if len(self.redo_state) > 0:
+            self.keep_state()
+            state = self.redo_state[-1]
+            self.state.append(state)
+            self.redo_state.pop(-1)
+            self.resume_state()
 
     def resume_state(self):
         if len(self.state) < 1:
@@ -441,7 +463,8 @@ class FabianBoard(Board):
         show_elements_menu.add_command(label="Show", command=self.show_all_elements)
         show_elements_menu.add_command(label="Hide", command=self.hide_all_elements)
 
-        menu.add_command(label="Undo", command=self.resume_state)
+        menu.add_command(label="Undo", command=self.undo)
+        menu.add_command(label="Redo", command=self.redo)
         menu.add_separator()
         menu.add_cascade(label='Select mode', menu=select_part_menu)
         menu.add_separator()
@@ -606,11 +629,13 @@ class FabianBoard(Board):
         elif mode == gv.hide_mode:
             if self.show_inps:
                 self.show_inps = False
+                self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
                 changed = True
         elif mode == gv.clear_mode:
             if len(self.inp_nets) > 0:
                 self.hide_all_inp_nets()
                 self.inp_nets = []
+                self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
                 changed = True
         if changed:
             if self.work_mode == gv.work_mode_dxf:
@@ -665,6 +690,8 @@ class FabianBoard(Board):
         if mode == gv.mouse_select_mode_copy_net or mode == gv.mouse_select_mode_move_net or \
                 mode == gv.mouse_select_mode_flip_net or mode == gv.mouse_select_mode_rotate_net:
             self.select_parts_mode = gv.part_type_net_line
+        elif self.work_mode == gv.work_mode_dxf:
+            self.select_parts_mode = gv.part_type_entity
 
     def change_select_parts_mode(self, mode):
         self.remove_selected_part_mark()
@@ -3207,3 +3234,8 @@ class FabianBoard(Board):
         if self.show_corners:
             self.show_all_corners()
         self.window_main.update()
+
+    # debug
+    def test_key(self, key):
+        print(key.keycode)
+
