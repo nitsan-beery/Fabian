@@ -37,7 +37,7 @@ class Board:
         self.text_on_screen = None
 
         self.board.bind('<MouseWheel>', self.mouse_wheel)
-        self.window_main.bind('<Key>', self.key)
+        self.window_main.bind('<Key>', self.board_key)
 
     # scroll view to x, y in canvas coordinates
     def set_screen_position(self, x, y):
@@ -147,7 +147,7 @@ class Board:
             i = '-1'
         self.board.yview('scroll', i, 'units')
 
-    def key(self, key):
+    def board_key(self, key):
         self.hide_text_on_screen()
         if key.keycode == 37:
             self.board.xview('scroll', -1, 'units')
