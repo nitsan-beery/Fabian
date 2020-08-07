@@ -4,7 +4,7 @@ import json
 import ezdxf
 
 
-def load_json(parent, filename=None, my_dir="./data files/"):
+def load_json(parent, filename=None, my_dir=gv.files_dir):
     if filename is None:
         filename = filedialog.askopenfilename(parent=parent, initialdir=my_dir, title="Select file",
                                               filetypes=(("json files", "*.json"), ("all files", "*.*")))
@@ -15,7 +15,7 @@ def load_json(parent, filename=None, my_dir="./data files/"):
     return data
 
 
-def save_json(parent, data=None, my_dir="./data files/", file_name='Fabian'):
+def save_json(parent, data=None, my_dir=gv.files_dir, file_name='Fabian'):
     filename = filedialog.asksaveasfilename(parent=parent, initialdir=my_dir, title="Select file",
                                             initialfile=file_name, defaultextension=".json",
                                             filetypes=(("json files", "*.json"), ("all files", "*.*")))
@@ -56,7 +56,7 @@ def convert_doc_to_entity_list(doc=None):
 
 
 def save_inp(parent, file_name, node_list, element_list):
-    filename = filedialog.asksaveasfilename(parent=parent, initialdir="./data files/", title="Select file",
+    filename = filedialog.asksaveasfilename(parent=parent, initialdir=gv.files_dir, title="Select file",
                                             initialfile=file_name, defaultextension=".inp",
                                             filetypes=(("inp files", "*.inp"), ("all files", "*.*")))
     if filename == '':
@@ -143,7 +143,7 @@ def save_dxf(parent, file_name, entity_list):
             msp.add_arc((e.center.x, e.center.y), e.radius, e.arc_start_angle, e.arc_end_angle)
         elif e.shape == 'CIRCLE':
             msp.add_circle((e.center.x, e.center.y), e.radius)
-    filename = filedialog.asksaveasfilename(parent=parent, initialdir="./data files/", title="Select file",
+    filename = filedialog.asksaveasfilename(parent=parent, initialdir=gv.files_dir, title="Select file",
                                             initialfile=file_name, defaultextension=".dxf",
                                             filetypes=(("dxf files", "*.dxf"), ("all files", "*.*")))
     if filename == '':
@@ -155,7 +155,7 @@ def save_dxf(parent, file_name, entity_list):
 
 
 def load(parent):
-    filename = filedialog.askopenfilename(parent=parent, initialdir="./data files/", title="Select file",
+    filename = filedialog.askopenfilename(parent=parent, initialdir=gv.files_dir , title="Select file",
                                           filetypes=(("Json files", "*.json"), ("DXF files", "*.dxf"),
                                                      ("INP files", "*.inp"), ("all files", "*.*")))
     if filename == '':

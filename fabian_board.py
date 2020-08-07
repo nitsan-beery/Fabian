@@ -217,7 +217,7 @@ class FabianBoard(Board):
             self.board.delete(self.temp_rect_mark)
         x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
         mouse_point = Point(x, y)
-        p1 = p2 = mouse_point
+        p = p1 = p2 = mouse_point
         if self.selected_part is None:
             self.temp_rect_start_point = mouse_point
             return
@@ -458,7 +458,6 @@ class FabianBoard(Board):
         show_inp_menu = tk.Menu(menu, tearoff=0)
         show_inp_menu.add_command(label="Show", command=lambda: self.change_show_inp_mode(gv.show_mode))
         show_inp_menu.add_command(label="Hide", command=lambda: self.change_show_inp_mode(gv.hide_mode))
-        show_inp_menu.add_command(label="Clear", command=lambda: self.change_show_inp_mode(gv.clear_mode))
         show_elements_menu = tk.Menu(menu, tearoff=0)
         show_elements_menu.add_command(label="Show", command=self.show_all_elements)
         show_elements_menu.add_command(label="Hide", command=self.hide_all_elements)
@@ -508,10 +507,12 @@ class FabianBoard(Board):
                         menu.add_command(label="Rotate net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_rotate_net))
                     if len(self.inp_nets) > 1:
                         menu.add_command(label="Merge nets", command=self.merge_inp_nets)
-                    menu.add_cascade(label='INP net', menu=show_inp_menu)
+                    menu.add_command(label="Clear nets", command=lambda: self.change_show_inp_mode(gv.clear_mode))
+                    menu.add_cascade(label='Show / Hide nets', menu=show_inp_menu)
                     menu.add_separator()
         elif self.work_mode == gv.work_mode_inp:
             mark_list = self.get_marked_parts(gv.part_list_net_lines)
+            show_inp_menu.add_command(label="Clear", command=lambda: self.change_show_inp_mode(gv.clear_mode))
             if len(mark_list) > 0:
                 menu.add_command(label="Merge marked net lines", command=lambda: self.merge(True))
                 menu.add_command(label="Delete marked net lines", command=self.remove_marked_net_lines_from_list)
@@ -537,7 +538,7 @@ class FabianBoard(Board):
                 menu.add_separator()
             menu.add_command(label="Set net", command=self.set_net)
             menu.add_command(label="Set initial border nodes...", command=self.set_initial_border_nodes)
-            menu.add_command(label="Clear net", command=self.clear_net)
+            menu.add_command(label="Clear inner net", command=self.clear_net)
             menu.add_separator()
         menu.add_command(label="Quit")
         menu.post(key.x_root, key.y_root)
@@ -694,9 +695,11 @@ class FabianBoard(Board):
             self.select_parts_mode = gv.part_type_entity
 
     def change_select_parts_mode(self, mode):
+        self.remove_temp_line()
         self.remove_selected_part_mark()
         if mode != self.select_parts_mode:
             self.select_parts_mode = mode
+        if self.mouse_select_mode == gv.mouse_select_mode_corner:
             self.mouse_select_mode = gv.mouse_select_mode_edge
 
     def handle_corners(self, mode, arg=gv.corners_set_net_both):
@@ -3210,7 +3213,7 @@ class FabianBoard(Board):
                 while i < len(s) and s[i] == '0':
                     i += 1
                 zeros = i
-        gv.accuracy = zeros+3
+        gv.accuracy = zeros+2
         # debug
         print(f'set accuracy: 1/{int(math.pow(10, gv.accuracy))}')
 
