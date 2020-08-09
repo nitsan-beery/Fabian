@@ -1,5 +1,4 @@
 from point import *
-from general_functions import *
 import tkinter as tk
 from tkinter import ttk
 

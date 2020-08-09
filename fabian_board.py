@@ -727,303 +727,6 @@ class FabianBoard(Board):
         node_hash_index = self.add_node_to_node_list(end_node)
         e.add_node_to_entity_nodes_list(node_hash_index)
 
-    def get_split_circle_points(self, circle, parts, start_angle, end_angle=None):
-        point_list = []
-        n = parts
-        diff_angle = 360
-        if end_angle is not None:
-            if end_angle < start_angle:
-                end_angle += 360
-            diff_angle = end_angle - start_angle
-        for i in range(n):
-            end_angle = start_angle + (diff_angle/n)
-            arc = Entity('ARC', center=circle.center, radius=circle.radius, start_angle=start_angle, end_angle=end_angle)
-            point_list.append(arc.start)
-            start_angle = end_angle
-        return point_list
-
-    def get_split_line_points(self, p1, p2, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):
-        point_list = [p1]
-        alfa = p1.get_alfa_to(p2) * math.pi / 180
-        d = p1.get_distance_to_point(p2)
-        start = p1
-        # if mode is split_mode_2_parts_percentage_side_by_point, check for valid point
-        if split_mode == gv.split_mode_2_parts_percentage_side_by_point:
-            if not isinstance(split_arg, tuple):
-                split_mode = gv.split_mode_2_parts_percentage_left
-            elif len(split_arg) < 2:
-                split_mode = gv.split_mode_2_parts_percentage_left
-            elif split_arg[1] is None:
-                split_arg = split_arg[0]
-                split_mode = gv.split_mode_2_parts_percentage_left
-            elif not isinstance(split_arg[1], Point):
-                split_arg = split_arg[0]
-                split_mode = gv.split_mode_2_parts_percentage_left
-        if split_mode == gv.split_mode_evenly_n_parts:
-            n = split_arg
-            step = d / n
-            for m in range(n):
-                end = Point(start.x + step * math.cos(alfa), start.y + step * math.sin(alfa))
-                point_list.append(end)
-                start = end
-        elif split_mode == gv.split_mode_2_parts_by_point:
-            middle_point = split_arg
-            point_list.append(middle_point)
-            point_list.append(p2)
-        elif split_mode == gv.split_mode_2_parts_percentage_left:
-            percentage_left = split_arg
-            if p2.is_smaller_x_smaller_y(p1):
-                percentage_left = 100-percentage_left
-            d = d * percentage_left / 100
-            new_point = Point(start.x + d * math.cos(alfa), start.y + d * math.sin(alfa))
-            point_list.append(new_point)
-            point_list.append(p2)
-        elif split_mode == gv.split_mode_2_parts_percentage_side_by_point:
-            percentage_left = split_arg[0]
-            reference_point = split_arg[1]
-            d1 = p1.get_distance_to_point(reference_point)
-            d2 = p2.get_distance_to_point(reference_point)
-            if d2 < d1:
-                percentage_left = 100 - percentage_left
-            d = d * percentage_left / 100
-            new_point = Point(start.x + d * math.cos(alfa), start.y + d * math.sin(alfa))
-            point_list.append(new_point)
-            point_list.append(p2)
-        elif split_mode == gv.split_mode_3_parts_percentage_middle:
-            percentage_middle = split_arg
-            percentage_side = (100 - percentage_middle) / 2
-            d1 = d * percentage_side / 100
-            d2 = d * (percentage_middle + percentage_side) / 100
-            new_point_1 = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
-            new_point_2 = Point(start.x + d2 * math.cos(alfa), start.y + d2 * math.sin(alfa))
-            point_list.append(new_point_1)
-            point_list.append(new_point_2)
-            point_list.append(p2)
-        elif split_mode == gv.split_mode_graduate_n_parts:
-            opposite = False
-            if p2.is_smaller_x_smaller_y(p1):
-                opposite = True
-            n = split_arg[0]
-            left = split_arg[1]
-            diff = 100 - (n * left)
-            sum_n = n * (n - 1) / 2
-            step = diff / sum_n
-            add_on = 0
-            for i in range(n - 1):
-                add_on = add_on + left + step * i
-                actual_p = add_on
-                if opposite:
-                    actual_p = 100 - actual_p
-                d1 = d * actual_p / 100
-                new_point = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
-                point_list.append(new_point)
-            if opposite:
-                point_list.remove(p1)
-                point_list.reverse()
-                point_list.insert(0, p1)
-            point_list.append(p2)
-        elif split_mode == gv.split_mode_graduate_from_middle:
-            total_parts = split_arg[0]
-            side_parts = math.ceil(total_parts / 2)
-            middle = split_arg[1]
-            start_middle_percentage = 50
-            if total_parts % 2 == 1:
-                start_middle_percentage -= middle / 2
-            side_ratio = 100 / (100 - start_middle_percentage)
-            middle_side = middle * side_ratio
-            diff = 100 - (side_parts * middle_side)
-            sum_n = side_parts * (side_parts - 1) / 2
-            step = diff / sum_n / side_ratio
-            d_list = []
-            add_on = 0
-            # collect points from middle to one side
-            for i in range(side_parts - 1):
-                add_on = add_on + middle + step * i
-                d_list.append(start_middle_percentage + add_on)
-            n = len(d_list)
-            # insert symmetrical points from other side to middle
-            for i in range(n):
-                d_list.insert(i, 100-d_list[-(i+1)])
-            if total_parts % 2 == 0:
-                d_list.insert(n, 50)
-            for i in range(len(d_list)):
-                d1 = d * d_list[i] / 100
-                new_point = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
-                point_list.append(new_point)
-            point_list.append(p2)
-        elif split_mode == gv.split_mode_graduate_percentage_left_right:
-            left = split_arg[0]
-            right = split_arg[1]
-            opposite = False
-            if right > left:
-                left, right = right, left
-                opposite = True
-            diff = 100 - (left + right)
-            sum = left + right
-            residual = left-right
-            chunk = math.ceil(diff/sum)
-            bulk = 100 / chunk
-            add_on = (bulk - sum) / 2
-            left += add_on
-            right += add_on
-            n = 2 * chunk - 1
-            step = residual / n
-            current_p = left
-            add_on = left
-            for i in range(1, n+1):
-                left_to_right_p = current_p
-                if opposite:
-                    pass
-                    left_to_right_p = 100 - current_p
-                d1 = d * left_to_right_p / 100
-                new_point = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
-                point_list.append(new_point)
-                add_on -= step
-                current_p += add_on
-            if opposite:
-                point_list.remove(p1)
-                point_list.reverse()
-                point_list.insert(0, p1)
-            point_list.append(p2)
-        return point_list
-
-    def get_split_arc_points(self, arc, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):
-        point_list = [arc.start]
-        start_angle = arc.arc_start_angle
-        diff_angle = arc.arc_end_angle - arc.arc_start_angle
-        if split_mode == gv.split_mode_evenly_n_parts:
-            n = split_arg
-            angle = (arc.arc_end_angle - arc.arc_start_angle) / n
-            for m in range(n):
-                end_angle = start_angle + angle
-                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                                 end_angle=end_angle)
-                point_list.append(new_arc.end)
-                start_angle = end_angle
-        elif split_mode == gv.split_mode_2_parts_by_point:
-            middle_point = split_arg
-            end_angle = arc.center.get_alfa_to(middle_point)
-            new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                             end_angle=end_angle)
-            point_list.append(new_arc.end)
-            point_list.append(arc.end)
-        elif split_mode == gv.split_mode_2_parts_percentage_left:
-            percentage_left = split_arg
-            if arc.end.is_smaller_x_smaller_y(arc.start):
-                percentage_left = 100 - percentage_left
-            angle = diff_angle * percentage_left / 100
-            end_angle = start_angle + angle
-            new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                             end_angle=end_angle)
-            point_list.append(new_arc.end)
-            point_list.append(arc.end)
-        elif split_mode == gv.split_mode_3_parts_percentage_middle:
-            percentage_middle = split_arg
-            percentage_side = (100 - percentage_middle) / 2
-            angle = diff_angle * percentage_side / 100
-            end_angle = start_angle + angle
-            new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                             end_angle=end_angle)
-            point_list.append(new_arc.end)
-            angle = diff_angle * (percentage_middle + percentage_side) / 100
-            end_angle = start_angle + angle
-            new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                             end_angle=end_angle)
-            point_list.append(new_arc.end)
-            point_list.append(arc.end)
-        elif split_mode == gv.split_mode_graduate_n_parts:
-            n = split_arg[0]
-            left = split_arg[1]
-            opposite = False
-            if arc.end.is_smaller_x_smaller_y(arc.start):
-                opposite = True
-            diff = 100 - (n * left)
-            sum_n = n * (n - 1) / 2
-            step = diff / sum_n
-            add_on = 0
-            for i in range(n-1):
-                add_on = add_on + left + step * i
-                angle_p = add_on
-                actual_p = angle_p
-                if opposite:
-                    actual_p = 100 - angle_p
-                angle = diff_angle * actual_p / 100
-                end_angle = start_angle + angle
-                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                                 end_angle=end_angle)
-                point_list.append(new_arc.end)
-            if opposite:
-                point_list.remove(arc.start)
-                point_list.reverse()
-                point_list.insert(0, arc.start)
-            point_list.append(arc.end)
-        elif split_mode == gv.split_mode_graduate_from_middle:
-            total_parts = split_arg[0]
-            side_parts = math.ceil(total_parts / 2)
-            middle = split_arg[1]
-            start_middle_percentage = 50
-            if total_parts % 2 == 1:
-                start_middle_percentage -= middle / 2
-            side_ratio = 100 / (100 - start_middle_percentage)
-            middle_side = middle * side_ratio
-            diff = 100 - (side_parts * middle_side)
-            sum_n = side_parts * (side_parts - 1) / 2
-            step = diff / sum_n / side_ratio
-            d_list = []
-            add_on = 0
-            # collect points from middle to one side
-            for i in range(side_parts - 1):
-                add_on = add_on + middle + step * i
-                d_list.append(start_middle_percentage + add_on)
-            n = len(d_list)
-            # insert symmetrical points from other side to middle
-            for i in range(n):
-                d_list.insert(i, 100-d_list[-(i+1)])
-            if total_parts % 2 == 0:
-                d_list.insert(n, 50)
-            for i in range(len(d_list)):
-                angle = diff_angle * d_list[i] / 100
-                end_angle = start_angle + angle
-                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                                 end_angle=end_angle)
-                point_list.append(new_arc.end)
-            point_list.append(arc.end)
-        elif split_mode == gv.split_mode_graduate_percentage_left_right:
-            left = split_arg[0]
-            right = split_arg[1]
-            opposite = False
-            if arc.end.is_smaller_x_smaller_y(arc.start):
-                opposite = True
-            diff = 100 - (left + right)
-            sum = left + right
-            residual = left - right
-            chunk = math.ceil(diff / sum)
-            bulk = 100 / chunk
-            add_on = (bulk - sum) / 2
-            left += add_on
-            right += add_on
-            n = 2 * chunk - 1
-            step = residual / n
-            angle_p = left
-            add_on = left
-            for i in range(1, n + 1):
-                left_to_right_p = angle_p
-                if opposite:
-                    left_to_right_p = 100 - angle_p
-                angle = diff_angle * left_to_right_p / 100
-                end_angle = start_angle + angle
-                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                                 end_angle=end_angle)
-                point_list.append(new_arc.end)
-                add_on -= step
-                angle_p += add_on
-            if opposite:
-                point_list.remove(arc.start)
-                point_list.reverse()
-                point_list.insert(0, arc.start)
-            point_list.append(arc.end)
-        return point_list
-
     # return continues list of lines, None if the list is broken
     def sort_net_line_parts(self, part_list):
         if part_list is None:
@@ -1411,11 +1114,11 @@ class FabianBoard(Board):
                 print('bug in split_net_line_by_entity')
             p1 = self.node_list[start_node_index].p
             p2 = self.node_list[end_node_index].p
-            new_points = self.get_split_line_points(p1, p2, split_mode, split_additional_arg)
+            new_points = get_split_line_points(p1, p2, split_mode, split_additional_arg)
         elif entity.shape == 'ARC':
             start_hash_node = entity.nodes_list[0]
             arc = self.entity_list[part]
-            new_points = self.get_split_arc_points(arc, split_mode, split_additional_arg)
+            new_points = get_split_arc_points(arc, split_mode, split_additional_arg)
         # entity.shape == 'CIRCLE'
         else:
             new_points = self.get_split_circle_points(entity, split_additional_arg, start)
@@ -1445,7 +1148,7 @@ class FabianBoard(Board):
             shape = self.entity_list[line.entity].shape
         start_node = line.start_node
         if shape == 'LINE':
-            new_points = self.get_split_line_points(node1.p, node2.p, split_mode, split_additional_arg)
+            new_points = get_split_line_points(node1.p, node2.p, split_mode, split_additional_arg)
         # shape == 'ARC' or shape == 'CIRCLE'
         else:
             reference_entity = self.entity_list[line.entity]
@@ -1459,7 +1162,7 @@ class FabianBoard(Board):
                 start_angle, end_angle = end_angle, start_angle
                 start_node = line.end_node
             arc = Entity('ARC', reference_entity.center, reference_entity.radius, start_angle=start_angle, end_angle=end_angle)
-            new_points = self.get_split_arc_points(arc, split_mode, split_additional_arg)
+            new_points = get_split_arc_points(arc, split_mode, split_additional_arg)
         for j in range(len(new_points) - 1):
             new_node = Node(new_points[j+1], entity=line.entity)
             end_node = self.add_node_to_node_list(new_node)
@@ -2619,7 +2322,7 @@ class FabianBoard(Board):
                 p = item[2]
                 if hash_node is None:
                     arg = (split_middle_lines_side_percentage, reference_point)
-                    self.split_net_line(line, gv.split_mode_2_parts_percentage_side_by_point, arg)
+                    self.split_net_line(line, gv.split_mode_2_parts_percentage_side_by_reference_point, arg)
                     p = self.node_list[-1].p
                 new_points.append(p)
                 i -= 1
@@ -3273,7 +2976,7 @@ class FabianBoard(Board):
                 while i < len(s) and s[i] == '0':
                     i += 1
                 zeros = i
-        gv.accuracy = zeros+2
+        gv.accuracy = zeros + gv.default_accuracy
         # debug
         print(f'set accuracy: 1/{int(math.pow(10, gv.accuracy))}')
 

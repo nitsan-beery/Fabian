@@ -13,6 +13,11 @@ class Point:
             return False
         min_d = math.pow(10, -accuracy) * gv.min_distance_between_nodes
         distance = math.sqrt(math.pow(self.x - p.x, 2) + math.pow(self.y - p.y, 2))
+        # debug
+        '''
+        if distance < min_d:
+            print(f"equal points ({p.x}, {p.y})  ({self.x}, {self.y})   distance: {distance}   min_d: {min_d}")
+        '''
         return distance < min_d
 
     def is_smaller_x_smaller_y(self, p, by_x=True):

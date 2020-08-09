@@ -5,7 +5,7 @@ WINDWO_SIZE = str(WINDOW_WIDTH)+'x'+str(WINDOW_HEIGHT)
 BOARD_HEIGHT = 50000
 BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
-files_dir = "./data files/NR-PRT-25150"
+files_dir = "./data files"  #/NR-PRT-25150"
 
 max_nodes_to_create_element = 4
 
@@ -17,8 +17,8 @@ max_line_length_for_net_line = 0.6
 
 default_accuracy = 3
 accuracy = default_accuracy
-# times * acuuracy (if accuracy = 1/1000, distance is 0.025)
-min_distance_between_nodes = 25
+# times * acuuracy (if accuracy = 1/1000, distance is 0.004)
+min_distance_between_nodes = 4
 angle_diff_accuracy = 1
 min_angle_to_create_element = 20
 max_angle_to_create_element = 160
@@ -59,7 +59,8 @@ clear_mode = 'clear'
 split_mode_evenly_n_parts = 'evenly_n_parts'
 split_mode_2_parts_by_point = '2_parts_by_point'
 split_mode_2_parts_percentage_left = '2_parts_percentage_left'
-split_mode_2_parts_percentage_side_by_point = '2_parts_percentage_side_by_point'
+# 2 parts by percentage, side is defined by the reference point. mode used to split crossing lines automatically
+split_mode_2_parts_percentage_side_by_reference_point = '2_parts_percentage_side_by_reference_point'
 split_mode_3_parts_percentage_middle = '3_parts_percentage_middle'
 split_mode_graduate_n_parts = 'graduate_n_parts'
 split_mode_graduate_from_middle = 'graduate_from_middle'
