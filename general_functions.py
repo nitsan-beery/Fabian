@@ -38,6 +38,13 @@ def is_point_in_node_list(p, node_list):
     return False
 
 
+def get_index_of_node_with_point_in_list(p, node_list):
+    for i in range(len(node_list)):
+        node = node_list[i]
+        if p.is_equal(node.p):
+            return i
+    return None
+
 
 
 

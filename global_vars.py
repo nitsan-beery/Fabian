@@ -15,7 +15,10 @@ max_arc_angle_for_net_line = 30
 # length relative to length of object measured from bottom-left to right-up
 max_line_length_for_net_line = 0.6
 
-accuracy = 3
+default_accuracy = 3
+accuracy = default_accuracy
+# times * acuuracy (if accuracy = 1/1000, distance is 0.025)
+min_distance_between_nodes = 25
 angle_diff_accuracy = 1
 min_angle_to_create_element = 20
 max_angle_to_create_element = 160
@@ -37,10 +40,13 @@ mouse_select_mode_copy_net = 'copy_net'
 mouse_select_mode_move_net = 'move_net'
 mouse_select_mode_flip_net = 'flip_net'
 mouse_select_mode_rotate_net = 'rotate_net'
+mouse_select_mode_adjust_node = 'adjust_node'
 work_mode_dxf = 'dxf'
 work_mode_inp = 'inp'
 part_type_entity = 'entity'
 part_type_net_line = 'net_line'
+part_type_both = 'entity_and_net_line'
+part_type_inp_net = 'inp_net'
 mark_option_mark = 'mark'
 mark_option_unmark = 'unmark'
 mark_option_invert = 'invert'

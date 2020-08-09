@@ -8,11 +8,12 @@ class Point:
         self.x = x
         self.y = y
 
-    def is_equal(self, p):
+    def is_equal(self, p, accuracy=gv.accuracy):
         if p is None:
             return False
-        return round(self.x, gv.accuracy) == round(p.x, gv.accuracy) and \
-               round(self.y, gv.accuracy) == round(p.y, gv.accuracy)
+        min_d = math.pow(10, -accuracy) * gv.min_distance_between_nodes
+        distance = math.sqrt(math.pow(self.x - p.x, 2) + math.pow(self.y - p.y, 2))
+        return distance < min_d
 
     def is_smaller_x_smaller_y(self, p, by_x=True):
         if by_x:
