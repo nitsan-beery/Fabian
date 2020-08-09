@@ -822,6 +822,35 @@ class FabianBoard(Board):
                 point_list.reverse()
                 point_list.insert(0, p1)
             point_list.append(p2)
+        elif split_mode == gv.split_mode_graduate_from_middle:
+            total_parts = split_arg[0]
+            side_parts = math.ceil(total_parts / 2)
+            middle = split_arg[1]
+            start_middle_percentage = 50
+            if total_parts % 2 == 1:
+                start_middle_percentage -= middle / 2
+            side_ratio = 100 / (100 - start_middle_percentage)
+            middle_side = middle * side_ratio
+            diff = 100 - (side_parts * middle_side)
+            sum_n = side_parts * (side_parts - 1) / 2
+            step = diff / sum_n / side_ratio
+            d_list = []
+            add_on = 0
+            # collect points from middle to one side
+            for i in range(side_parts - 1):
+                add_on = add_on + middle + step * i
+                d_list.append(start_middle_percentage + add_on)
+            n = len(d_list)
+            # insert symmetrical points from other side to middle
+            for i in range(n):
+                d_list.insert(i, 100-d_list[-(i+1)])
+            if total_parts % 2 == 0:
+                d_list.insert(n, 50)
+            for i in range(len(d_list)):
+                d1 = d * d_list[i] / 100
+                new_point = Point(start.x + d1 * math.cos(alfa), start.y + d1 * math.sin(alfa))
+                point_list.append(new_point)
+            point_list.append(p2)
         elif split_mode == gv.split_mode_graduate_percentage_left_right:
             left = split_arg[0]
             right = split_arg[1]

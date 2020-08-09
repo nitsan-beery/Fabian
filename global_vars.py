@@ -5,7 +5,7 @@ WINDWO_SIZE = str(WINDOW_WIDTH)+'x'+str(WINDOW_HEIGHT)
 BOARD_HEIGHT = 50000
 BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
-files_dir = "./data files/DMS-6579"
+files_dir = "./data files/NR-PRT-25150"
 
 max_nodes_to_create_element = 4
 
@@ -62,6 +62,7 @@ split_mode_2_parts_percentage_left = '2_parts_percentage_left'
 split_mode_2_parts_percentage_side_by_point = '2_parts_percentage_side_by_point'
 split_mode_3_parts_percentage_middle = '3_parts_percentage_middle'
 split_mode_graduate_n_parts = 'graduate_n_parts'
+split_mode_graduate_from_middle = 'graduate_from_middle'
 split_mode_graduate_percentage_left_right = 'graduate_percentage_left_right'
 split_mode_by_longitude = 'by_longitude'
 split_mode_by_angle = 'by_angle'
