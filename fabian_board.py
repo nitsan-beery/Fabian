@@ -949,13 +949,42 @@ class FabianBoard(Board):
                     actual_p = 100 - angle_p
                 angle = diff_angle * actual_p / 100
                 end_angle = start_angle + angle
-                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                             end_angle=end_angle)
+                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle, end_angle=end_angle)
                 point_list.append(new_arc.end)
             if opposite:
                 point_list.remove(arc.start)
                 point_list.reverse()
                 point_list.insert(0, arc.start)
+            point_list.append(arc.end)
+        elif split_mode == gv.split_mode_graduate_from_middle:
+            total_parts = split_arg[0]
+            side_parts = math.ceil(total_parts / 2)
+            middle = split_arg[1]
+            start_middle_percentage = 50
+            if total_parts % 2 == 1:
+                start_middle_percentage -= middle / 2
+            side_ratio = 100 / (100 - start_middle_percentage)
+            middle_side = middle * side_ratio
+            diff = 100 - (side_parts * middle_side)
+            sum_n = side_parts * (side_parts - 1) / 2
+            step = diff / sum_n / side_ratio
+            d_list = []
+            add_on = 0
+            # collect points from middle to one side
+            for i in range(side_parts - 1):
+                add_on = add_on + middle + step * i
+                d_list.append(start_middle_percentage + add_on)
+            n = len(d_list)
+            # insert symmetrical points from other side to middle
+            for i in range(n):
+                d_list.insert(i, 100-d_list[-(i+1)])
+            if total_parts % 2 == 0:
+                d_list.insert(n, 50)
+            for i in range(len(d_list)):
+                angle = diff_angle * d_list[i] / 100
+                end_angle = start_angle + angle
+                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle, end_angle=end_angle)
+                point_list.append(new_arc.end)
             point_list.append(arc.end)
         elif split_mode == gv.split_mode_graduate_percentage_left_right:
             left = split_arg[0]
