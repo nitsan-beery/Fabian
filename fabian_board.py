@@ -897,7 +897,7 @@ class FabianBoard(Board):
             for m in range(n):
                 end_angle = start_angle + angle
                 new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                             end_angle=end_angle)
+                                 end_angle=end_angle)
                 point_list.append(new_arc.end)
                 start_angle = end_angle
         elif split_mode == gv.split_mode_2_parts_by_point:
@@ -914,7 +914,7 @@ class FabianBoard(Board):
             angle = diff_angle * percentage_left / 100
             end_angle = start_angle + angle
             new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                         end_angle=end_angle)
+                             end_angle=end_angle)
             point_list.append(new_arc.end)
             point_list.append(arc.end)
         elif split_mode == gv.split_mode_3_parts_percentage_middle:
@@ -949,7 +949,8 @@ class FabianBoard(Board):
                     actual_p = 100 - angle_p
                 angle = diff_angle * actual_p / 100
                 end_angle = start_angle + angle
-                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle, end_angle=end_angle)
+                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
+                                 end_angle=end_angle)
                 point_list.append(new_arc.end)
             if opposite:
                 point_list.remove(arc.start)
@@ -983,7 +984,8 @@ class FabianBoard(Board):
             for i in range(len(d_list)):
                 angle = diff_angle * d_list[i] / 100
                 end_angle = start_angle + angle
-                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle, end_angle=end_angle)
+                new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
+                                 end_angle=end_angle)
                 point_list.append(new_arc.end)
             point_list.append(arc.end)
         elif split_mode == gv.split_mode_graduate_percentage_left_right:
@@ -1011,7 +1013,7 @@ class FabianBoard(Board):
                 angle = diff_angle * left_to_right_p / 100
                 end_angle = start_angle + angle
                 new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
-                             end_angle=end_angle)
+                                 end_angle=end_angle)
                 point_list.append(new_arc.end)
                 add_on -= step
                 angle_p += add_on
