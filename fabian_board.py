@@ -350,11 +350,12 @@ class FabianBoard(Board):
                 self.new_line_edge[1] = p
                 self.new_line_original_part[1] = self.selected_part
                 new_points = self.add_line()
-                start_point = new_points[0]
-                for i in range(1, len(new_points)):
-                    end_point = new_points[i]
-                    self.add_line_to_net_list_by_points(start_point, end_point)
-                    start_point = end_point
+                if new_points is not None:
+                    start_point = new_points[0]
+                    for i in range(1, len(new_points)):
+                        end_point = new_points[i]
+                        self.add_line_to_net_list_by_points(start_point, end_point)
+                        start_point = end_point
                 self.remove_temp_line()
                 self.update_view()
 
@@ -1299,6 +1300,8 @@ class FabianBoard(Board):
         self.remove_parts_from_list(lonely_nodes_list, gv.part_list_nodes)
 
     def remove_parts_from_list(self, part_list, list_name):
+        if part_list is None:
+            return
         # remove duplicate parts from list
         part_list = list(dict.fromkeys(part_list))
         part_list = sorted(part_list, reverse=True)
@@ -1811,6 +1814,8 @@ class FabianBoard(Board):
                 horizontal_nodes.append([line.start_node, line.end_node])
             else:
                 horizontal_nodes.append([line.end_node, line.start_node])
+        if len(middle_lines) == 0:
+            middle_lines = None
         n = len(bottom_node_list) + 1
         for i in range(len(bottom_node_list)):
             start_hash = bottom_node_list[i]
@@ -1819,7 +1824,11 @@ class FabianBoard(Board):
             end_index = get_index_from_hash(self.nodes_hash, end_hash)
             p1 = self.node_list[start_index].p
             p2 = self.node_list[end_index].p
-            line_points = self.add_line(p1, p2, (i+1)*100/n, reference_point, middle_lines)
+            if middle_lines is None:
+                percentage = 100 / (n - i)
+            else:
+                percentage = (i + 1) * 100 / n
+            line_points = self.add_line(p1, p2, percentage, reference_point, middle_lines)
             line_nodes = []
             for point in line_points:
                 node = Node(point)
@@ -2408,13 +2417,13 @@ class FabianBoard(Board):
         node2 = self.node_list[node2_index]
         angle = node1.p.get_alfa_to(node2.p)
         found_track = False
-        for i in range(2):
+        for i in range(3):
             middle_nodes = []
             if i == 0:
                 node_hash_index = self.get_next_node_on_straight_line(node1_hash_index, angle)
                 if node_hash_index is None:
                     continue
-            else:
+            elif i == 1:
                 adjacent_nodes = self.get_border_nodes_adjacent_to_node(node1_hash_index)
                 if len(adjacent_nodes) < 2:
                     print(f"can't find adjacent border nodes for node {node1_hash_index}")
@@ -2434,8 +2443,7 @@ class FabianBoard(Board):
                     middle_nodes = []
                     prev_node_hash_index = node1_hash_index
                     node_hash_index = adjacent_nodes[1]
-                    counter = 0
-                    continue
+                    break
                 middle_nodes.append(node_hash_index)
                 if i == 0:
                     next_node_hash_index = self.get_next_node_on_straight_line(node_hash_index, angle)
