@@ -5,7 +5,7 @@ WINDWO_SIZE = str(WINDOW_WIDTH)+'x'+str(WINDOW_HEIGHT)
 BOARD_HEIGHT = 50000
 BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
-files_dir = "./data files/NR-PRT-25150"
+files_dir = "./data files"#/NR-PRT-25150"
 
 max_nodes_to_create_element = 4
 
@@ -31,8 +31,8 @@ max_split_middle_percentage = 100-2*min_split_percentage
 handle_corners_mode_clear = 'clear'
 handle_corners_mode_set_net = 'set_net'
 corners_set_net_both = 'both'
-corners_set_net_left_right = 'left-right'
-corners_set_net_bottom_top = 'bottom_top'
+corners_set_net_1_4 = 'set net 1-4'
+corners_set_net_1_2 = 'set net 1-2'
 mouse_select_mode_edge = 'edge'
 mouse_select_mode_point = 'point'
 mouse_select_mode_corner = 'corner'
