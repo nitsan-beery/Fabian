@@ -2434,7 +2434,8 @@ class FabianBoard(Board):
             # max middle nodes = all nodes except node[0], node1 and node2
             while counter < len(self.node_list) - 3:
                 if node_hash_index is None:
-                    print(f"can't find middle nodes")
+                    # debug
+                    # print(f"can't find middle nodes")
                     return []
                 if node_hash_index == node2_hash_index:
                     found_track = True
@@ -2455,7 +2456,8 @@ class FabianBoard(Board):
             if found_track:
                 break
         if not found_track:
-            print(f"can't find middle nodes")
+            # debug
+            # print(f"can't find middle nodes")
             return []
         return middle_nodes
 
