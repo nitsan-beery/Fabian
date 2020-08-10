@@ -1,5 +1,6 @@
 from fabian_classes import *
 from point import *
+from tkinter import messagebox
 
 
 def get_index_from_hash(hash_table, hash_index):
@@ -57,29 +58,37 @@ def get_split_line_points(p1, p2, split_mode=gv.split_mode_evenly_n_parts, split
         point_list.append(middle_point)
         point_list.append(p2)
         return point_list
+    # check for valid point
     if split_mode == gv.split_mode_2_parts_percentage_side_by_reference_point:
-        percentage_left = split_arg[0]
-        reference_point = split_arg[1]
-        d1 = p1.get_distance_to_point(reference_point)
-        d2 = p2.get_distance_to_point(reference_point)
-        if d2 < d1:
-            split_arg[0] = 100 - percentage_left
-        split_mode = gv.split_mode_2_parts_percentage_left
-    p_list = get_middle_split_points_percentage_list(split_mode, split_arg)
-    if p2.is_smaller_x_smaller_y(p1):
-        for i in range(len(p_list)):
-            p_list[i] = 100 - p_list[i]
-        p_list.reverse()
+        if not isinstance(split_arg, tuple):
+            percentage_left = split_arg
+        else:
+            percentage_left = split_arg[0]
+            if len(split_arg) > 1 and isinstance(split_arg[1], Point):
+                reference_point = split_arg[1]
+                d1 = p1.get_distance_to_point(reference_point)
+                d2 = p2.get_distance_to_point(reference_point)
+                if d2 < d1:
+                    percentage_left = 100 - percentage_left
+        p_list = [percentage_left]
+    else:
+        p_list = get_middle_split_points_percentage_list(split_mode, split_arg)
+        if p2.is_smaller_x_smaller_y(p1):
+            for i in range(len(p_list)):
+                p_list[i] = 100 - p_list[i]
+            p_list.reverse()
     for p in p_list:
         current_d = d * p / 100
         middle_point = Point(start.x + current_d * math.cos(alfa), start.y + current_d * math.sin(alfa))
         point_list.append(middle_point)
     point_list.append(p2)
+    point_list = check_point_list_validity(point_list)
     return point_list
 
 
 def get_split_arc_points(arc, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):
     point_list = [arc.start]
+    start_angle = arc.arc_start_angle
     diff_angle = arc.arc_end_angle - arc.arc_start_angle
     if split_mode == gv.split_mode_2_parts_by_point:
         middle_point = split_arg
@@ -94,7 +103,6 @@ def get_split_arc_points(arc, split_mode=gv.split_mode_evenly_n_parts, split_arg
         for i in range(len(p_list)):
             p_list[i] = 100 - p_list[i]
         p_list.reverse()
-    start_angle = arc.arc_start_angle
     for p in p_list:
         end_angle = arc.arc_start_angle + diff_angle * p / 100
         new_arc = Entity(shape=arc.shape, center=arc.center, radius=arc.radius, start_angle=start_angle,
@@ -102,6 +110,7 @@ def get_split_arc_points(arc, split_mode=gv.split_mode_evenly_n_parts, split_arg
         point_list.append(new_arc.end)
         start_angle = end_angle
     point_list.append(arc.end)
+    point_list = check_point_list_validity(point_list)
     return point_list
 
 
@@ -122,18 +131,6 @@ def get_split_circle_points(circle, parts, start_angle, end_angle=None):
 
 
 def get_middle_split_points_percentage_list(split_mode, split_arg):
-    # if mode is split_mode_2_parts_percentage_side_by_reference_point, check for valid point
-    if split_mode == gv.split_mode_2_parts_percentage_side_by_reference_point:
-        if not isinstance(split_arg, tuple):
-            split_mode = gv.split_mode_2_parts_percentage_left
-        elif len(split_arg) < 2:
-            split_mode = gv.split_mode_2_parts_percentage_left
-        elif split_arg[1] is None:
-            split_arg = split_arg[0]
-            split_mode = gv.split_mode_2_parts_percentage_left
-        elif not isinstance(split_arg[1], Point):
-            split_arg = split_arg[0]
-            split_mode = gv.split_mode_2_parts_percentage_left
     p_list = []
     if split_mode == gv.split_mode_evenly_n_parts:
         n = split_arg
@@ -202,4 +199,35 @@ def get_middle_split_points_percentage_list(split_mode, split_arg):
             p_list.append(current_p)
             add_on -= step
             current_p += add_on
+    if split_mode == gv.split_mode_graduate_from_middle or split_mode == gv.split_mode_graduate_n_parts:
+        p_list = check_percentage_list_validity(p_list)
     return p_list
+
+
+def check_percentage_list_validity(p_list):
+    p = p_list[0]
+    valid = False
+    if p > 0:
+        valid = True
+        for i in range(len(p_list)):
+            if p_list[i] < p or p_list[i] >= 100:
+                valid = False
+                break
+    if not valid:
+        m = f"can't split with current parameters"
+        messagebox.showwarning("Warning", m)
+        p_list = [50]
+    return p_list
+
+
+def check_point_list_validity(point_list):
+    if len(point_list) < 3:
+        return point_list
+    # check closest nodes (list edges)
+    if point_list[0].is_equal(point_list[1]) or point_list[-1].is_equal(point_list[-2]):
+        m = f"Too short lines, change split parameters"
+        messagebox.showwarning("Warning", m)
+        point_list = [point_list[0], point_list[-1]]
+    return point_list
+
+
