@@ -1823,10 +1823,8 @@ class FabianBoard(Board):
         for i in range(len(bottom_node_list)):
             start_hash = bottom_node_list[i]
             end_hash = top_node_list[i]
-            start_index = get_index_from_hash(self.nodes_hash, start_hash)
-            end_index = get_index_from_hash(self.nodes_hash, end_hash)
-            p1 = self.node_list[start_index].p
-            p2 = self.node_list[end_index].p
+            p1 = self.get_node_p(start_hash)
+            p2 = self.get_node_p(end_hash)
             if middle_lines is None:
                 percentage = 100 / (n - i)
             else:
