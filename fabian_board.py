@@ -1776,9 +1776,9 @@ class FabianBoard(Board):
         dy = d * math.sin(angle_out_1_4)
         p_1_4 = Point(p_1_4.x + dx, p_1_4.y + dy)
         middle_nodes_1_2, found_track, length = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[1], True)
-        middle_nodes_2_3, found_track, length = self.get_middle_nodes_between_node1_and_node_2(hash_node[1], hash_node[2], False)
-        middle_nodes_4_3, found_track, length = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2], False)
-        middle_nodes_1_4, found_track, length = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[3], False)
+        middle_nodes_2_3, found_track, length = self.get_middle_nodes_between_node1_and_node_2(hash_node[1], hash_node[2])
+        middle_nodes_4_3, found_track, length = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2])
+        middle_nodes_1_4, found_track, length = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[3])
         if mode != gv.corners_set_net_1_2 and len(middle_nodes_1_2) != len(middle_nodes_4_3):
             print(f'mismatch number of nodes left ({len(middle_nodes_1_2)}) and right ({len(middle_nodes_4_3)})')
             return False
@@ -2409,7 +2409,7 @@ class FabianBoard(Board):
                 new_points.append(p2)
         return new_points
 
-    def get_middle_nodes_between_node1_and_node_2(self, node1_hash_index, node2_hash_index, set_attached_lines=True, visited_nodes=[]):
+    def get_middle_nodes_between_node1_and_node_2(self, node1_hash_index, node2_hash_index, set_attached_lines=False, visited_nodes=[], prev_length=0):
         if set_attached_lines:
             self.set_all_nodes_attached_line_list()
         attached_lines = self.get_lines_attached_to_node(node1_hash_index)
@@ -2420,7 +2420,7 @@ class FabianBoard(Board):
             if al.second_node in visited_nodes:
                 continue
             else:
-                path_length = self.get_node_p(node1_hash_index).get_distance_to_point(self.get_node_p(al.second_node))
+                path_length = prev_length + self.get_node_p(node1_hash_index).get_distance_to_point(self.get_node_p(al.second_node))
                 if path_length >= shortest_path:
                     continue
             if al.second_node == node2_hash_index:
@@ -2431,8 +2431,7 @@ class FabianBoard(Board):
             else:
                 tmp_list = visited_nodes.copy()
                 tmp_list.append(node1_hash_index)
-                tmp_list, tmp_found, tmp_length = self.get_middle_nodes_between_node1_and_node_2(al.second_node, node2_hash_index, False, tmp_list)
-                path_length += tmp_length
+                tmp_list, tmp_found, path_length = self.get_middle_nodes_between_node1_and_node_2(al.second_node, node2_hash_index, False, tmp_list, path_length)
                 if tmp_found and path_length < shortest_path:
                     middle_nodes = [al.second_node]
                     middle_nodes += tmp_list
