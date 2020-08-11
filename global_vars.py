@@ -5,7 +5,7 @@ WINDWO_SIZE = str(WINDOW_WIDTH)+'x'+str(WINDOW_HEIGHT)
 BOARD_HEIGHT = 50000
 BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
-files_dir = "./data files/NR-PRT-25150"
+files_dir = "./data files"#/NR-PRT-25150"
 
 max_nodes_to_create_element = 4
 
@@ -27,6 +27,7 @@ max_split_parts = 100
 min_split_percentage = 1
 max_split_side_percentage = 100-min_split_percentage
 max_split_middle_percentage = 100-2*min_split_percentage
+infinite_size = BOARD_HEIGHT
 
 handle_corners_mode_clear = 'clear'
 handle_corners_mode_set_net = 'set_net'

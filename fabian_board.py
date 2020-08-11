@@ -1145,21 +1145,19 @@ class FabianBoard(Board):
             return False
         new_lines = []
         line = self.net_line_list[part]
-        start_node_index = get_index_from_hash(self.nodes_hash, line.start_node)
-        end_node_index = get_index_from_hash(self.nodes_hash, line.end_node)
-        node1 = self.node_list[start_node_index]
-        node2 = self.node_list[end_node_index]
+        p1 = self.get_node_p(line.start_node)
+        p2 = self.get_node_p(line.end_node)
         shape = 'LINE'
         if line.entity is not None:
             shape = self.entity_list[line.entity].shape
         start_node = line.start_node
         if shape == 'LINE':
-            new_points = get_split_line_points(node1.p, node2.p, split_mode, split_additional_arg)
+            new_points = get_split_line_points(p1, p2, split_mode, split_additional_arg)
         # shape == 'ARC' or shape == 'CIRCLE'
         else:
             reference_entity = self.entity_list[line.entity]
-            start_angle = reference_entity.center.get_alfa_to(node1.p)
-            end_angle = reference_entity.center.get_alfa_to(node2.p)
+            start_angle = reference_entity.center.get_alfa_to(p1)
+            end_angle = reference_entity.center.get_alfa_to(p2)
             if end_angle + 360 - start_angle < 180:
                 end_angle += 360
             if start_angle + 360 - end_angle < 180:
@@ -1174,9 +1172,9 @@ class FabianBoard(Board):
             end_node = self.add_node_to_node_list(new_node)
             new_lines.append(NetLine(start_node, end_node, line.entity))
             start_node = end_node
-        self.remove_parts_from_list([part], gv.part_list_net_lines)
         for j in range(len(new_lines)):
             self.add_line_to_net_list_by_line(new_lines[j])
+        self.remove_parts_from_list([part], gv.part_list_net_lines)
         return True
 
     # return all net lines crossed by line from p1 to p2
@@ -1277,6 +1275,11 @@ class FabianBoard(Board):
             if part_list[i].is_marked:
                 mark_list.append(i)
         return mark_list
+
+    def get_node_p(self, hash_index):
+        node_index = get_index_from_hash(self.nodes_hash, hash_index)
+        node = self.node_list[node_index]
+        return node.p
 
     def get_nodes_attached_to_lines(self, net_line_list):
         nodes_list = []
@@ -1772,10 +1775,10 @@ class FabianBoard(Board):
         dx = d * math.cos(angle_out_1_4)
         dy = d * math.sin(angle_out_1_4)
         p_1_4 = Point(p_1_4.x + dx, p_1_4.y + dy)
-        middle_nodes_1_2 = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[1], hash_node[3])
-        middle_nodes_2_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[1], hash_node[2], hash_node[0])
-        middle_nodes_4_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2], hash_node[0])
-        middle_nodes_1_4 = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[3], hash_node[1])
+        middle_nodes_1_2, found_track, length = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[1], True)
+        middle_nodes_2_3, found_track, length = self.get_middle_nodes_between_node1_and_node_2(hash_node[1], hash_node[2], False)
+        middle_nodes_4_3, found_track, length = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2], False)
+        middle_nodes_1_4, found_track, length = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[3], False)
         if mode != gv.corners_set_net_1_2 and len(middle_nodes_1_2) != len(middle_nodes_4_3):
             print(f'mismatch number of nodes left ({len(middle_nodes_1_2)}) and right ({len(middle_nodes_4_3)})')
             return False
@@ -2406,10 +2409,41 @@ class FabianBoard(Board):
                 new_points.append(p2)
         return new_points
 
+    def get_middle_nodes_between_node1_and_node_2(self, node1_hash_index, node2_hash_index, set_attached_lines=True, visited_nodes=[]):
+        if set_attached_lines:
+            self.set_all_nodes_attached_line_list()
+        attached_lines = self.get_lines_attached_to_node(node1_hash_index)
+        shortest_path = gv.infinite_size
+        found_track = False
+        middle_nodes = []
+        for al in attached_lines:
+            if al.second_node in visited_nodes:
+                continue
+            else:
+                path_length = self.get_node_p(node1_hash_index).get_distance_to_point(self.get_node_p(al.second_node))
+                if path_length >= shortest_path:
+                    continue
+            if al.second_node == node2_hash_index:
+                shortest_path = path_length
+                middle_nodes = []
+                found_track = True
+                break
+            else:
+                tmp_list = visited_nodes.copy()
+                tmp_list.append(node1_hash_index)
+                tmp_list, tmp_found, tmp_length = self.get_middle_nodes_between_node1_and_node_2(al.second_node, node2_hash_index, False, tmp_list)
+                path_length += tmp_length
+                if tmp_found and path_length < shortest_path:
+                    middle_nodes = [al.second_node]
+                    middle_nodes += tmp_list
+                    found_track = True
+                    shortest_path = path_length
+        return middle_nodes, found_track, shortest_path
+
     # return list of nodes_hash_index between the 2 nodes
     # first trying to search nodes on a straight line/ if not found - then search for connected nodes on outer or inner border
     # if the path meets wrong_direction_node, search will start again in other direction
-    def get_middle_nodes_between_node1_and_node_2(self, node1_hash_index, node2_hash_index, wrong_direction_node):
+    def get_middle_nodes_between_node1_and_node_2_old(self, node1_hash_index, node2_hash_index, wrong_direction_node):
         # try to find on a straight line
         node1_index = get_index_from_hash(self.nodes_hash, node1_hash_index)
         node2_index = get_index_from_hash(self.nodes_hash, node2_hash_index)
