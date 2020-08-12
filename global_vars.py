@@ -5,7 +5,7 @@ WINDWO_SIZE = str(WINDOW_WIDTH)+'x'+str(WINDOW_HEIGHT)
 BOARD_HEIGHT = 50000
 BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
-files_dir = "./data files/NR-PRT-25150"
+files_dir = "./data files"#/NR-PRT-25150"
 
 max_nodes_to_create_element = 4
 
@@ -14,6 +14,7 @@ default_split_circle_parts = 18
 max_arc_angle_for_net_line = 30
 # length relative to length of object measured from bottom-left to right-up
 max_line_length_for_net_line = 0.6
+max_diff_angle_for_staright_line = 2
 
 default_accuracy = 3
 accuracy = default_accuracy
