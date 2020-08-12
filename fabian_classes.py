@@ -769,8 +769,8 @@ class SplitCircleDialog(object):
         except ValueError:
             print('choose a number for #parts')
             return
-        if parts < 3:
-            print('choose a number bigger than 2 for #parts')
+        if parts < 2:
+            print('choose a number bigger than 1 for #parts')
             return
         self.choice = {
             'split_mode': split_mode,

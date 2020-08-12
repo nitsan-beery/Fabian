@@ -1061,11 +1061,13 @@ class FabianBoard(Board):
         elif e.shape == 'CIRCLE':
             self.split_circle(part, split_mode, split_additional_arg)
             return True
-        self.remove_parts_from_list([part], gv.part_list_entities)
         for m in range(n):
             self.entity_list.append(new_part_list[m])
             self.define_new_entity_color(-1)
             self.show_entity(-1)
+        self.remove_parts_from_list([part], gv.part_list_entities)
+        if split_mode == gv.split_mode_2_parts_by_point:
+            self.mouse_select_mode = gv.mouse_select_mode_edge
         return True
 
     def split_all_circles(self, n=gv.default_split_circle_parts):
@@ -1698,6 +1700,9 @@ class FabianBoard(Board):
             if e.shape == 'CIRCLE':
                 continue
             self.set_entity_edge_nodes(i)
+            # debug
+            if len(e.nodes_list) < 2:
+                print(f'in set_entity_edge_nodes: entity {i}  shape {e.shape}  len e.nodes_list: {len(e.nodes_list)}')
             start_node = e.nodes_list[0]
             end_node = e.nodes_list[1]
             line_entity = i
