@@ -1675,6 +1675,11 @@ class FabianBoard(Board):
         node_list_index = self.nodes_hash.get(str(hash_index))
         if node_list_index is None:
             return
+        # make sure that corner will not remain on invalid node
+        for corner in self.corner_list:
+            if corner.hash_node == hash_index:
+                self.clear_corner_list()
+                break
         # update hash
         for i in range(node_list_index+1, len(self.node_list)):
             node_hash_index = self.node_list[i].hash_index
@@ -2407,6 +2412,7 @@ class FabianBoard(Board):
                 new_points.append(p2)
         return new_points
 
+    # return list of nodes_hash_index between the 2 nodes in the shortest path
     def get_middle_nodes_between_node1_and_node_2(self, node1_hash_index, node2_hash_index, set_attached_lines=False, visited_nodes=[], prev_length=0):
         if set_attached_lines:
             self.set_all_nodes_attached_line_list()
@@ -2436,85 +2442,6 @@ class FabianBoard(Board):
                     found_track = True
                     shortest_path = path_length
         return middle_nodes, found_track, shortest_path
-
-    # return list of nodes_hash_index between the 2 nodes
-    # first trying to search nodes on a straight line/ if not found - then search for connected nodes on outer or inner border
-    # if the path meets wrong_direction_node, search will start again in other direction
-    def get_middle_nodes_between_node1_and_node_2_old(self, node1_hash_index, node2_hash_index, wrong_direction_node):
-        # try to find on a straight line
-        node1_index = get_index_from_hash(self.nodes_hash, node1_hash_index)
-        node2_index = get_index_from_hash(self.nodes_hash, node2_hash_index)
-        node1 = self.node_list[node1_index]
-        node2 = self.node_list[node2_index]
-        angle = node1.p.get_alfa_to(node2.p)
-        found_track = False
-        for i in range(3):
-            middle_nodes = []
-            if i == 0:
-                node_hash_index = self.get_next_node_on_straight_line(node1_hash_index, angle)
-                if node_hash_index is None:
-                    continue
-            elif i == 1:
-                adjacent_nodes = self.get_border_nodes_adjacent_to_node(node1_hash_index)
-                if len(adjacent_nodes) < 2:
-                    print(f"can't find adjacent border nodes for node {node1_hash_index}")
-                    return middle_nodes
-                prev_node_hash_index = node1_hash_index
-                node_hash_index = adjacent_nodes[0]
-            counter = 0
-            # max middle nodes = all nodes except node[0], node1 and node2
-            while counter < len(self.node_list) - 3:
-                if node_hash_index is None:
-                    # debug
-                    # print(f"can't find middle nodes")
-                    return []
-                if node_hash_index == node2_hash_index:
-                    found_track = True
-                    break
-                elif node_hash_index == wrong_direction_node:
-                    middle_nodes = []
-                    prev_node_hash_index = node1_hash_index
-                    node_hash_index = adjacent_nodes[1]
-                    break
-                middle_nodes.append(node_hash_index)
-                if i == 0:
-                    next_node_hash_index = self.get_next_node_on_straight_line(node_hash_index, angle)
-                else:
-                    next_node_hash_index = self.get_next_node_on_border(node_hash_index, prev_node_hash_index)
-                prev_node_hash_index = node_hash_index
-                node_hash_index = next_node_hash_index
-                counter += 1
-            if found_track:
-                break
-        if not found_track:
-            # debug
-            # print(f"can't find middle nodes")
-            return []
-        return middle_nodes
-
-    def get_border_nodes_adjacent_to_node(self, hash_node):
-        adjacent_border_nodes = []
-        attached_lines = self.get_lines_attached_to_node(hash_node)
-        for al in attached_lines:
-            line = self.net_line_list[al.line_index]
-            if line.entity is not None:
-                adjacent_border_nodes.append(al.second_node)
-        return adjacent_border_nodes
-
-    # return the next connected border node
-    def get_next_node_on_border(self, hash_node, prev_hash_node):
-        adjacent_nodes = self.get_border_nodes_adjacent_to_node(hash_node)
-        for node in adjacent_nodes:
-            if node != prev_hash_node:
-                return node
-        return None
-
-    def get_next_node_on_straight_line(self, hash_node, angle):
-        attached_lines = self.get_lines_attached_to_node(hash_node)
-        for al in attached_lines:
-            if round(al.angle_to_second_node, gv.accuracy) == round(angle, gv.accuracy):
-                return al.second_node
-        return None
 
     def get_index_of_entity(self, entity):
         for i in range(len(self.entity_list)):
