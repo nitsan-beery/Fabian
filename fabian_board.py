@@ -1121,7 +1121,7 @@ class FabianBoard(Board):
             new_points = get_split_arc_points(arc, split_mode, split_additional_arg)
         # entity.shape == 'CIRCLE'
         else:
-            new_points = self.get_split_circle_points(entity, split_additional_arg, start)
+            new_points = get_split_circle_points(entity, split_additional_arg, start)
             new_node = Node(new_points[0], entity=part)
             start_hash_node = self.add_node_to_node_list(new_node)
             circle_first_node = start_hash_node
@@ -1761,10 +1761,10 @@ class FabianBoard(Board):
         for i in range(len(self.corner_list)):
             hash_node.append(self.corner_list[i].hash_node)
             corner_p.append(self.get_node_p(hash_node[-1]))
-        middle_nodes_1_2 = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[1], hash_node[3], True)
-        middle_nodes_2_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[1], hash_node[2], hash_node[0])
-        middle_nodes_4_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2], hash_node[0])
-        middle_nodes_1_4 = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[3], hash_node[1])
+        middle_nodes_1_2, found_track_1_2 = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[1], hash_node[3], True)
+        middle_nodes_2_3, found_track_2_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[1], hash_node[2], hash_node[0])
+        middle_nodes_4_3, found_track_4_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2], hash_node[0])
+        middle_nodes_1_4, found_track_1_4 = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[3], hash_node[1])
         if mode != gv.corners_set_net_1_2 and len(middle_nodes_1_2) != len(middle_nodes_4_3):
             print(f'mismatch number of nodes left ({len(middle_nodes_1_2)}) and right ({len(middle_nodes_4_3)})')
             return False
@@ -2413,17 +2413,22 @@ class FabianBoard(Board):
         # try to set middle nodes on a straight line
         middle_nodes, found_track = self.get_middle_nodes_on_straight_line(node1_hash_index, node2_hash_index)
         if found_track:
-            return middle_nodes
+            return middle_nodes, True
         # try to set middle nodes on border lines only
-        self.keep_state()
+        self.clear_corner_list()
         self.clear_net()
         middle_nodes, found_track, shortest_path = self.get_shortest_path_middle_nodes(node1_hash_index, node2_hash_index, wrong_node, visited_nodes=[], prev_length=0)
-        self.resume_state()
+        self.undo()
+        self.undo()
         if found_track:
-            return middle_nodes
+            return middle_nodes, True
+        else:
+            return [], False
+        '''
         # set middle nodes via shortest path on the whole net
         middle_nodes, found_track, shortest_path = self.get_shortest_path_middle_nodes(node1_hash_index, node2_hash_index, wrong_node, visited_nodes=[], prev_length=0)
         return middle_nodes
+        '''
 
     # return list of nodes_hash_index between the 2 nodes on a straight line
     def get_middle_nodes_on_straight_line(self, node1_hash_index, node2_hash_index):
