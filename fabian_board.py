@@ -1514,7 +1514,7 @@ class FabianBoard(Board):
         self.set_lines_attached_to_node(node_hash_index)
         return node.attached_lines
 
-    def mark_border_lines(self):
+    def set_border_lines(self):
         n_hash = self.get_bottom_left_node()
         n_index = get_index_from_hash(self.nodes_hash, n_hash)
         nodes_outer_list = [n_index]
@@ -1542,7 +1542,7 @@ class FabianBoard(Board):
                     al.is_available = False
                     al.border_type = gv.line_border_type_outer
         # debug
-        print(f'outer line: {nodes_outer_list}')
+        #print(f'outer line: {nodes_outer_list}')
         inner_border_nodes = []
         for i in range(len(self.net_line_list)):
             net_line = self.net_line_list[i]
@@ -1557,7 +1557,7 @@ class FabianBoard(Board):
         # remove duplicate nodes
         inner_border_nodes = list(dict.fromkeys(inner_border_nodes))
         # debug
-        print(f'inner nodes (hash): {inner_border_nodes}')
+        #print(f'inner nodes (hash): {inner_border_nodes}')
         while len(inner_border_nodes) > 0:
             if len(inner_border_nodes) < 3:
                 m = f'There are open inner entities. remove or fix before INP mode'
@@ -1767,7 +1767,7 @@ class FabianBoard(Board):
             hash_node.append(self.corner_list[i].hash_node)
             corner_p.append(self.get_node_p(hash_node[-1]))
         self.set_all_nodes_attached_line_list()
-        self.mark_border_lines()
+        self.set_border_lines()
         middle_nodes_1_2, found_track_1_2 = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[1], [hash_node[0], hash_node[2], hash_node[3]])
         middle_nodes_2_3, found_track_2_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[1], hash_node[2], [hash_node[0], hash_node[1], hash_node[3]])
         middle_nodes_4_3, found_track_4_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2], [hash_node[0], hash_node[1], hash_node[3]])
@@ -1859,7 +1859,7 @@ class FabianBoard(Board):
 
     def set_nodes_attached_lines_and_exception(self):
         self.set_all_nodes_attached_line_list()
-        self.mark_border_lines()
+        self.set_border_lines()
         #debug
         #print(nodes_outer_list)
         self.set_all_nodes_expected_elements_and_exceptions()
@@ -3012,9 +3012,11 @@ class FabianBoard(Board):
     def clear_net(self):
         self.hide_all_elements()
         line_list = []
+        self.set_all_nodes_attached_line_list()
+        self.set_border_lines()
         for i in range(len(self.net_line_list)):
             line = self.net_line_list[i]
-            if line.entity is None:
+            if line.border_type == gv.line_border_type_none:
                 line_list.append(i)
         if len(line_list) > 0:
             self.keep_state()
