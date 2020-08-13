@@ -2476,8 +2476,8 @@ class FabianBoard(Board):
             shortest_path = len(middle_nodes)
         # try other side
         next_node = side_border_node[1]
-        middle_nodes_2, found_track = self.get_middle_nodes_on_one_direction(next_node, node1_hash_index, node2_hash_index, wrong_nodes)
-        if found_track and len(middle_nodes_2) < shortest_path:
+        middle_nodes_2, found_track_2 = self.get_middle_nodes_on_one_direction(next_node, node1_hash_index, node2_hash_index, wrong_nodes)
+        if found_track_2 and len(middle_nodes_2) < shortest_path:
             return middle_nodes_2, True
         return middle_nodes, found_track
 
