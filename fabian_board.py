@@ -1779,10 +1779,10 @@ class FabianBoard(Board):
         if msg != "couldn't find middle nodes between":
             messagebox.showwarning("Warning", msg)
         if mode != gv.corners_set_net_1_2 and len(middle_nodes_1_2) != len(middle_nodes_4_3):
-            print(f'mismatch number of nodes left ({len(middle_nodes_1_2)}) and right ({len(middle_nodes_4_3)})')
+            print(f'mismatch number of nodes between 1-2 ({len(middle_nodes_1_2)}) and 4-3 ({len(middle_nodes_4_3)})')
             return False
         if mode != gv.corners_set_net_1_4 and len(middle_nodes_2_3) != len(middle_nodes_1_4):
-            print(f'mismatch number of nodes top ({len(middle_nodes_2_3)}) and bottom ({len(middle_nodes_1_4)})')
+            print(f'mismatch number of nodes between 1-4 ({len(middle_nodes_1_4)}) and 2-3 ({len(middle_nodes_2_3)})')
             return False
         if mode == gv.corners_set_net_1_4 or mode == gv.corners_set_net_both:
             self.add_lines_between_2_node_list(middle_nodes_1_2, middle_nodes_4_3, corner_p[0], corner_p[1], middle_nodes_1_4, middle_nodes_2_3)
@@ -2427,11 +2427,12 @@ class FabianBoard(Board):
         if found_track:
             return middle_nodes, True
         # try to set middle nodes on border lines only
+        state_stack = len(self.state)
         self.clear_corner_list()
         self.clear_net()
         middle_nodes, found_track, shortest_path = self.get_shortest_path_middle_nodes(node1_hash_index, node2_hash_index, wrong_node, visited_nodes=[], prev_length=0)
-        self.undo()
-        self.undo()
+        while len(self.state) > state_stack:
+            self.undo()
         if found_track:
             return middle_nodes, True
         else:
@@ -2453,7 +2454,7 @@ class FabianBoard(Board):
             attached_lines = self.get_lines_attached_to_node(node)
             found_next_node = False
             for al in attached_lines:
-                if get_smallest_diff_angle(al.angle_to_second_node, angle) < gv.max_diff_angle_for_staright_line:
+                if get_smallest_diff_angle(al.angle_to_second_node, angle) < gv.max_diff_angle_for_straight_line:
                     node = al.second_node
                     found_next_node = True
                     break

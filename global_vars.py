@@ -5,7 +5,7 @@ WINDWO_SIZE = str(WINDOW_WIDTH)+'x'+str(WINDOW_HEIGHT)
 BOARD_HEIGHT = 50000
 BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
-files_dir = "./data files/NR-PRT-25150"
+files_dir = "./data files/IM-0101-Frame"
 
 max_nodes_to_create_element = 4
 
@@ -21,7 +21,7 @@ accuracy = default_accuracy
 min_distance_between_nodes = 4
 angle_diff_accuracy = 1
 min_angle_to_create_element = 20
-max_diff_angle_for_staright_line = min_angle_to_create_element
+max_diff_angle_for_straight_line = min_angle_to_create_element
 max_angle_to_create_element = 160
 max_state_stack = 100
 max_split_parts = 100
