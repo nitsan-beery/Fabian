@@ -240,6 +240,7 @@ class FabianBoard(Board):
             self.new_line_edge[0] = p
             self.keep_state()
             self.split_selected_part(gv.split_mode_2_parts_by_point)
+            self.mouse_select_mode = gv.mouse_select_mode_edge
             return
         if self.mouse_select_mode != gv.mouse_select_mode_point:
             d1 = p1.get_distance_to_point(mouse_point)
@@ -632,6 +633,7 @@ class FabianBoard(Board):
                 changed = True
         elif mode == gv.hide_mode:
             if self.show_inps:
+                self.hide_all_inp_nets()
                 self.show_inps = False
                 self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
                 changed = True
@@ -1765,6 +1767,17 @@ class FabianBoard(Board):
         middle_nodes_2_3, found_track_2_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[1], hash_node[2], hash_node[0])
         middle_nodes_4_3, found_track_4_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2], hash_node[0])
         middle_nodes_1_4, found_track_1_4 = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[3], hash_node[1])
+        msg = "couldn't find middle nodes between"
+        if not found_track_1_2:
+            msg += ' 1-2 '
+        if not found_track_2_3:
+            msg += ' 2-3 '
+        if not found_track_4_3:
+            msg += ' 3-4 '
+        if not found_track_1_4:
+            msg += ' 1-4 '
+        if msg != "couldn't find middle nodes between":
+            messagebox.showwarning("Warning", msg)
         if mode != gv.corners_set_net_1_2 and len(middle_nodes_1_2) != len(middle_nodes_4_3):
             print(f'mismatch number of nodes left ({len(middle_nodes_1_2)}) and right ({len(middle_nodes_4_3)})')
             return False
@@ -2082,7 +2095,6 @@ class FabianBoard(Board):
             self.update_view()
         # inp mode
         else:
-            pass
             self.set_inp_net(new_inp, node_list, element_list)
             self.inp_nets.append(new_inp)
             self.show_inp(-1)
