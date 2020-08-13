@@ -1033,12 +1033,13 @@ class FabianBoard(Board):
                 new_part_list.append(arc)
                 arc = Entity(shape=e.shape, center=e.center, radius=e.radius, start_angle=mid_angle, end_angle=e.arc_end_angle)
                 new_part_list.append(arc)
-            # currently only split_mode_evenly_n_parts is supported
             else:
-                angle = (e.arc_end_angle-e.arc_start_angle) / n
+                new_points = get_split_arc_points(e, split_mode, split_additional_arg)
+                n = len(new_points) - 1
                 start_angle = e.arc_start_angle
-                for m in range(n):
-                    end_angle = start_angle + angle
+                for i in range(n):
+                    p = new_points[i+1]
+                    end_angle = e.center.get_alfa_to(p)
                     arc = Entity(shape=e.shape, center=e.center, radius=e.radius, start_angle=start_angle, end_angle=end_angle)
                     new_part_list.append(arc)
                     start_angle = end_angle
@@ -1051,19 +1052,18 @@ class FabianBoard(Board):
                 line = Entity(shape='LINE', start=mid_point, end=e.end)
                 new_part_list.append(line)
             else:
-                alfa = e.start.get_alfa_to(e.end)*math.pi/180
-                d = e.start.get_distance_to_point(e.end)
-                step = d/n
+                new_points = get_split_line_points(e.start, e.end, split_mode, split_additional_arg)
+                n = len(new_points) - 1
                 start = e.start
-                for m in range(n):
-                    end = Point(start.x + step * math.cos(alfa), start.y + step * math.sin(alfa))
+                for i in range(n):
+                    end = new_points[i+1]
                     line = Entity(shape='LINE', start=start, end=end)
                     new_part_list.append(line)
                     start = end
         elif e.shape == 'CIRCLE':
             self.split_circle(part, split_mode, split_additional_arg)
             return True
-        for m in range(n):
+        for i in range(n):
             self.entity_list.append(new_part_list[m])
             self.define_new_entity_color(-1)
             self.show_entity(-1)

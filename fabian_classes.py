@@ -760,7 +760,7 @@ class SplitCircleDialog(object):
         parts = self.entry_parts.get()
         # validity check
         try:
-            angle = int(angle)
+            angle = float(angle)
         except ValueError:
             print('choose a number for angle')
             return
