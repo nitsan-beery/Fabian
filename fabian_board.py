@@ -806,11 +806,17 @@ class FabianBoard(Board):
         first_part = part_list[0]
         e_0 = self.entity_list[first_part]
         shape = e_0.shape
-        if shape == 'ARC':
+        for i in part_list:
+            ei = self.entity_list[i]
+            if ei.shape != e_0.shape:
+                return None
+        if shape == 'CIRCLE':
+            return None
+        elif shape == 'ARC':
             # find smallest start_angle, and check all parts with same center and radius
             for i in part_list:
                 ei = self.entity_list[i]
-                if ei.shape != e_0.shape or ei.center != e_0.center or ei.radius != e_0.radius:
+                if ei.center != e_0.center or ei.radius != e_0.radius:
                     return None
                 if ei.arc_start_angle < e_0.arc_start_angle:
                     first_part = i
@@ -832,9 +838,6 @@ class FabianBoard(Board):
                     return None
         elif shape == 'LINE':
             for i in part_list:
-                ei = self.entity_list[i]
-                if ei.shape != e_0.shape:
-                    return None
                 if ei.left_bottom.is_smaller_x_smaller_y(e_0.left_bottom):
                     first_part = i
                     e_0 = self.entity_list[first_part]
@@ -1600,12 +1603,12 @@ class FabianBoard(Board):
         lowest_node.attached_lines[inner_attached_line].border_type = gv.line_border_type_inner
         lowest_node.attached_lines[inner_attached_line].is_available = False
         inner_border_nodes.pop(lowest_index)
-        removed_nodes = [lowest_node_index]
+        removed_nodes = [lowest_hash]
         while next_inner_node is not None and len(inner_border_nodes) > 0:
             node_index = get_index_from_hash(self.nodes_hash, next_inner_node)
             node = self.node_list[node_index]
             inner_border_nodes.remove(next_inner_node)
-            removed_nodes.append(node_index)
+            removed_nodes.append(next_inner_node)
             next_inner_node = None
             for i in range(len(node.attached_lines)):
                 al = node.attached_lines[i]
@@ -1618,11 +1621,21 @@ class FabianBoard(Board):
                     next_inner_node = al.second_node
                     break
         # validity check
-        net_line = NetLine(removed_nodes[-1], removed_nodes[0])
-        if not is_line_in_net_line_list(net_line, self.net_line_list):
-            print("can't close inner line loop. check DXF")
+        if len(removed_nodes) > 0:
+            node_index = get_index_from_hash(self.nodes_hash, removed_nodes[-1])
+            node = self.node_list[node_index]
+            is_valid = False
+            for al in node.attached_lines:
+                if al.second_node == removed_nodes[0]:
+                    is_valid = True
+                    al.is_available = False
+                    al.border_type = gv.line_border_type_inner
+                    break
+            if not is_valid:
+                print("can't close inner line loop. check DXF")
         # mark relevant attached lines as unavailale
-        for node_index in removed_nodes:
+        for node_hash in removed_nodes:
+            node_index = get_index_from_hash(self.nodes_hash, node_hash)
             node = self.node_list[node_index]
             for al in node.attached_lines:
                 net_line = self.net_line_list[al.line_index]
