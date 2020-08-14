@@ -17,7 +17,7 @@ max_line_length_for_net_line = 0.6
 
 default_accuracy = 3
 accuracy = default_accuracy
-# times * acuuracy (if accuracy = 1/1000, distance is 0.004)
+# times * accuracy (if accuracy = 1/1000, distance is 0.004)
 min_distance_between_nodes = 4
 angle_diff_accuracy = 1
 min_angle_to_create_element = 20

@@ -1772,7 +1772,7 @@ class FabianBoard(Board):
         middle_nodes_2_3, found_track_2_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[1], hash_node[2], [hash_node[0], hash_node[1], hash_node[3]])
         middle_nodes_4_3, found_track_4_3 = self.get_middle_nodes_between_node1_and_node_2(hash_node[3], hash_node[2], [hash_node[0], hash_node[1], hash_node[3]])
         middle_nodes_1_4, found_track_1_4 = self.get_middle_nodes_between_node1_and_node_2(hash_node[0], hash_node[3], [hash_node[0], hash_node[1], hash_node[2]])
-        msg = "couldn't find middle nodes between"
+        msg = ""
         if not found_track_1_2:
             msg += ' 1-2 '
         if not found_track_2_3:
@@ -1781,8 +1781,9 @@ class FabianBoard(Board):
             msg += ' 3-4 '
         if not found_track_1_4:
             msg += ' 1-4 '
-        if msg != "couldn't find middle nodes between":
-            messagebox.showwarning("Warning", msg)
+        if msg != "":
+            msg = "couldn't find middle nodes between" + msg
+            print(msg)
         if mode != gv.corners_set_net_1_2 and len(middle_nodes_1_2) != len(middle_nodes_4_3):
             print(f'mismatch number of nodes between 1-2 ({len(middle_nodes_1_2)}) and 4-3 ({len(middle_nodes_4_3)})')
             return False
