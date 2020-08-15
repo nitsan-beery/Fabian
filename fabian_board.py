@@ -2439,8 +2439,8 @@ class FabianBoard(Board):
 
     # return list of nodes_hash_index between the 2 nodes in the shortest path
     def get_middle_nodes_between_node1_and_node_2(self, node1_hash_index, node2_hash_index, wrong_nodes=[]):
-        # try to set middle nodes on a straight line
-        middle_nodes, found_track = self.get_middle_nodes_on_straight_line(node1_hash_index, node2_hash_index)
+        # try to set middle nodes direction oriented
+        middle_nodes, found_track = self.get_middle_nodes_direction_oriented(node1_hash_index, node2_hash_index)
         if found_track:
             return middle_nodes, True
         # try to set middle nodes on border lines only
@@ -2450,27 +2450,38 @@ class FabianBoard(Board):
         else:
             return [], False
 
-    # return list of nodes_hash_index between the 2 nodes on a straight line
-    def get_middle_nodes_on_straight_line(self, node1_hash_index, node2_hash_index):
+    # return list of nodes_hash_index between the 2 nodes on lines towards node2_hash_index
+    def get_middle_nodes_direction_oriented(self, node1_hash_index, node2_hash_index):
         middle_nodes = []
         p1 = self.get_node_p(node1_hash_index)
         p2 = self.get_node_p(node2_hash_index)
-        angle = p1.get_alfa_to(p2)
+        original_angle = p1.get_alfa_to(p2)
+        prev_angle = original_angle
         node_hash = node1_hash_index
         while node_hash != node2_hash_index:
             node_index = get_index_from_hash(self.nodes_hash, node_hash)
             attached_lines = self.node_list[node_index].attached_lines
-            found_next_node = False
+            next_node_hash = None
+            smallest_diff_angle = 360
             for al in attached_lines:
-                if get_smallest_diff_angle(al.angle_to_second_node, angle) < gv.max_diff_angle_for_straight_line:
-                    node_hash = al.second_node
-                    found_next_node = True
-                    break
-            if not found_next_node:
-                return middle_nodes, False
-            if node_hash == node2_hash_index:
-                return middle_nodes, True
-            middle_nodes.append(node_hash)
+                angle_to_target = self.get_node_p(node_hash).get_alfa_to(p2)
+                diff_prev_angle = get_smallest_diff_angle(al.angle_to_second_node, prev_angle)
+                diff_original_angle = get_smallest_diff_angle(angle_to_target, original_angle)
+                if diff_prev_angle < smallest_diff_angle and diff_original_angle < gv.max_diff_angle_for_direction_oriented:
+                    next_node_hash = al.second_node
+                    smallest_diff_angle = diff_prev_angle
+                    prev_angle = angle_to_target
+                    continue
+            if next_node_hash is not None:
+                node_hash = next_node_hash
+                middle_nodes.append(node_hash)
+                continue
+            else:
+                break
+        if node_hash == node2_hash_index:
+            middle_nodes.pop(-1)
+            return middle_nodes, True
+        return [], False
 
     # return list of nodes_hash_index between the 2 nodes in the shortest path
     def get_middle_nodes_on_border_lines(self, node1_hash_index, node2_hash_index, wrong_nodes=[]):
