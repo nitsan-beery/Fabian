@@ -1157,13 +1157,15 @@ class FabianBoard(Board):
             reference_entity = self.entity_list[line.entity]
             start_angle = reference_entity.center.get_alfa_to(p1)
             end_angle = reference_entity.center.get_alfa_to(p2)
-            if end_angle + 360 - start_angle < 180:
-                end_angle += 360
-            if start_angle + 360 - end_angle < 180:
-                start_angle += 360
-            if end_angle < start_angle:
+            if reference_entity.arc_end_angle >= 360:
+                if start_angle < reference_entity.arc_start_angle:
+                    start_angle += 360
+                if end_angle < reference_entity.arc_start_angle:
+                    end_angle += 360
+            diff1 = reference_entity.arc_end_angle - end_angle
+            diff2 = reference_entity.arc_end_angle - start_angle
+            if diff1 > diff2:
                 start_angle, end_angle = end_angle, start_angle
-                start_node = line.end_node
             arc = Entity('ARC', reference_entity.center, reference_entity.radius, start_angle=start_angle, end_angle=end_angle)
             new_points = get_split_arc_points(arc, split_mode, split_additional_arg)
         for j in range(len(new_points) - 1):
