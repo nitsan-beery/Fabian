@@ -5,7 +5,7 @@ WINDWO_SIZE = str(WINDOW_WIDTH)+'x'+str(WINDOW_HEIGHT)
 BOARD_HEIGHT = 50000
 BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
-files_dir = "./data files/Im-Y3-5"
+files_dir = "./data files"#/Im-Y3-5"
 
 max_nodes_to_create_element = 4
 

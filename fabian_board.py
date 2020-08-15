@@ -1152,20 +1152,44 @@ class FabianBoard(Board):
         start_node = line.start_node
         if shape == 'LINE':
             new_points = get_split_line_points(p1, p2, split_mode, split_additional_arg)
-        # shape == 'ARC' or shape == 'CIRCLE'
-        else:
+        elif shape == 'ARC':
             reference_entity = self.entity_list[line.entity]
             start_angle = reference_entity.center.get_alfa_to(p1)
             end_angle = reference_entity.center.get_alfa_to(p2)
             if reference_entity.arc_end_angle >= 360:
-                if start_angle < reference_entity.arc_start_angle:
+                if round(start_angle, gv.accuracy) < round(reference_entity.arc_start_angle, gv.accuracy):
                     start_angle += 360
-                if end_angle < reference_entity.arc_start_angle:
+                if round(end_angle, gv.accuracy) < round(reference_entity.arc_start_angle, gv.accuracy):
                     end_angle += 360
             diff1 = reference_entity.arc_end_angle - end_angle
             diff2 = reference_entity.arc_end_angle - start_angle
             if diff1 > diff2:
                 start_angle, end_angle = end_angle, start_angle
+            arc = Entity('ARC', reference_entity.center, reference_entity.radius, start_angle=start_angle, end_angle=end_angle)
+            new_points = get_split_arc_points(arc, split_mode, split_additional_arg)
+        # shape == 'CIRCLE'
+        else:
+            circle_lines = self.get_lines_attached_to_entity(line.entity)
+            circle_lines.remove(part)
+            p = None
+            for cl in circle_lines:
+                net_line = self.net_line_list[cl]
+                if net_line.start_node != line.start_node and net_line.start_node != line.end_node:
+                    p = self.get_node_p(net_line.start_node)
+                    break
+                elif net_line.end_node != line.start_node and net_line.end_node != line.end_node:
+                    p = self.get_node_p(net_line.end_node)
+                    break
+            reference_entity = self.entity_list[line.entity]
+            start_angle = reference_entity.center.get_alfa_to(p1)
+            end_angle = reference_entity.center.get_alfa_to(p2)
+            if p is not None:
+                p = get_shifted_point(p, p1, -p1.get_alfa_to(p2))
+                if p.y < 0:
+                    start_angle, end_angle = end_angle, start_angle
+            if end_angle < start_angle:
+                end_angle += 360
+
             arc = Entity('ARC', reference_entity.center, reference_entity.radius, start_angle=start_angle, end_angle=end_angle)
             new_points = get_split_arc_points(arc, split_mode, split_additional_arg)
         for j in range(len(new_points) - 1):
