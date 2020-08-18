@@ -1189,9 +1189,10 @@ class FabianBoard(Board):
                     start_angle, end_angle = end_angle, start_angle
             if end_angle < start_angle:
                 end_angle += 360
-
             arc = Entity('ARC', reference_entity.center, reference_entity.radius, start_angle=start_angle, end_angle=end_angle)
             new_points = get_split_arc_points(arc, split_mode, split_additional_arg)
+            new_node = Node(new_points[0], entity=line.entity)
+            start_node = self.add_node_to_node_list(new_node)
         for j in range(len(new_points) - 1):
             new_node = Node(new_points[j+1], entity=line.entity)
             end_node = self.add_node_to_node_list(new_node)
