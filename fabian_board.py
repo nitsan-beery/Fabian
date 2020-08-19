@@ -1167,6 +1167,8 @@ class FabianBoard(Board):
                 start_angle, end_angle = end_angle, start_angle
             arc = Entity('ARC', reference_entity.center, reference_entity.radius, start_angle=start_angle, end_angle=end_angle)
             new_points = get_split_arc_points(arc, split_mode, split_additional_arg)
+            new_node = Node(new_points[0], entity=line.entity)
+            start_node = self.add_node_to_node_list(new_node)
         # shape == 'CIRCLE'
         else:
             circle_lines = self.get_lines_attached_to_entity(line.entity)
