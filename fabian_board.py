@@ -2483,21 +2483,21 @@ class FabianBoard(Board):
         p1 = self.get_node_p(node1_hash_index)
         p2 = self.get_node_p(node2_hash_index)
         original_angle = p1.get_alfa_to(p2)
-        prev_angle = original_angle
         node_hash = node1_hash_index
         while node_hash != node2_hash_index:
+            angle_to_target = self.get_node_p(node_hash).get_alfa_to(p2)
+            diff_original_angle = get_smallest_diff_angle(angle_to_target, original_angle)
+            if diff_original_angle > gv.max_diff_angle_for_direction_oriented:
+                break
             node_index = get_index_from_hash(self.nodes_hash, node_hash)
             attached_lines = self.node_list[node_index].attached_lines
             next_node_hash = None
-            smallest_diff_angle = 360
+            smallest_diff_angle = gv.max_diff_angle_for_direction_oriented
             for al in attached_lines:
-                angle_to_target = self.get_node_p(node_hash).get_alfa_to(p2)
-                diff_prev_angle = get_smallest_diff_angle(al.angle_to_second_node, prev_angle)
-                diff_original_angle = get_smallest_diff_angle(angle_to_target, original_angle)
-                if diff_prev_angle < smallest_diff_angle and diff_original_angle < gv.max_diff_angle_for_direction_oriented:
+                diff_prev_angle = get_smallest_diff_angle(al.angle_to_second_node, angle_to_target)
+                if diff_prev_angle < smallest_diff_angle:
                     next_node_hash = al.second_node
                     smallest_diff_angle = diff_prev_angle
-                    prev_angle = angle_to_target
                     continue
             if next_node_hash is not None:
                 node_hash = next_node_hash
