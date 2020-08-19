@@ -787,3 +787,87 @@ class SplitCircleDialog(object):
     def key(self, event):
         if event.keycode == 13:
             self.get_choice()
+
+
+yes_no_choices_list = ['Yes', 'No']
+
+yes_no_mode_dictionary = {
+    yes_no_choices_list[0]: True,
+    yes_no_choices_list[1]: False
+}
+
+
+class ExtendArcDialog(object):
+    def __init__(self, parent, length=1):
+        self.window = tk.Toplevel(parent)
+        self.window.title(' Choose')
+        self.window.geometry('280x160')
+        self.window.resizable(0, 0)
+
+        self.frame_1 = tk.Frame(self.window)
+        self.frame_1.pack(side=tk.TOP, fill=tk.BOTH, pady=5)
+        self.frame_2 = tk.Frame(self.window)
+        self.frame_2.pack(side=tk.TOP, fill=tk.BOTH, ipady=6)
+        self.frame_3 = tk.Frame(self.window)
+        self.frame_3.pack(side=tk.BOTTOM, fill=tk.BOTH, ipady=0)
+
+        self.label_mode = tk.Label(self.frame_2, text='Include Left', padx=5)
+        self.label_angle = tk.Label(self.frame_2, width=15, text='Include right', padx=5)
+        self.label_parts = tk.Label(self.frame_2, width=5, text='Length', padx=5)
+
+        self.label_mode.grid(row=0, column=0)
+        self.label_angle.grid(row=0, column=1)
+        self.label_parts.grid(row=0, column=2)
+
+        self.extend_left_edge_choice_menu = ttk.Combobox(self.frame_2, width=10, values=yes_no_choices_list)
+        self.extend_right_edge_choice_menu = ttk.Combobox(self.frame_2, width=10, values=yes_no_choices_list)
+        self.entry_length = tk.Entry(self.frame_2, width=5)
+
+        self.extend_left_edge_choice_menu.grid(row=1, column=0, padx=10, pady=5)
+        self.extend_right_edge_choice_menu.grid(row=1, column=1)
+        self.entry_length.grid(row=1, column=2)
+
+        button_ok = tk.Button(self.frame_3, text="OK", width=5, command=self.get_choice)
+        button_cancel = tk.Button(self.frame_3, text="Cancel", width=5, command=self.window.destroy)
+        button_ok.pack(side=tk.RIGHT, padx=5, pady=5)
+        button_cancel.pack(side=tk.LEFT, padx=5)
+
+        self.window.bind('<Key>', self.key)
+        self.window.lift()
+
+        # set default values
+        self.extend_left_edge_choice_menu.current(1)
+        self.extend_right_edge_choice_menu.current(1)
+        self.entry_length.insert(0, round(length, 1))
+        self.entry_length.focus_set()
+        self.choice = None
+        self.length = length
+
+    def get_choice(self):
+        extend_left_edge = yes_no_mode_dictionary.get(self.extend_left_edge_choice_menu.get())
+        extend_right_edge = yes_no_mode_dictionary.get(self.extend_right_edge_choice_menu.get())
+        length = self.entry_length.get()
+        # validity check
+        if length == 'Auto':
+            length = self.length
+        else:
+            try:
+                length = float(length)
+            except ValueError:
+                print('choose a number for length')
+                return
+        self.choice = {
+            'extend_left_edge': extend_left_edge,
+            'extend_right_edge': extend_right_edge,
+            'length': length
+        }
+        self.window.destroy()
+
+    def show(self):
+        self.window.deiconify()
+        self.window.wait_window()
+        return self.choice
+
+    def key(self, event):
+        if event.keycode == 13:
+            self.get_choice()
