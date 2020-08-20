@@ -2236,6 +2236,7 @@ class FabianBoard(Board):
             self.set_inp_net(new_inp, node_list, element_list)
             self.inp_nets.append(new_inp)
             self.show_inp(-1)
+            self.show_inps = True
 
     def set_inp_net(self, inp_net, node_list, element_list):
         inp_net.set_nodes_and_elements(node_list.copy(), element_list.copy())
@@ -2577,6 +2578,7 @@ class FabianBoard(Board):
         original_angle = p1.get_alfa_to(p2)
         node_hash = node1_hash_index
         next_node_hash = -1
+        prev_node_hash = -1
         while node_hash != node2_hash_index and next_node_hash not in wrong_nodes:
             angle_to_target = self.get_node_p(node_hash).get_alfa_to(p2)
             diff_original_angle = get_smallest_diff_angle(angle_to_target, original_angle)
@@ -2587,12 +2589,15 @@ class FabianBoard(Board):
             next_node_hash = None
             smallest_diff_angle = gv.max_diff_angle_for_direction_oriented
             for al in attached_lines:
+                if al.second_node == prev_node_hash:
+                    continue
                 diff_prev_angle = get_smallest_diff_angle(al.angle_to_second_node, angle_to_target)
                 if diff_prev_angle < smallest_diff_angle:
                     next_node_hash = al.second_node
                     smallest_diff_angle = diff_prev_angle
                     continue
             if next_node_hash is not None:
+                prev_node_hash = node_hash
                 node_hash = next_node_hash
                 middle_nodes.append(node_hash)
                 continue
