@@ -39,6 +39,7 @@ class FabianBoard(Board):
         self.select_parts_mode = gv.default_select_parts_mode
         self.mark_option = gv.default_mark_option
         self.selected_part = None
+        self.mouse_click_point = Point(0, 0)
         self.new_line_edge = [None, None]
         self.new_line_original_part = [None, None]
         self.new_line_edge_mark = [None, None]
@@ -89,6 +90,7 @@ class FabianBoard(Board):
         self.select_parts_mode = gv.default_select_parts_mode
         self.mark_option = gv.default_mark_option
         self.selected_part = None
+        self.mouse_click_point = Point(0, 0)
         self.new_line_edge = [None, None]
         self.new_line_original_part = [None, None]
         self.new_line_edge_mark = [None, None]
@@ -217,11 +219,12 @@ class FabianBoard(Board):
             self.board.delete(self.temp_rect_mark)
         x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
         mouse_point = Point(x, y)
+        self.mouse_click_point = mouse_point
         p = p1 = p2 = mouse_point
         if self.selected_part is None:
             self.temp_rect_start_point = mouse_point
             return
-        # slected part is not None
+        # selected part is not None
         if self.selected_part.part_type == gv.part_type_entity:
             e = self.entity_list[self.selected_part.index]
             if e.shape == 'CIRCLE':
@@ -371,6 +374,9 @@ class FabianBoard(Board):
         self.temp_rect_mark = self.board.create_rectangle(p1.x, p1.y, p2.x, p2.y)
 
     def mouse_1_released(self, key):
+        x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
+        mouse_point = Point(x, y)
+        # mark parts inside the "choose" rect
         if self.temp_rect_start_point is not None:
             p1 = self.temp_rect_start_point
             p1.x, p1.y = self.convert_xy_to_screen(p1.x, p1.y)
@@ -417,6 +423,14 @@ class FabianBoard(Board):
                         else:
                             self.set_part_color(list_name, i, non_marked_color)
                     i += 1
+        # move node
+        elif self.work_mode == gv.work_mode_inp and self.mouse_select_mode != gv.mouse_select_mode_point and \
+                self.new_line_edge[0] is not None and not self.mouse_click_point.is_equal(mouse_point):
+            node_index = get_index_of_node_with_point_in_list(self.new_line_edge[0], self.node_list)
+            self.keep_state()
+            self.node_list[node_index].p = mouse_point
+            self.remove_temp_line()
+            self.update_view()
         if self.temp_rect_mark is not None:
             self.board.delete(self.temp_rect_mark)
             self.temp_rect_mark = None
@@ -2608,29 +2622,6 @@ class FabianBoard(Board):
             return middle_nodes, True
         return [], False
 
-    # return list of nodes_hash_index between the 2 nodes in the shortest path
-    def get_middle_nodes_on_border_lines(self, node1_hash_index, node2_hash_index, wrong_nodes=[]):
-        node_index = get_index_from_hash(self.nodes_hash, node1_hash_index)
-        attached_lines = self.node_list[node_index].attached_lines
-        side_border_node = []
-        for al in attached_lines:
-            if al.border_type != gv.line_border_type_none:
-                side_border_node.append(al.second_node)
-        if len(side_border_node) < 2:
-            return [], False
-        shortest_path = gv.infinite_size
-        # try side 1
-        next_node = side_border_node[0]
-        middle_nodes, found_track = self.get_middle_nodes_on_one_direction(next_node, node1_hash_index, node2_hash_index, wrong_nodes)
-        if found_track:
-            shortest_path = len(middle_nodes)
-        # try other side
-        next_node = side_border_node[1]
-        middle_nodes_2, found_track_2 = self.get_middle_nodes_on_one_direction(next_node, node1_hash_index, node2_hash_index, wrong_nodes)
-        if found_track_2 and len(middle_nodes_2) < shortest_path:
-            return middle_nodes_2, True
-        return middle_nodes, found_track
-
     def get_middle_nodes_on_one_direction(self, node, prev_node, target_node, wrong_nodes=[]):
         middle_nodes = [node]
         c = len(self.node_list)
@@ -2655,6 +2646,29 @@ class FabianBoard(Board):
                 return [], False
             c -= 1
         return middle_nodes, True
+
+    # return list of nodes_hash_index between the 2 nodes in the shortest path
+    def get_middle_nodes_on_border_lines(self, node1_hash_index, node2_hash_index, wrong_nodes=[]):
+        node_index = get_index_from_hash(self.nodes_hash, node1_hash_index)
+        attached_lines = self.node_list[node_index].attached_lines
+        side_border_node = []
+        for al in attached_lines:
+            if al.border_type != gv.line_border_type_none:
+                side_border_node.append(al.second_node)
+        if len(side_border_node) < 2:
+            return [], False
+        shortest_path = gv.infinite_size
+        # try side 1
+        next_node = side_border_node[0]
+        middle_nodes, found_track = self.get_middle_nodes_on_one_direction(next_node, node1_hash_index, node2_hash_index, wrong_nodes)
+        if found_track:
+            shortest_path = len(middle_nodes)
+        # try other side
+        next_node = side_border_node[1]
+        middle_nodes_2, found_track_2 = self.get_middle_nodes_on_one_direction(next_node, node1_hash_index, node2_hash_index, wrong_nodes)
+        if found_track_2 and len(middle_nodes_2) < shortest_path:
+            return middle_nodes_2, True
+        return middle_nodes, found_track
 
     def get_index_of_entity(self, entity):
         for i in range(len(self.entity_list)):

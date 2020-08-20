@@ -39,7 +39,7 @@ def is_point_in_node_list(p, node_list):
             return True
     return False
 
-
+# return the real index, not the hash
 def get_index_of_node_with_point_in_list(p, node_list):
     for i in range(len(node_list)):
         node = node_list[i]
