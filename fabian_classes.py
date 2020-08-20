@@ -838,7 +838,7 @@ class ExtendArcDialog(object):
         # set default values
         self.extend_left_edge_choice_menu.current(1)
         self.extend_right_edge_choice_menu.current(1)
-        self.entry_length.insert(0, round(length, 1))
+        self.entry_length.insert(0, round(length, 3))
         self.entry_length.focus_set()
         self.choice = None
         self.length = length

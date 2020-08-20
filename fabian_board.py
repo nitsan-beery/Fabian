@@ -920,6 +920,7 @@ class FabianBoard(Board):
             y = entity.center.y + length * math.sin(alfa)
             new_node = Node(Point(x, y))
             extended_nodes.append(self.add_node_to_node_list(new_node))
+            self.show_node(get_index_from_hash(self.nodes_hash, extended_nodes[-1]))
             self.add_line_to_net_list_by_nodes(node, extended_nodes[-1])
         for i in range(len(extended_nodes) - 1):
             self.add_line_to_net_list_by_nodes(extended_nodes[i], extended_nodes[i + 1])
@@ -2558,7 +2559,7 @@ class FabianBoard(Board):
     # return list of nodes_hash_index between the 2 nodes in the shortest path
     def get_middle_nodes_between_node1_and_node_2(self, node1_hash_index, node2_hash_index, wrong_nodes=[]):
         # try to set middle nodes direction oriented
-        middle_nodes, found_track = self.get_middle_nodes_direction_oriented(node1_hash_index, node2_hash_index)
+        middle_nodes, found_track = self.get_middle_nodes_direction_oriented(node1_hash_index, node2_hash_index, wrong_nodes)
         if found_track:
             return middle_nodes, True
         # try to set middle nodes on border lines only
@@ -2569,13 +2570,14 @@ class FabianBoard(Board):
             return [], False
 
     # return list of nodes_hash_index between the 2 nodes on lines towards node2_hash_index
-    def get_middle_nodes_direction_oriented(self, node1_hash_index, node2_hash_index):
+    def get_middle_nodes_direction_oriented(self, node1_hash_index, node2_hash_index, wrong_nodes):
         middle_nodes = []
         p1 = self.get_node_p(node1_hash_index)
         p2 = self.get_node_p(node2_hash_index)
         original_angle = p1.get_alfa_to(p2)
         node_hash = node1_hash_index
-        while node_hash != node2_hash_index:
+        next_node_hash = -1
+        while node_hash != node2_hash_index and next_node_hash not in wrong_nodes:
             angle_to_target = self.get_node_p(node_hash).get_alfa_to(p2)
             diff_original_angle = get_smallest_diff_angle(angle_to_target, original_angle)
             if diff_original_angle > gv.max_diff_angle_for_direction_oriented:
