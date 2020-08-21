@@ -252,7 +252,7 @@ class FabianBoard(Board):
             if d1 < d2:
                 p = p1
 
-        if self.mouse_select_mode == gv.mouse_select_mode_corner and self.work_mode == gv.work_mode_inp:
+        if self.mouse_select_mode == gv.mouse_select_mode_corner:# and self.work_mode == gv.work_mode_inp:
             corner = Corner()
             node_hash_index = self.get_hash_index_of_node_with_point(p)
             #debug
@@ -502,8 +502,7 @@ class FabianBoard(Board):
                 menu.add_command(label="Merge", command=self.merge)
                 entity = self.entity_list[self.selected_part.index]
                 if entity.shape == 'ARC':
-                    menu.add_command(label="Extend arc", command=lambda: self.extend_arc())
-                    menu.add_command(label="Extend arc...", command=lambda: self.extend_arc(False))
+                    menu.add_command(label="Extend arc", command=self.extend_arc)
             if self.work_mode == gv.work_mode_dxf or (self.work_mode == gv.work_mode_inp and self.selected_part.part_type == gv.part_type_net_line):
                 menu.add_command(label="Delete", command=self.remove_selected_part_from_list)
                 menu.add_command(label="Mark", command=self.mark_selected_part)
@@ -527,6 +526,14 @@ class FabianBoard(Board):
                         menu.add_command(label="Clear reference point", command=self.clear_inp_rotation_point)
                     else:
                         menu.add_command(label="Rotate net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_rotate_net))
+                    menu.add_separator()
+                    menu.add_command(label="Set Corners",
+                                     command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
+                    if len(self.corner_list) > 0:
+                        menu.add_command(label="Clear corners",
+                                         command=lambda: self.handle_corners(gv.handle_corners_mode_clear))
+                    menu.add_command(label="Match net", command=self.match_inp_net)
+                    menu.add_separator()
                     if len(self.inp_nets) > 1:
                         menu.add_command(label="Merge nets", command=self.merge_inp_nets)
                     menu.add_command(label="Clear nets", command=lambda: self.change_show_inp_mode(gv.clear_mode))
@@ -651,12 +658,14 @@ class FabianBoard(Board):
                 changed = True
         elif mode == gv.hide_mode:
             if self.show_inps:
+                self.handle_corners(gv.handle_corners_mode_clear)
                 self.hide_all_inp_nets()
                 self.show_inps = False
                 self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
                 changed = True
         elif mode == gv.clear_mode:
             if len(self.inp_nets) > 0:
+                self.handle_corners(gv.handle_corners_mode_clear)
                 self.hide_all_inp_nets()
                 self.inp_nets = []
                 self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
@@ -880,7 +889,7 @@ class FabianBoard(Board):
                 e.start, e.end = e.left_bottom, e.right_up
         return sorted_list
 
-    def extend_arc(self, auto_param=True):
+    def extend_arc(self):
         if self.work_mode != gv.work_mode_inp:
             return
         if self.selected_part is None or self.selected_part.part_type != gv.part_type_entity:
@@ -892,19 +901,16 @@ class FabianBoard(Board):
         entity_nodes = self.get_nodes_attached_to_entity(entity_index)
         if len(entity_nodes) < 3:
             return
-        extend_left_edge = False
-        extend_right_edge = False
         d = entity.start.get_distance_to_point(entity.end)
         n = len(entity_nodes) - 1
-        length = entity.radius + (d / n)
-        if not auto_param:
-            choice = ExtendArcDialog(self.window_main, d / n).show()
-            if choice is not None:
-                extend_left_edge = choice.get('extend_left_edge')
-                extend_right_edge = choice.get('extend_right_edge')
-                length = entity.radius + choice.get('length')
-            else:
-                return
+        extension = 2 * (d / n)
+        choice = ExtendArcDialog(self.window_main, extension).show()
+        if choice is not None:
+            extend_left_edge = choice.get('extend_left_edge')
+            extend_right_edge = choice.get('extend_right_edge')
+            length = entity.radius + choice.get('length')
+        else:
+            return
         left_node = entity.nodes_list[0]
         right_node = entity.nodes_list[1]
         if self.get_node_p(right_node).is_equal(entity.left_bottom):
@@ -2182,6 +2188,9 @@ class FabianBoard(Board):
         # debug
         #self.print_node_list()
         #self.print_line_list()
+
+    def match_inp_net(self):
+        pass
 
     def merge_inp_nets(self):
         if len(self.inp_nets) < 2:
