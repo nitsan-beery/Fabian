@@ -72,8 +72,6 @@ class FabianBoard(Board):
         self.window_main.bind('<Control-y>', self.redo)
 
     def reset_board(self, empty_node_list=False, center_screen_position=True, reset_state=True):
-        if not reset_state:
-            self.keep_state()
         self.board.delete('all')
         if center_screen_position:
             self.set_screen_position(self.center.x, self.center.y)
@@ -107,6 +105,8 @@ class FabianBoard(Board):
             self.state = []
 
     def undo(self, key=None):
+        # debug
+        print(f'before resume len state: {len(self.state)}')
         if len(self.state) > 0:
             self.keep_state()
             if len(self.redo_state) == gv.max_state_stack:
@@ -115,6 +115,9 @@ class FabianBoard(Board):
             self.redo_state.append(state)
             self.state.pop(-1)
         self.resume_state()
+        # debug
+        print(f'after resume len state: {len(self.state)}')
+
 
     def redo(self, key=None):
         if len(self.redo_state) > 0:
@@ -2162,7 +2165,7 @@ class FabianBoard(Board):
             element_list = arg[1]
             if len(element_list) > 0:
                 self.keep_state()
-            self.add_inp_net(node_list, element_list)
+                self.add_inp_net(node_list, element_list)
             return
         self.reset_board()
         if filetype == 'dxf':
@@ -2233,7 +2236,7 @@ class FabianBoard(Board):
                 index, d = self.find_nearest_entity(node.p)
                 d, p = self.get_distance_from_entity_and_nearest_point(node.p, index)
                 node.p = p
-        self.clear_corner_list()
+        self.clear_corner_list(False)
         self.update_view()
 
     def merge_inp_nets(self):
