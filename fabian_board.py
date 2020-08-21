@@ -105,8 +105,6 @@ class FabianBoard(Board):
             self.state = []
 
     def undo(self, key=None):
-        # debug
-        print(f'before resume len state: {len(self.state)}')
         if len(self.state) > 0:
             self.keep_state()
             if len(self.redo_state) == gv.max_state_stack:
@@ -115,9 +113,6 @@ class FabianBoard(Board):
             self.redo_state.append(state)
             self.state.pop(-1)
         self.resume_state()
-        # debug
-        print(f'after resume len state: {len(self.state)}')
-
 
     def redo(self, key=None):
         if len(self.redo_state) > 0:
