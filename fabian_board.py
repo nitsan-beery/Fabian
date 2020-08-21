@@ -16,11 +16,13 @@ class FabianBoard(Board):
         self.button_zoom_in = tk.Button(self.frame_2, text='Zoom In', command=lambda: self.zoom(4/3))
         self.button_zoom_out = tk.Button(self.frame_2, text='Zoom Out', command=lambda: self.zoom(3/4))
         self.button_center = tk.Button(self.frame_2, text='Center view', command=lambda: self.center_view())
+        self.button_clear = tk.Button(self.frame_2, text='Clear all', command=lambda: self.reset_board(reset_state=False))
         # debug
         self.button_print = tk.Button(self.frame_2, text='Print lines', command=self.print_line_list)
         self.button_zoom_in.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_zoom_out.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_center.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
+        self.button_clear.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
         # debug
         #self.button_print.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.board.config(bg=gv.board_bg_color)
@@ -70,6 +72,8 @@ class FabianBoard(Board):
         self.window_main.bind('<Control-y>', self.redo)
 
     def reset_board(self, empty_node_list=False, center_screen_position=True, reset_state=True):
+        if not reset_state:
+            self.keep_state()
         self.board.delete('all')
         if center_screen_position:
             self.set_screen_position(self.center.x, self.center.y)
@@ -1408,8 +1412,13 @@ class FabianBoard(Board):
         nodes_list = list(dict.fromkeys(nodes_list))
         return nodes_list
 
-    def clear_lonely_nodes(self, hash_node_list):
+    def clear_lonely_nodes(self, hash_node_list=None):
         lonely_nodes_list = []
+        if hash_node_list is None:
+            hash_node_list = []
+            for i in range(1, len(self.node_list)):
+                node = self.node_list[i]
+                hash_node_list.append(node.hash_index)
         for n in hash_node_list:
             # modify attached lines
             self.set_lines_attached_to_node(n)
@@ -2247,7 +2256,10 @@ class FabianBoard(Board):
 
     def add_inp_net(self, node_list, element_list):
         new_inp = InpNet()
-        if self.work_mode == gv.work_mode_dxf:
+        is_empty_board = len(self.entity_list) == 0
+        if is_empty_board:
+            self.change_work_mode(gv.work_mode_inp)
+        if self.work_mode == gv.work_mode_dxf or is_empty_board:
             self.show_net = False
             self.show_inps = False
             self.show_elements = False
@@ -2266,7 +2278,7 @@ class FabianBoard(Board):
             self.hide_progress_bar()
             self.frame_1.update_idletasks()
             c = len(element_list)
-            self.show_text_on_screen('creating net elements')
+            self.show_text_on_screen('adding lines and elements')
             self.show_progress_bar(c)
             for element in element_list:
                 element_nodes = element.nodes
@@ -2281,20 +2293,27 @@ class FabianBoard(Board):
             self.hide_text_on_screen()
             self.hide_progress_bar()
             self.frame_1.update_idletasks()
+        if is_empty_board:
+            self.center_view(True)
+        if self.work_mode == gv.work_mode_dxf:
             self.element_list = element_list
             node_list = self.node_list[1:]
             self.set_inp_net(new_inp, node_list, element_list)
             self.inp_nets.append(new_inp)
-            self.show_net = True
             self.show_elements = True
             self.show_inps = True
-            self.update_view()
         # inp mode
         else:
-            self.set_inp_net(new_inp, node_list, element_list)
-            self.inp_nets.append(new_inp)
-            self.show_inp(-1)
-            self.show_inps = True
+            if is_empty_board:
+                self.clear_lonely_nodes()
+                self.change_select_parts_mode(gv.part_type_net_line)
+            else:
+                self.set_inp_net(new_inp, node_list, element_list)
+                self.inp_nets.append(new_inp)
+                self.show_inp(-1)
+                self.show_inps = True
+        self.show_net = True
+        self.update_view()
 
     def set_inp_net(self, inp_net, node_list, element_list):
         inp_net.set_nodes_and_elements(node_list.copy(), element_list.copy())
@@ -2321,7 +2340,7 @@ class FabianBoard(Board):
 
     def center_view(self, set_scale=False):
         self.hide_text_on_screen()
-        x, y = self.get_center(set_scale=set_scale)
+        x, y = self.get_center(by_nodes=True, set_scale=set_scale)
         if x is None:
             self.set_screen_position(self.center.x, self.center.y)
         else:
