@@ -2182,7 +2182,7 @@ class FabianBoard(Board):
             # enable the change work mode to operate
             self.work_mode = gv.work_mode_inp
             self.change_work_mode(gv.work_mode_dxf)
-            self.center_view(True)
+            self.center_view(set_scale=True)
             self.update_view()
             self.state = []
         elif filetype == 'json':
@@ -2294,7 +2294,7 @@ class FabianBoard(Board):
             self.hide_progress_bar()
             self.frame_1.update_idletasks()
         if is_empty_board:
-            self.center_view(True)
+            self.center_view(by_nodes=True, set_scale=True)
         if self.work_mode == gv.work_mode_dxf:
             self.element_list = element_list
             node_list = self.node_list[1:]
@@ -2338,9 +2338,9 @@ class FabianBoard(Board):
         window_width = self.window_main.winfo_width()
         self.scale = window_width/(object_width*2)
 
-    def center_view(self, set_scale=False):
+    def center_view(self, by_nodes=False, set_scale=False):
         self.hide_text_on_screen()
-        x, y = self.get_center(by_nodes=True, set_scale=set_scale)
+        x, y = self.get_center(by_nodes=by_nodes, set_scale=set_scale)
         if x is None:
             self.set_screen_position(self.center.x, self.center.y)
         else:
