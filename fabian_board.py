@@ -520,6 +520,9 @@ class FabianBoard(Board):
                     menu.add_command(label="Delete marked entities", command=self.remove_marked_entities_from_list)
                     menu.add_command(label="Delete NON marked entities", command=self.remove_non_marked_entities_from_list)
                 menu.add_separator()
+                if len(self.node_list) > 1:
+                    menu.add_cascade(label='Nodes', menu=show_node_menu)
+                    menu.add_separator()
                 if len(self.inp_nets) > 0:
                     menu.add_command(label="Copy net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_copy_net))
                     menu.add_command(label="Move net", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_move_net))
@@ -690,6 +693,8 @@ class FabianBoard(Board):
         self.keep_state()
         self.mouse_select_mode = gv.mouse_select_mode_edge
         self.choose_mark_option(gv.mark_option_mark)
+        self.handle_corners(gv.handle_corners_mode_clear)
+        self.change_show_inp_mode(gv.clear_mode)
         if mode == gv.work_mode_dxf:
             self.reset_net()
             self.show_nodes = False
@@ -2291,6 +2296,7 @@ class FabianBoard(Board):
             self.hide_text_on_screen()
             self.hide_progress_bar()
             self.frame_1.update_idletasks()
+        self.handle_corners(gv.clear_mode)
         if is_empty_board:
             self.center_view(by_nodes=True, set_scale=True)
         if self.work_mode == gv.work_mode_dxf:
@@ -2746,8 +2752,12 @@ class FabianBoard(Board):
             self.corner_list = []
 
     def add_corner_to_corner_list(self, corner):
+        # in DXF mode - unlimited corners
+        max_corners = len(self.node_list) - 1
+        if self.work_mode == gv.work_mode_inp:
+            max_corners = 4
         i = len(self.corner_list)
-        if i < 4:
+        if i < max_corners:
             if not self.is_corner_in_list(corner):
                 self.keep_state()
                 self.corner_list.append(corner)
