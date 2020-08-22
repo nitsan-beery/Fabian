@@ -426,13 +426,13 @@ class FabianBoard(Board):
                             self.set_part_color(list_name, i, non_marked_color)
                     i += 1
         # move node
-        elif self.work_mode == gv.work_mode_inp and self.mouse_select_mode != gv.mouse_select_mode_point and \
-                self.new_line_edge[0] is not None and not self.mouse_click_point.is_equal(mouse_point):
-            node_index = get_index_of_node_with_point_in_list(self.new_line_edge[0], self.node_list)
-            self.keep_state()
-            self.node_list[node_index].p = mouse_point
-            self.remove_temp_line()
-            self.update_view()
+        if self.work_mode == gv.work_mode_inp or (self.work_mode == gv.work_mode_dxf and self.select_parts_mode == gv.part_type_net_line):
+            if self.mouse_select_mode != gv.mouse_select_mode_point and self.new_line_edge[0] is not None and not self.mouse_click_point.is_equal(mouse_point):
+                node_index = get_index_of_node_with_point_in_list(self.new_line_edge[0], self.node_list)
+                self.keep_state()
+                self.node_list[node_index].p = mouse_point
+                self.remove_temp_line()
+                self.update_view()
         if self.temp_rect_mark is not None:
             self.board.delete(self.temp_rect_mark)
             self.temp_rect_mark = None
@@ -446,7 +446,7 @@ class FabianBoard(Board):
         work_mode_menu.add_separator()
         work_mode_menu.add_command(label="Quit")
         select_part_menu = tk.Menu(menu, tearoff=0)
-        if self.work_mode == gv.work_mode_inp:
+        if self.work_mode == gv.work_mode_inp or len(self.inp_nets) > 0:
             select_part_menu.add_command(label="Entities", command=lambda: self.change_select_parts_mode(gv.part_type_entity))
             select_part_menu.add_command(label="Net lines", command=lambda: self.change_select_parts_mode(gv.part_type_net_line))
             select_part_menu.add_command(label="both", command=lambda: self.change_select_parts_mode('all'))
