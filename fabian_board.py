@@ -69,6 +69,9 @@ class FabianBoard(Board):
         self.board.bind('<Control-ButtonRelease-1>', self.control_mouse_1_released)
         self.board.bind('<Button-3>', self.mouse_3_pressed)
 
+        self.window_main.bind('<Delete>', self.remove_selected_part_from_list)
+        self.window_main.bind('m', self.mark_selected_part)
+        self.window_main.bind('u', self.unmark_selected_part)
         self.window_main.bind('<Control-z>', self.undo)
         self.window_main.bind('<Control-y>', self.redo)
 
@@ -2435,7 +2438,7 @@ class FabianBoard(Board):
                 index = i
         return self.node_list[index].hash_index
 
-    def mark_selected_part(self):
+    def mark_selected_part(self, key=None):
         if self.selected_part is None:
             return
         i = self.selected_part.index
@@ -2452,7 +2455,7 @@ class FabianBoard(Board):
             n.is_marked = True
             self.set_net_line_color(i, gv.marked_net_line_color)
 
-    def unmark_selected_part(self):
+    def unmark_selected_part(self, key=None):
         if self.selected_part is None:
             return
         i = self.selected_part.index
@@ -2539,7 +2542,7 @@ class FabianBoard(Board):
         self.board.delete('all')
         self.show_all_entities()
 
-    def remove_selected_part_from_list(self):
+    def remove_selected_part_from_list(self, key=None):
         if self.selected_part is None:
             return
         self.keep_state()
@@ -2547,7 +2550,7 @@ class FabianBoard(Board):
         if self.selected_part.part_type == gv.part_type_entity and self.work_mode == gv.work_mode_dxf:
             changed = True
             self.remove_parts_from_list([self.selected_part.index], gv.part_list_entities)
-        elif self.selected_part.part_type == gv.part_type_net_line and self.work_mode == gv.work_mode_inp:
+        elif self.selected_part.part_type == gv.part_type_net_line:
             changed = True
             self.remove_parts_from_list([self.selected_part.index], gv.part_list_net_lines)
         if changed:
