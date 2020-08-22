@@ -66,6 +66,7 @@ class FabianBoard(Board):
         self.board.bind('<Button-1>', self.mouse_1_pressed)
         self.board.bind('<B1-Motion>', self.mouse_1_motion)
         self.board.bind('<ButtonRelease-1>', self.mouse_1_released)
+        self.board.bind('<Control-ButtonRelease-1>', self.control_mouse_1_released)
         self.board.bind('<Button-3>', self.mouse_3_pressed)
 
         self.window_main.bind('<Control-z>', self.undo)
@@ -375,9 +376,22 @@ class FabianBoard(Board):
             self.board.delete(self.temp_rect_mark)
         self.temp_rect_mark = self.board.create_rectangle(p1.x, p1.y, p2.x, p2.y)
 
-    def mouse_1_released(self, key):
+    def control_mouse_1_released(self, key):
         x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
         mouse_point = Point(x, y)
+        if self.work_mode == gv.work_mode_inp or (self.work_mode == gv.work_mode_dxf and self.select_parts_mode == gv.part_type_net_line):
+            if self.mouse_select_mode != gv.mouse_select_mode_point and self.new_line_edge[0] is not None and not self.mouse_click_point.is_equal(mouse_point):
+                node_index = get_index_of_node_with_point_in_list(self.new_line_edge[0], self.node_list)
+                self.keep_state()
+                self.node_list[node_index].p = mouse_point
+                self.remove_temp_line()
+                self.update_view()
+        if self.temp_rect_mark is not None:
+            self.board.delete(self.temp_rect_mark)
+            self.temp_rect_mark = None
+        self.temp_rect_start_point = None
+
+    def mouse_1_released(self, key):
         # mark parts inside the "choose" rect
         if self.temp_rect_start_point is not None:
             p1 = self.temp_rect_start_point
@@ -425,18 +439,6 @@ class FabianBoard(Board):
                         else:
                             self.set_part_color(list_name, i, non_marked_color)
                     i += 1
-        # move node
-        if self.work_mode == gv.work_mode_inp or (self.work_mode == gv.work_mode_dxf and self.select_parts_mode == gv.part_type_net_line):
-            if self.mouse_select_mode != gv.mouse_select_mode_point and self.new_line_edge[0] is not None and not self.mouse_click_point.is_equal(mouse_point):
-                node_index = get_index_of_node_with_point_in_list(self.new_line_edge[0], self.node_list)
-                self.keep_state()
-                self.node_list[node_index].p = mouse_point
-                self.remove_temp_line()
-                self.update_view()
-        if self.temp_rect_mark is not None:
-            self.board.delete(self.temp_rect_mark)
-            self.temp_rect_mark = None
-        self.temp_rect_start_point = None
 
     def mouse_3_pressed(self, key):
         menu = tk.Menu(self.board, tearoff=0)
@@ -478,6 +480,7 @@ class FabianBoard(Board):
         show_inp_menu = tk.Menu(menu, tearoff=0)
         show_inp_menu.add_command(label="Show", command=lambda: self.change_show_inp_mode(gv.show_mode))
         show_inp_menu.add_command(label="Hide", command=lambda: self.change_show_inp_mode(gv.hide_mode))
+        show_inp_menu.add_command(label="Clear", command=lambda: self.change_show_inp_mode(gv.clear_mode))
         show_elements_menu = tk.Menu(menu, tearoff=0)
         show_elements_menu.add_command(label="Show", command=self.show_all_elements)
         show_elements_menu.add_command(label="Hide", command=self.hide_all_elements)
@@ -538,15 +541,12 @@ class FabianBoard(Board):
                         menu.add_command(label="Clear corners",
                                          command=lambda: self.handle_corners(gv.handle_corners_mode_clear))
                     menu.add_command(label="Match net", command=self.match_inp_net)
-                    menu.add_separator()
                     if len(self.inp_nets) > 1:
                         menu.add_command(label="Merge nets", command=self.merge_inp_nets)
-                    menu.add_command(label="Clear nets", command=lambda: self.change_show_inp_mode(gv.clear_mode))
                     menu.add_cascade(label='Show / Hide nets', menu=show_inp_menu)
                     menu.add_separator()
         elif self.work_mode == gv.work_mode_inp:
             mark_list = self.get_marked_parts(gv.part_list_net_lines)
-            show_inp_menu.add_command(label="Clear", command=lambda: self.change_show_inp_mode(gv.clear_mode))
             if len(mark_list) > 0:
                 menu.add_command(label="Merge marked net lines", command=lambda: self.merge(True))
                 menu.add_command(label="Delete marked net lines", command=self.remove_marked_net_lines_from_list)
