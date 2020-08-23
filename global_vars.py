@@ -107,9 +107,3 @@ unattached = 'unattached'
 too_steep_angle = 'too steep angle'
 too_wide_angle = 'too wide angle'
 expected_elements_not_complete = 'expected elements not completed'
-
-
-
-
-
-

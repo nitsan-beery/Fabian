@@ -72,6 +72,7 @@ class FabianBoard(Board):
         self.window_main.bind('d', self.remove_selected_part_from_list)
         self.window_main.bind('m', self.mark_selected_part)
         self.window_main.bind('u', self.unmark_selected_part)
+        self.window_main.bind('r', self.remove_temp_line)
         self.window_main.bind('<Control-z>', self.undo)
         self.window_main.bind('<Control-y>', self.redo)
 
@@ -666,14 +667,14 @@ class FabianBoard(Board):
                 changed = True
         elif mode == gv.hide_mode:
             if self.show_inps:
-                self.handle_corners(gv.handle_corners_mode_clear)
+                self.clear_corner_list()
                 self.hide_all_inp_nets()
                 self.show_inps = False
                 self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
                 changed = True
         elif mode == gv.clear_mode:
             if len(self.inp_nets) > 0:
-                self.handle_corners(gv.handle_corners_mode_clear)
+                self.clear_corner_list()
                 self.hide_all_inp_nets()
                 self.inp_nets = []
                 self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
@@ -690,19 +691,17 @@ class FabianBoard(Board):
     def change_work_mode(self, mode):
         if mode == self.work_mode:
             return
-        if self.selected_part is not None:
-            self.remove_selected_part_mark()
+        self.remove_selected_part_mark()
         self.remove_temp_line()
         self.keep_state()
         self.mouse_select_mode = gv.mouse_select_mode_edge
         self.choose_mark_option(gv.mark_option_mark)
-        self.handle_corners(gv.handle_corners_mode_clear)
+        self.clear_corner_list()
         self.change_show_inp_mode(gv.clear_mode)
         if mode == gv.work_mode_dxf:
             self.reset_net()
             self.show_nodes = False
             self.show_net = False
-            self.clear_corner_list(False)
             self.show_elements = False
             self.show_entities = True
             self.select_parts_mode = gv.part_type_entity
@@ -756,7 +755,7 @@ class FabianBoard(Board):
             self.keep_state()
             changed = self.set_net_between_corners(arg)
             if changed:
-                self.clear_corner_list(by_menu=False)
+                self.clear_corner_list()
                 self.mouse_select_mode = gv.mouse_select_mode_edge
                 self.update_view()
             else:
@@ -2252,7 +2251,7 @@ class FabianBoard(Board):
                 index, d = self.find_nearest_entity(node.p)
                 d, p = self.get_distance_from_entity_and_nearest_point(node.p, index)
                 node.p = p
-        self.clear_corner_list(False)
+        self.clear_corner_list()
         self.update_view()
 
     def merge_inp_nets(self):
@@ -2312,7 +2311,7 @@ class FabianBoard(Board):
             self.hide_text_on_screen()
             self.hide_progress_bar()
             self.frame_1.update_idletasks()
-        self.handle_corners(gv.clear_mode)
+        self.clear_corner_list()
         if is_empty_board:
             self.center_view(by_nodes=True, set_scale=True)
         if self.work_mode == gv.work_mode_dxf:
@@ -2557,6 +2556,7 @@ class FabianBoard(Board):
 
     def remove_selected_part_from_list(self, key=None):
         if self.selected_part is None:
+            self.remove_temp_line()
             return
         self.keep_state()
         changed = False
@@ -2571,7 +2571,7 @@ class FabianBoard(Board):
         else:
             self.state.pop(-1)
 
-    def remove_temp_line(self):
+    def remove_temp_line(self, key=None):
         if self.new_line_edge_mark[1] is not None:
             self.board.delete(self.new_line_edge_mark[1])
         self.new_line_edge[1] = None
@@ -2760,9 +2760,9 @@ class FabianBoard(Board):
                 return i
         return None
 
-    def clear_corner_list(self, by_menu=True):
+    def clear_corner_list(self, keep_state=False):
         if len(self.corner_list) > 0:
-            if by_menu:
+            if keep_state:
                 self.keep_state()
             self.hide_all_corners(keep_new_state=False)
             self.corner_list = []

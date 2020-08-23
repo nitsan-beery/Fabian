@@ -185,11 +185,11 @@ def get_middle_split_points_percentage_list(split_mode, split_arg):
         left = split_arg[0]
         right = split_arg[1]
         diff = 100 - (left + right)
-        sum = left + right
+        both_sides = left + right
         residual = left - right
-        chunk = math.ceil(diff / sum)
+        chunk = math.ceil(diff / both_sides)
         bulk = 100 / chunk
-        add_on = (bulk - sum) / 2
+        add_on = (bulk - both_sides) / 2
         left += add_on
         right += add_on
         n = 2 * chunk - 1
@@ -230,5 +230,3 @@ def check_point_list_validity(point_list):
         messagebox.showwarning("Warning", m)
         point_list = [point_list[0], point_list[-1]]
     return point_list
-
-
