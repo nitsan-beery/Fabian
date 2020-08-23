@@ -366,3 +366,50 @@ def sort_entity_parts(entity_list, part_list):
             e.start, e.end = e.left_bottom, e.right_up
     return sorted_list
 
+
+# set expected elements
+# set exceptions for unattached and exceeding angles
+def set_node_expected_elements_and_exceptions(node):
+    node.exceptions = []
+    num_lines = len(node.attached_lines)
+    if num_lines < 2:
+        node.exceptions.append(gv.unattached)
+        node.expected_elements = 0
+        node.exceptions.append(gv.unattached)
+        return node
+    num_outer_lines = 0
+    num_inner_lines = 0
+    for al in node.attached_lines:
+        if al.border_type == gv.line_border_type_outer:
+            num_outer_lines += 1
+        elif al.border_type == gv.line_border_type_inner:
+            num_inner_lines += 1
+    num_border_lines = num_outer_lines + num_inner_lines
+    node.expected_elements = len(node.attached_lines) - int(num_border_lines / 2)
+    if num_border_lines == 1 or num_border_lines == 3:
+        # debug
+        m = f'unexpected number of border lines in set_node_expected_elements_and_exceptions node {n}  outer: {num_outer_lines}   inner: {num_inner_lines}'
+        print(m)
+        return node
+    prev_line = node.attached_lines[0]
+    angle = prev_line.angle_to_second_node
+    for i in range(num_lines):
+        prev_angle = angle
+        line = node.attached_lines[(i+1) % num_lines]
+        angle = line.angle_to_second_node
+        if not prev_line.is_available:
+            prev_line = line
+            continue
+        if angle < prev_angle:
+            angle += 360
+        diff_angle = round(angle - prev_angle, gv.accuracy)
+        if diff_angle < gv.min_angle_to_create_element:
+            prev_line.is_available = False
+            node.exceptions.append(gv.too_steep_angle)
+        elif diff_angle > gv.max_angle_to_create_element:
+            prev_line.is_available = False
+            node.exceptions.append(gv.too_wide_angle)
+        prev_line = line
+    return node
+
+

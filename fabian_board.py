@@ -267,7 +267,7 @@ class FabianBoard(Board):
                 print("can't find match node for corner")
                 return
             corner.hash_node = node_hash_index
-            self.add_corner_to_corner_list(corner)
+            self.add_or_replace_corner(corner)
             return
 
         # first point
@@ -568,8 +568,7 @@ class FabianBoard(Board):
                 set_corner_net_menu.add_command(label="1 -> 4", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_1_4))
                 set_corner_net_menu.add_command(label="1 -> 2", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_1_2))
                 menu.add_cascade(label="Set net between corners", menu=set_corner_net_menu)
-            else:
-                menu.add_command(label="Set Corners", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
+            menu.add_command(label="Set Corners", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
             if len(self.corner_list) > 0:
                 menu.add_command(label="Clear corners",
                                          command=lambda: self.handle_corners(gv.handle_corners_mode_clear))
@@ -1380,53 +1379,9 @@ class FabianBoard(Board):
 
     def set_all_nodes_expected_elements_and_exceptions(self):
         for i in range(1, len(self.node_list)):
-            self.set_node_expected_elements_and_exceptions(i)
+            node = self.node_list[i]
+            self.node_list[i] = set_node_expected_elements_and_exceptions(node)
     
-    # set expected elements
-    # set exeptions for unattached and exceeding angles
-    def set_node_expected_elements_and_exceptions(self, n):
-        node = self.node_list[n]
-        node.exceptions = []
-        num_lines = len(node.attached_lines)
-        if num_lines < 2:
-            node.exceptions.append(gv.unattached)
-            node.expected_elements = 0
-            node.exceptions.append(gv.unattached)
-            return
-        num_outer_lines = 0
-        num_inner_lines = 0
-        for al in node.attached_lines:
-            if al.border_type == gv.line_border_type_outer:
-                num_outer_lines += 1
-            elif al.border_type == gv.line_border_type_inner:
-                num_inner_lines += 1
-        num_border_lines = num_outer_lines + num_inner_lines
-        node.expected_elements = len(node.attached_lines) - int(num_border_lines / 2)
-        if num_border_lines == 1 or num_border_lines == 3:
-            # debug
-            m = f'unexpected number of border lines in set_node_expected_elements_and_exceptions node {n}  outer: {num_outer_lines}   inner: {num_inner_lines}'
-            print(m)
-            return
-        prev_line = node.attached_lines[0]
-        angle = prev_line.angle_to_second_node
-        for i in range(num_lines):
-            prev_angle = angle
-            line = node.attached_lines[(i+1) % num_lines]
-            angle = line.angle_to_second_node
-            if not prev_line.is_available:
-                prev_line = line
-                continue
-            if angle < prev_angle:
-                angle += 360
-            diff_angle = round(angle - prev_angle, gv.accuracy)
-            if diff_angle < gv.min_angle_to_create_element:
-                prev_line.is_available = False
-                node.exceptions.append(gv.too_steep_angle)
-            elif diff_angle > gv.max_angle_to_create_element:
-                prev_line.is_available = False
-                node.exceptions.append(gv.too_wide_angle)
-            prev_line = line
-
     # return the hash key of the nodes with specific exception, or all exceptions (default)
     def get_exception_nodes(self, exception='all'):
         exception_list = []
@@ -2637,21 +2592,30 @@ class FabianBoard(Board):
             self.hide_all_corners(keep_new_state=False)
             self.corner_list = []
 
-    def add_corner_to_corner_list(self, corner):
+    def add_or_replace_corner(self, corner):
         # in DXF mode - unlimited corners
         max_corners = len(self.node_list) - 1
         if self.work_mode == gv.work_mode_inp:
             max_corners = 4
+        self.keep_state()
+        changed = False
         i = len(self.corner_list)
-        if i < max_corners:
-            if not self.is_corner_in_list(corner):
-                self.keep_state()
-                self.corner_list.append(corner)
-                self.show_corner(i)
+        if self.remove_corner_from_list(corner):
+            changed = True
+            self.update_view()
+        elif i < max_corners:
+            changed = True
+            self.corner_list.append(corner)
+            self.show_corner(i)
+        if not changed:
+            self.state.pop(-1)
 
-    def is_corner_in_list(self, corner):
-        for c in self.corner_list:
+    def remove_corner_from_list(self, corner):
+        for i in range(len(self.corner_list)):
+            c = self.corner_list[i]
             if c.hash_node == corner.hash_node:
+                self.hide_corner(i)
+                self.corner_list.remove(c)
                 return True
         return False
 
