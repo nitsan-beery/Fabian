@@ -24,7 +24,11 @@ class Board:
 
             self.button_load = tk.Button(self.frame_2, text='Load', command=lambda: load_json(self.window_main))
             self.button_save = tk.Button(self.frame_2, text='Save', command=lambda: save_json(self.window_main))
+            self.button_zoom_in = tk.Button(self.frame_2, text='Zoom In', command=lambda: self.zoom(4 / 3))
+            self.button_zoom_out = tk.Button(self.frame_2, text='Zoom Out', command=lambda: self.zoom(3 / 4))
             self.button_load.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
+            self.button_zoom_in.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
+            self.button_zoom_out.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
             self.button_save.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
 
         self.window_main.geometry(gv.WINDWO_SIZE)
@@ -146,6 +150,15 @@ class Board:
         else:
             i = '-1'
         self.board.yview('scroll', i, 'units')
+
+    def zoom(self, factor):
+        self.hide_text_on_screen()
+        x, y = self.get_center_keyx_keyy()
+        x, y = self.convert_keyx_keyy_to_xy(x, y)
+        self.scale = round(self.scale*factor, 2)
+        x, y = self.convert_xy_to_screen(x, y)
+        self.set_screen_position(x, y)
+        self.window_main.update_idletasks()
 
     def board_key(self, key):
         self.hide_text_on_screen()

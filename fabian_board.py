@@ -13,14 +13,12 @@ class FabianBoard(Board):
         self.window_main.title("Fabian")
         self.button_load.config(text='Load', command=lambda: self.load())
         self.button_save.config(text='Save as', command=lambda: self.save_as())
-        self.button_zoom_in = tk.Button(self.frame_2, text='Zoom In', command=lambda: self.zoom(4/3))
-        self.button_zoom_out = tk.Button(self.frame_2, text='Zoom Out', command=lambda: self.zoom(3/4))
+        self.button_zoom_in.config(command=lambda: self.zoom_modified(4 / 3))
+        self.button_zoom_out.config(command=lambda: self.zoom_modified(3 / 4))
         self.button_center = tk.Button(self.frame_2, text='Center view', command=lambda: self.center_view())
         self.button_clear = tk.Button(self.frame_2, text='Clear all', command=lambda: self.reset_board(reset_state=False))
         # debug
         self.button_print = tk.Button(self.frame_2, text='Print lines', command=self.print_line_list)
-        self.button_zoom_in.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
-        self.button_zoom_out.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_center.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_clear.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
         # debug
@@ -71,6 +69,7 @@ class FabianBoard(Board):
         self.board.bind('<Control-MouseWheel>', self.control_mouse_wheel)
 
         self.window_main.bind('<Delete>', self.remove_selected_part_from_list)
+        self.window_main.bind('d', self.remove_selected_part_from_list)
         self.window_main.bind('m', self.mark_selected_part)
         self.window_main.bind('u', self.unmark_selected_part)
         self.window_main.bind('<Control-z>', self.undo)
@@ -2131,6 +2130,19 @@ class FabianBoard(Board):
         #self.print_nodes_expected_elements()
         #self.print_elements(self.element_list)
 
+    def zoom_modified(self, factor):
+        self.remove_temp_line()
+        self.remove_selected_part_mark()
+        self.zoom(factor)
+        self.update_view()
+
+    def control_mouse_wheel(self, key):
+        if key.delta < 0:
+            factor = 5/4
+        else:
+            factor = 4/5
+        self.zoom_modified(factor)
+
     def save_as(self):
         file_name = self.window_main.title()
         dot_index = file_name.find('.')
@@ -3288,24 +3300,6 @@ class FabianBoard(Board):
             return
         self.board.delete(self.selected_part.board_part)
         self.selected_part = None
-
-    def zoom(self, factor):
-        self.hide_text_on_screen()
-        self.remove_temp_line()
-        self.remove_selected_part_mark()
-        x, y = self.get_center_keyx_keyy()
-        x, y = self.convert_keyx_keyy_to_xy(x, y)
-        self.scale = round(self.scale*factor, 2)
-        x, y = self.convert_xy_to_screen(x, y)
-        self.set_screen_position(x, y)
-        self.update_view()
-
-    def control_mouse_wheel(self, key):
-        if key.delta < 0:
-            factor = 5/4
-        else:
-            factor = 4/5
-        self.zoom(factor)
 
     def get_first_entity_to_set_accuracy(self):
         for i in range(len(self.entity_list)):
