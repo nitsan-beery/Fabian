@@ -230,3 +230,139 @@ def check_point_list_validity(point_list):
         messagebox.showwarning("Warning", m)
         point_list = [point_list[0], point_list[-1]]
     return point_list
+
+
+# return continues list of lines, None if the list is broken
+def sort_net_line_parts(net_line_list, part_list):
+    if part_list is None:
+        return None
+    elif len(part_list) == 0:
+        return None
+    elif len(part_list) == 1:
+        return part_list
+    sorted_list = []
+    first_line = None
+    # find first unattached line and node
+    for i in range(len(part_list)):
+        line_i = net_line_list[part_list[i]]
+        is_line_i_start_node_connected = False
+        is_line_i_end_node_connected = False
+        for j in range(len(part_list)):
+            if j == i:
+                continue
+            line_j = net_line_list[part_list[j]]
+            if line_i.start_node == line_j.start_node or line_i.start_node == line_j.end_node:
+                is_line_i_start_node_connected = True
+            if line_i.end_node == line_j.start_node or line_i.end_node == line_j.end_node:
+                is_line_i_end_node_connected = True
+            if is_line_i_start_node_connected and is_line_i_end_node_connected:
+                break
+        if not is_line_i_start_node_connected:
+            first_line = part_list[i]
+            break
+        elif not is_line_i_end_node_connected:
+            first_line = part_list[i]
+            line_i.start_node, line_i.end_node = line_i.end_node, line_i.start_node
+            break
+    if first_line is None:
+        #debug
+        print("can't find unattached line in sort_net_line_parts")
+        return None
+    entity = net_line_list[first_line].entity
+    next_node = net_line_list[first_line].end_node
+    sorted_list.append(first_line)
+    part_list.remove(first_line)
+    found_part = False
+    # iterate list to find connected parts, add to list or return None if can't find
+    while len(part_list) > 0:
+        for j in part_list:
+            found_part = False
+            line = net_line_list[j]
+            if line.entity != entity:
+                return None
+            if line.start_node == next_node:
+                found_part = True
+            elif line.end_node == next_node:
+                line.start_node, line.end_node = line.end_node, line.start_node
+                found_part = True
+            if found_part:
+                sorted_list.append(j)
+                next_node = line.end_node
+                part_list.remove(j)
+                break
+        if not found_part:
+            return None
+    return sorted_list
+
+
+# return continues list of parts from same entity, None if the list is broken
+def sort_entity_parts(entity_list, part_list):
+    if part_list is None:
+        return None
+    elif len(part_list) == 0:
+        return None
+    elif len(part_list) == 1:
+        return part_list
+    sorted_list = []
+    first_part = part_list[0]
+    e_0 = entity_list[first_part]
+    shape = e_0.shape
+    for i in part_list:
+        ei = entity_list[i]
+        if ei.shape != e_0.shape:
+            return None
+    if shape == 'CIRCLE':
+        return None
+    elif shape == 'ARC':
+        # check that all parts with same center and radius
+        for i in part_list:
+            ei = entity_list[i]
+            if ei.center != e_0.center or ei.radius != e_0.radius:
+                return None
+        sorted_list.append(first_part)
+        part_list.remove(first_part)
+        found_part = False
+        # iterate list to find connected parts, add to list or return None if can't find
+        while len(part_list) > 0:
+            start = entity_list[sorted_list[0]].arc_start_angle % 360
+            end = entity_list[sorted_list[-1]].arc_end_angle % 360
+            for j in part_list:
+                found_part = False
+                if entity_list[j].arc_start_angle % 360 == end:
+                    sorted_list.append(j)
+                    found_part = True
+                    part_list.remove(j)
+                    break
+                elif entity_list[j].arc_end_angle % 360 == start:
+                    sorted_list.insert(0, j)
+                    found_part = True
+                    part_list.remove(j)
+                    break
+            if not found_part:
+                return None
+    elif shape == 'LINE':
+        for i in part_list:
+            if ei.left_bottom.is_smaller_x_smaller_y(e_0.left_bottom):
+                first_part = i
+                e_0 = entity_list[first_part]
+        sorted_list.append(first_part)
+        part_list.remove(first_part)
+        found_part = False
+        # iterate list to find connected parts, add to list or return None if can't find
+        while len(part_list) > 0:
+            start = entity_list[sorted_list[-1]].right_up
+            for j in part_list:
+                found_part = False
+                if entity_list[j].left_bottom == start:
+                    sorted_list.append(j)
+                    found_part = True
+                    part_list.remove(j)
+                    break
+            if not found_part:
+                return None
+        # set start and end points accordingly
+        for i in sorted_list:
+            e = entity_list[i]
+            e.start, e.end = e.left_bottom, e.right_up
+    return sorted_list
+

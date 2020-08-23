@@ -773,136 +773,6 @@ class FabianBoard(Board):
         node_hash_index = self.add_node_to_node_list(end_node)
         e.add_node_to_entity_nodes_list(node_hash_index)
 
-    # return continues list of lines, None if the list is broken
-    def sort_net_line_parts(self, part_list):
-        if part_list is None:
-            return None
-        elif len(part_list) == 0:
-            return None
-        elif len(part_list) == 1:
-            return part_list
-        sorted_list = []
-        first_line = None
-        # find first unattached line and node
-        for i in range(len(part_list)):
-            line_i = self.net_line_list[part_list[i]]
-            is_line_i_start_node_connected = False
-            is_line_i_end_node_connected = False
-            for j in range(len(part_list)):
-                if j == i:
-                    continue
-                line_j = self.net_line_list[part_list[j]]
-                if line_i.start_node == line_j.start_node or line_i.start_node == line_j.end_node:
-                    is_line_i_start_node_connected = True
-                if line_i.end_node == line_j.start_node or line_i.end_node == line_j.end_node:
-                    is_line_i_end_node_connected = True
-                if is_line_i_start_node_connected and is_line_i_end_node_connected:
-                    break
-            if not is_line_i_start_node_connected:
-                first_line = part_list[i]
-                break
-            elif not is_line_i_end_node_connected:
-                first_line = part_list[i]
-                line_i.start_node, line_i.end_node = line_i.end_node, line_i.start_node
-                break
-        if first_line is None:
-            #debug
-            print("can't find unattached line in sort_net_line_parts")
-            return None
-        entity = self.net_line_list[first_line].entity
-        next_node = self.net_line_list[first_line].end_node
-        sorted_list.append(first_line)
-        part_list.remove(first_line)
-        found_part = False
-        # iterate list to find connected parts, add to list or return None if can't find
-        while len(part_list) > 0:
-            for j in part_list:
-                found_part = False
-                line = self.net_line_list[j]
-                if line.entity != entity:
-                    return None
-                if line.start_node == next_node:
-                    found_part = True
-                elif line.end_node == next_node:
-                    line.start_node, line.end_node = line.end_node, line.start_node
-                    found_part = True
-                if found_part:
-                    sorted_list.append(j)
-                    next_node = line.end_node
-                    part_list.remove(j)
-                    break
-            if not found_part:
-                return None
-        return sorted_list
-
-    # return continues list of parts from same entity, None if the list is broken
-    def sort_entity_parts(self, part_list):
-        if part_list is None:
-            return None
-        elif len(part_list) == 0:
-            return None
-        elif len(part_list) == 1:
-            return part_list
-        sorted_list = []
-        first_part = part_list[0]
-        e_0 = self.entity_list[first_part]
-        shape = e_0.shape
-        for i in part_list:
-            ei = self.entity_list[i]
-            if ei.shape != e_0.shape:
-                return None
-        if shape == 'CIRCLE':
-            return None
-        elif shape == 'ARC':
-            # find smallest start_angle, and check all parts with same center and radius
-            for i in part_list:
-                ei = self.entity_list[i]
-                if ei.center != e_0.center or ei.radius != e_0.radius:
-                    return None
-                if ei.arc_start_angle < e_0.arc_start_angle:
-                    first_part = i
-                    e_0 = self.entity_list[first_part]
-            sorted_list.append(first_part)
-            part_list.remove(first_part)
-            found_part = False
-            # iterate list to find connected parts, add to list or return None if can't find
-            while len(part_list) > 0:
-                start = self.entity_list[sorted_list[-1]].arc_end_angle
-                for j in part_list:
-                    found_part = False
-                    if self.entity_list[j].arc_start_angle == start:
-                        sorted_list.append(j)
-                        found_part = True
-                        part_list.remove(j)
-                        break
-                if not found_part:
-                    return None
-        elif shape == 'LINE':
-            for i in part_list:
-                if ei.left_bottom.is_smaller_x_smaller_y(e_0.left_bottom):
-                    first_part = i
-                    e_0 = self.entity_list[first_part]
-            sorted_list.append(first_part)
-            part_list.remove(first_part)
-            found_part = False
-            # iterate list to find connected parts, add to list or return None if can't find
-            while len(part_list) > 0:
-                start = self.entity_list[sorted_list[-1]].right_up
-                for j in part_list:
-                    found_part = False
-                    if self.entity_list[j].left_bottom == start:
-                        sorted_list.append(j)
-                        found_part = True
-                        part_list.remove(j)
-                        break
-                if not found_part:
-                    return None
-            # set start and end points accordingly
-            for i in sorted_list:
-                e = self.entity_list[i]
-                e.start, e.end = e.left_bottom, e.right_up
-        return sorted_list
-
     def extend_arc(self):
         if self.work_mode != gv.work_mode_inp:
             return
@@ -983,7 +853,7 @@ class FabianBoard(Board):
             e_list = self.get_marked_parts(gv.part_list_entities)
             if len(e_list) < 2:
                 return False
-            e_list = self.sort_entity_parts(e_list)
+            e_list = sort_entity_parts(self.entity_list, e_list)
             if e_list is None:
                 m = "can't merge strange entities"
                 messagebox.showwarning(m)
@@ -1021,7 +891,7 @@ class FabianBoard(Board):
         p_list = self.get_marked_parts(gv.part_list_net_lines)
         if len(p_list) < 2:
             return False
-        p_list = self.sort_net_line_parts(p_list)
+        p_list = sort_net_line_parts(self.net_line_list, p_list)
         if p_list is None:
             m = "can't merge strange lines"
             messagebox.showwarning(m)
