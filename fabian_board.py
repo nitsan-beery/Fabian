@@ -245,7 +245,7 @@ class FabianBoard(Board):
             node_index = get_index_from_hash(self.nodes_hash, line.start_node)
             p1 = self.get_node_p(line.start_node)
             p2 = self.get_node_p(line.end_node)
-            d, p = self.get_distance_from_line_and_nearest_point(Point(x, y), p1, p2)
+            d, p = get_distance_from_line_and_nearest_point(Point(x, y), p1, p2)
         if self.mouse_select_mode == gv.mouse_select_mode_point and self.work_mode == gv.work_mode_inp:
             self.new_line_edge[0] = p
             self.keep_state()
@@ -397,52 +397,54 @@ class FabianBoard(Board):
 
     def mouse_1_released(self, key):
         # mark parts inside the "choose" rect
-        if self.temp_rect_start_point is not None:
-            p1 = self.temp_rect_start_point
-            p1.x, p1.y = self.convert_xy_to_screen(p1.x, p1.y)
-            p2 = Point()
-            p2.x = self.board.canvasx(key.x)
-            p2.y = self.board.canvasy(key.y)
-            left = p1.x
-            right = p2.x
-            lower = p1.y
-            upper = p2.y
-            if left > right:
-                left, right = right, left
-            if upper > lower:
-                upper, lower = lower, upper
-            enclosed_parts = self.board.find_enclosed(left, upper, right, lower)
-            t1 = len(enclosed_parts) > 0
-            t2 = self.work_mode == gv.work_mode_dxf
-            t3 = self.work_mode == gv.work_mode_inp and (self.select_parts_mode == gv.part_type_net_line or self.select_parts_mode == 'all')
-            if t1 and (t2 or t3):
-                mark_option = {
-                    "mark": True,
-                    "unmark": False
-                }
-                self.keep_state()
-                marked_color = gv.marked_entity_color
-                non_marked_color = gv.default_entity_color
-                part_list = self.entity_list
-                list_name = gv.part_list_entities
-                if t3:
-                    part_list = self.net_line_list
-                    marked_color = gv.marked_net_line_color
-                    non_marked_color = gv.net_line_color
-                    list_name = gv.part_list_net_lines
-                i = 0
-                for p in part_list:
-                    if p.board_part in enclosed_parts:
-                        if self.mark_option == gv.mark_option_mark or self.mark_option == gv.mark_option_unmark:
-                            p.is_marked = mark_option.get(self.mark_option)
-                        # invert
-                        else:
-                            p.is_marked = not p.is_marked
-                        if p.is_marked:
-                            self.set_part_color(list_name, i, marked_color)
-                        else:
-                            self.set_part_color(list_name, i, non_marked_color)
-                    i += 1
+        if self.temp_rect_start_point is None:
+            return
+        p1 = self.temp_rect_start_point
+        p1.x, p1.y = self.convert_xy_to_screen(p1.x, p1.y)
+        p2 = Point()
+        p2.x = self.board.canvasx(key.x)
+        p2.y = self.board.canvasy(key.y)
+        left = p1.x
+        right = p2.x
+        lower = p1.y
+        upper = p2.y
+        if left > right:
+            left, right = right, left
+        if upper > lower:
+            upper, lower = lower, upper
+        enclosed_parts = self.board.find_enclosed(left, upper, right, lower)
+        t1 = len(enclosed_parts) > 0
+        t2 = self.work_mode == gv.work_mode_dxf
+        t3 = self.work_mode == gv.work_mode_inp and (self.select_parts_mode == gv.part_type_net_line or self.select_parts_mode == 'all')
+        if t1 and (t2 or t3):
+            mark_option = {
+                "mark": True,
+                "unmark": False
+            }
+            self.keep_state()
+            marked_color = gv.marked_entity_color
+            non_marked_color = gv.default_entity_color
+            part_list = self.entity_list
+            list_name = gv.part_list_entities
+            if t3:
+                part_list = self.net_line_list
+                marked_color = gv.marked_net_line_color
+                non_marked_color = gv.net_line_color
+                list_name = gv.part_list_net_lines
+            i = 0
+            for p in part_list:
+                if p.board_part in enclosed_parts:
+                    if self.mark_option == gv.mark_option_mark or self.mark_option == gv.mark_option_unmark:
+                        p.is_marked = mark_option.get(self.mark_option)
+                    # invert
+                    else:
+                        p.is_marked = not p.is_marked
+                    if p.is_marked:
+                        self.set_part_color(list_name, i, marked_color)
+                    else:
+                        self.set_part_color(list_name, i, non_marked_color)
+                i += 1
+        self.board.delete(self.temp_rect_mark)
 
     def mouse_3_pressed(self, key):
         menu = tk.Menu(self.board, tearoff=0)
@@ -2721,7 +2723,7 @@ class FabianBoard(Board):
             return None, None
         p1 = self.get_node_p(start_node_hash)
         p2 = self.get_node_p(end_node_hash)
-        min_d, nearest_point = self.get_distance_from_line_and_nearest_point(p, p1, p2)
+        min_d, nearest_point = get_distance_from_line_and_nearest_point(p, p1, p2)
         for i in range(len(self.net_line_list)):
             if only_visible and self.net_line_list[i].board_part is None:
                 continue
@@ -2735,7 +2737,7 @@ class FabianBoard(Board):
                 return None, None
             p1 = self.get_node_p(start_node_hash)
             p2 = self.get_node_p(end_node_hash)
-            d, nearest_point = self.get_distance_from_line_and_nearest_point(p, p1, p2)
+            d, nearest_point = get_distance_from_line_and_nearest_point(p, p1, p2)
             if d < min_d:
                 min_d_index = i
                 min_d = d
@@ -2779,26 +2781,7 @@ class FabianBoard(Board):
                     d = e.end.get_distance_to_point(p)
                     nearest_point = e.end
         elif e.shape == 'LINE':
-            d, nearest_point = self.get_distance_from_line_and_nearest_point(p, e.start, e.end)
-        return round(d, gv.accuracy), nearest_point
-
-    def get_distance_from_line_and_nearest_point(self, p, line_start, line_end):
-        alfa = line_start.get_alfa_to(line_end)
-        endx = math.fabs(get_shifted_point(line_end, line_start, -alfa).x)
-        p = get_shifted_point(p, line_start, -alfa)
-        x = p.x
-        if 0 <= x <= endx:
-            d = math.fabs(p.y)
-            alfa = alfa * math.pi / 180
-            px = math.cos(alfa)*x+line_start.x
-            py = math.sin(alfa)*x+line_start.y
-            nearest_point = Point(px, py)
-        elif x < 0:
-            d = p.get_distance_to_point(Point(0, 0))
-            nearest_point = line_start
-        else:
-            d = p.get_distance_to_point(Point(endx, 0))
-            nearest_point = line_end
+            d, nearest_point = get_distance_from_line_and_nearest_point(p, e.start, e.end)
         return round(d, gv.accuracy), nearest_point
 
     def get_net_line_by_board_part(self, board_part):

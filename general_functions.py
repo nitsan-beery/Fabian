@@ -388,7 +388,7 @@ def set_node_expected_elements_and_exceptions(node):
     node.expected_elements = len(node.attached_lines) - int(num_border_lines / 2)
     if num_border_lines == 1 or num_border_lines == 3:
         # debug
-        m = f'unexpected number of border lines in set_node_expected_elements_and_exceptions node {n}  outer: {num_outer_lines}   inner: {num_inner_lines}'
+        m = f'unexpected number of border lines in set_node_expected_elements_and_exceptions node(hash) {node.hash_index}  outer: {num_outer_lines}   inner: {num_inner_lines}'
         print(m)
         return node
     prev_line = node.attached_lines[0]
@@ -411,5 +411,25 @@ def set_node_expected_elements_and_exceptions(node):
             node.exceptions.append(gv.too_wide_angle)
         prev_line = line
     return node
+
+
+def get_distance_from_line_and_nearest_point(p, line_start, line_end):
+    alfa = line_start.get_alfa_to(line_end)
+    endx = math.fabs(get_shifted_point(line_end, line_start, -alfa).x)
+    p = get_shifted_point(p, line_start, -alfa)
+    x = p.x
+    if 0 <= x <= endx:
+        d = math.fabs(p.y)
+        alfa = alfa * math.pi / 180
+        px = math.cos(alfa)*x+line_start.x
+        py = math.sin(alfa)*x+line_start.y
+        nearest_point = Point(px, py)
+    elif x < 0:
+        d = p.get_distance_to_point(Point(0, 0))
+        nearest_point = line_start
+    else:
+        d = p.get_distance_to_point(Point(endx, 0))
+        nearest_point = line_end
+    return round(d, gv.accuracy), nearest_point
 
 
