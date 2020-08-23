@@ -238,7 +238,7 @@ class FabianBoard(Board):
                 return
             p1 = e.left_bottom
             p2 = e.right_up
-            d, p = self.get_distance_from_entity_and_nearest_point(Point(x, y), self.selected_part.index)
+            d, p = get_distance_from_entity_and_nearest_point(Point(x, y), self.selected_part.index, self.entity_list)
         # self.selected_part.part_type == gv.part_type_net_line
         elif self.selected_part.part_type == gv.part_type_net_line:
             line = self.net_line_list[self.selected_part.index]
@@ -1511,6 +1511,8 @@ class FabianBoard(Board):
             alfa = line.angle_to_second_node
             next_node_index = get_index_from_hash(self.nodes_hash, next_node_hash_index)
             outer_border_nodes.append(next_node_index)
+        # remove duplicate nodes
+        outer_border_nodes = list(dict.fromkeys(outer_border_nodes))
         # mark relevant attached lines as unavailale
         for node_index in outer_border_nodes:
             node = self.node_list[node_index]
@@ -1530,12 +1532,11 @@ class FabianBoard(Board):
                     inner_border_nodes.append(net_line.start_node)
                 if get_index_from_hash(self.nodes_hash, net_line.end_node) not in outer_border_nodes:
                     inner_border_nodes.append(net_line.end_node)
-        if len(inner_border_nodes) == 0:
-            return outer_border_nodes + inner_border_nodes
         # remove duplicate nodes
         inner_border_nodes = list(dict.fromkeys(inner_border_nodes))
         # debug
         #print(f'inner nodes (hash): {inner_border_nodes}')
+        border_nodes = outer_border_nodes + inner_border_nodes
         while len(inner_border_nodes) > 0:
             if len(inner_border_nodes) < 3:
                 m = f'There are open inner entities. remove or fix before INP mode'
@@ -1543,6 +1544,7 @@ class FabianBoard(Board):
                 print(m)
                 return []
             inner_border_nodes = self.set_inner_attached_lines(inner_border_nodes)
+        return border_nodes
 
     def set_inner_attached_lines(self, inner_border_nodes):
         if len(inner_border_nodes) == 0:
@@ -1574,7 +1576,7 @@ class FabianBoard(Board):
                 next_inner_node = al.second_node
         if inner_attached_line < 0:
             print(f"can't find inner line in lowest inner node")
-            return None
+            return []
         lowest_node.attached_lines[inner_attached_line].border_type = gv.line_border_type_inner
         lowest_node.attached_lines[inner_attached_line].is_available = False
         inner_border_nodes.pop(lowest_index)
@@ -2076,7 +2078,7 @@ class FabianBoard(Board):
             # adjust node to closest point on entity
             else:
                 index, d = self.find_nearest_entity(node.p)
-                d, p = self.get_distance_from_entity_and_nearest_point(node.p, index)
+                d, p = get_distance_from_entity_and_nearest_point(node.p, index, self.entity_list)
                 node.p = p
         self.clear_corner_list()
         self.update_view()
@@ -2691,11 +2693,11 @@ class FabianBoard(Board):
             min_d_index = self.get_first_visible_entity()
         if len(self.entity_list) == 0 or min_d_index is None:
             return None, None
-        min_d, nearest_point = self.get_distance_from_entity_and_nearest_point(p, min_d_index, only_visible)
+        min_d, nearest_point = get_distance_from_entity_and_nearest_point(p, min_d_index, self.entity_list, only_visible)
         for i in range(len(self.entity_list)):
             if only_visible and self.entity_list[i].board_part is None:
                 continue
-            d, nearest_point = self.get_distance_from_entity_and_nearest_point(p, i, only_visible)
+            d, nearest_point = get_distance_from_entity_and_nearest_point(p, i, self.entity_list, only_visible)
             if d < min_d:
                 min_d_index = i
                 min_d = d
@@ -2742,47 +2744,6 @@ class FabianBoard(Board):
                 min_d_index = i
                 min_d = d
         return min_d_index, min_d
-
-    # return the distance of Point p from entity[i]
-    def get_distance_from_entity_and_nearest_point(self, p, i, only_visible=False):
-        e = self.entity_list[i]
-        if only_visible and e.board_part is None:
-            return None, None
-        d = None
-        nearest_point = None
-        if e.shape == 'CIRCLE':
-            d = math.fabs(e.center.get_distance_to_point(p)-e.radius)
-            alfa = e.center.get_alfa_to(p)*math.pi/180
-            if alfa is None:
-                d = e.radius
-                alfa = 0
-            px = e.center.x+math.cos(alfa)*e.radius
-            py = e.center.y+math.sin(alfa)*e.radius
-            nearest_point = Point(px, py)
-        elif e.shape == 'ARC':
-            alfa = e.center.get_alfa_to(p)
-            if e.arc_end_angle > 360 and alfa < e.arc_start_angle:
-                alfa += 360
-            if e.arc_start_angle <= alfa <= e.arc_end_angle:
-                d = math.fabs(e.center.get_distance_to_point(p) - e.radius)
-                alfa = alfa*math.pi/180
-                px = e.center.x + math.cos(alfa) * e.radius
-                py = e.center.y + math.sin(alfa) * e.radius
-                nearest_point = Point(px, py)
-            else:
-                mid_angle = (e.arc_start_angle + e.arc_end_angle)/2
-                if mid_angle < 180:
-                    mid_angle += 360
-                a1 = (mid_angle-180)
-                if a1 < alfa < mid_angle:
-                    d = e.start.get_distance_to_point(p)
-                    nearest_point = e.start
-                else:
-                    d = e.end.get_distance_to_point(p)
-                    nearest_point = e.end
-        elif e.shape == 'LINE':
-            d, nearest_point = get_distance_from_line_and_nearest_point(p, e.start, e.end)
-        return round(d, gv.accuracy), nearest_point
 
     def get_net_line_by_board_part(self, board_part):
         i = 0
@@ -3187,8 +3148,3 @@ class FabianBoard(Board):
         if self.show_corners:
             self.show_all_corners()
         self.window_main.update()
-
-    # debug
-    def test_key(self, key):
-        print(key.keycode)
-

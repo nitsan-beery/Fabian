@@ -433,3 +433,44 @@ def get_distance_from_line_and_nearest_point(p, line_start, line_end):
     return round(d, gv.accuracy), nearest_point
 
 
+# return the distance of Point p from entity[i]
+def get_distance_from_entity_and_nearest_point(p, index, entity_list, only_visible=False):
+    e = entity_list[index]
+    if only_visible and e.board_part is None:
+        return None, None
+    d = None
+    nearest_point = None
+    if e.shape == 'CIRCLE':
+        d = math.fabs(e.center.get_distance_to_point(p)-e.radius)
+        alfa = e.center.get_alfa_to(p)*math.pi/180
+        if alfa is None:
+            d = e.radius
+            alfa = 0
+        px = e.center.x+math.cos(alfa)*e.radius
+        py = e.center.y+math.sin(alfa)*e.radius
+        nearest_point = Point(px, py)
+    elif e.shape == 'ARC':
+        alfa = e.center.get_alfa_to(p)
+        if e.arc_end_angle > 360 and alfa < e.arc_start_angle:
+            alfa += 360
+        if e.arc_start_angle <= alfa <= e.arc_end_angle:
+            d = math.fabs(e.center.get_distance_to_point(p) - e.radius)
+            alfa = alfa*math.pi/180
+            px = e.center.x + math.cos(alfa) * e.radius
+            py = e.center.y + math.sin(alfa) * e.radius
+            nearest_point = Point(px, py)
+        else:
+            mid_angle = (e.arc_start_angle + e.arc_end_angle)/2
+            if mid_angle < 180:
+                mid_angle += 360
+            a1 = (mid_angle-180)
+            if a1 < alfa < mid_angle:
+                d = e.start.get_distance_to_point(p)
+                nearest_point = e.start
+            else:
+                d = e.end.get_distance_to_point(p)
+                nearest_point = e.end
+    elif e.shape == 'LINE':
+        d, nearest_point = get_distance_from_line_and_nearest_point(p, e.start, e.end)
+    return round(d, gv.accuracy), nearest_point
+
