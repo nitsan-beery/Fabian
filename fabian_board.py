@@ -68,6 +68,7 @@ class FabianBoard(Board):
         self.board.bind('<ButtonRelease-1>', self.mouse_1_released)
         self.board.bind('<Control-ButtonRelease-1>', self.control_mouse_1_released)
         self.board.bind('<Button-3>', self.mouse_3_pressed)
+        self.board.bind('<Control-MouseWheel>', self.control_mouse_wheel)
 
         self.window_main.bind('<Delete>', self.remove_selected_part_from_list)
         self.window_main.bind('m', self.mark_selected_part)
@@ -3294,10 +3295,17 @@ class FabianBoard(Board):
         self.remove_selected_part_mark()
         x, y = self.get_center_keyx_keyy()
         x, y = self.convert_keyx_keyy_to_xy(x, y)
-        self.scale = round(self.scale*factor, 1)
+        self.scale = round(self.scale*factor, 2)
         x, y = self.convert_xy_to_screen(x, y)
         self.set_screen_position(x, y)
         self.update_view()
+
+    def control_mouse_wheel(self, key):
+        if key.delta < 0:
+            factor = 5/4
+        else:
+            factor = 4/5
+        self.zoom(factor)
 
     def get_first_entity_to_set_accuracy(self):
         for i in range(len(self.entity_list)):
