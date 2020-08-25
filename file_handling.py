@@ -109,6 +109,7 @@ def save_data(parent, file_name, state):
         "net_line_list": state.net_line_list,
         "element_list": state.element_list,
         "corner_list": state.corner_list,
+        "inp_corner_list": state.inp_corner_list,
         "inp_nets": state.inp_nets,
         "mouse_select_mode": state.mouse_select_mode,
         "work_mode": state.work_mode,
@@ -183,6 +184,7 @@ def load(parent):
         state.net_line_list = data.get("net_line_list")
         state.element_list = data.get("element_list")
         state.corner_list = data.get("corner_list")
+        state.inp_corner_list = data.get("inp_corner_list")
         state.inp_nets = data.get("inp_nets")
         state.mouse_select_mode = data.get("mouse_select_mode")
         state.work_mode = data.get("work_mode")

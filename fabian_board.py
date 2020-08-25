@@ -32,6 +32,7 @@ class FabianBoard(Board):
         self.net_line_list = []
         self.element_list = []
         self.corner_list = []
+        self.inp_corner_list = []
         self.inp_nets = []
         self.longitude = None
         self.mouse_select_mode = gv.default_mouse_select_mode
@@ -90,6 +91,7 @@ class FabianBoard(Board):
         self.net_line_list = []
         self.element_list = []
         self.corner_list = []
+        self.inp_corner_list = []
         self.inp_nets = []
         self.longitude = None
         self.mouse_select_mode = gv.default_mouse_select_mode
@@ -132,32 +134,43 @@ class FabianBoard(Board):
             return
         state = self.state[-1]
         self.reset_board(empty_node_list=True, center_screen_position=False, reset_state=False)
-        for t in state.entity_list:
-            e = Entity()
-            e.get_data_from_tuple(t)
-            self.entity_list.append(e)
-        for t in state.node_list:
-            n = Node()
-            n.get_data_from_tuple(t)
-            self.node_list.append(n)
+        if state.entity_list is not None:
+            for t in state.entity_list:
+                e = Entity()
+                e.get_data_from_tuple(t)
+                self.entity_list.append(e)
+        if state.node_list is not None:
+            for t in state.node_list:
+                n = Node()
+                n.get_data_from_tuple(t)
+                self.node_list.append(n)
         self.next_node_hash_index = state.next_node_hash_index
         self.nodes_hash = state.nodes_hash.copy()
-        for t in state.net_line_list:
-            line = NetLine()
-            line.get_data_from_tuple(t)
-            self.net_line_list.append(line)
-        for t in state.element_list:
-            element = Element()
-            element.get_data_from_tuple(t)
-            self.element_list.append(element)
-        for t in state.corner_list:
-            corner = Corner()
-            corner.get_data_from_tuple(t)
-            self.corner_list.append(corner)
-        for t in state.inp_nets:
-            inp_net = InpNet()
-            inp_net.get_data_from_tuple(t)
-            self.inp_nets.append(inp_net)
+        if state.net_line_list is not None:
+            for t in state.net_line_list:
+                line = NetLine()
+                line.get_data_from_tuple(t)
+                self.net_line_list.append(line)
+        if state.element_list is not None:
+            for t in state.element_list:
+                element = Element()
+                element.get_data_from_tuple(t)
+                self.element_list.append(element)
+        if state.corner_list is not None:
+            for t in state.corner_list:
+                corner = Corner()
+                corner.get_data_from_tuple(t)
+                self.corner_list.append(corner)
+        if state.inp_corner_list is not None:
+            for t in state.inp_corner_list:
+                corner = Corner()
+                corner.get_data_from_tuple(t)
+                self.inp_corner_list.append(corner)
+        if state.inp_nets is not None:
+            for t in state.inp_nets:
+                inp_net = InpNet()
+                inp_net.get_data_from_tuple(t)
+                self.inp_nets.append(inp_net)
         self.mouse_select_mode = state.mouse_select_mode
         self.work_mode = state.work_mode
         self.select_parts_mode = state.select_parts_mode
@@ -198,6 +211,10 @@ class FabianBoard(Board):
         for e in self.corner_list:
             t = e.convert_into_tuple()
             corner_list.append(t)
+        inp_corner_list = []
+        for e in self.inp_corner_list:
+            t = e.convert_into_tuple()
+            inp_corner_list.append(t)
         inp_nets = []
         for e in self.inp_nets:
             t = e.convert_into_tuple()
@@ -207,6 +224,7 @@ class FabianBoard(Board):
         state.net_line_list = net_list.copy()
         state.element_list = element_list.copy()
         state.corner_list = corner_list.copy()
+        state.inp_corner_list = inp_corner_list.copy()
         state.inp_nets = inp_nets.copy()
         state.mouse_select_mode = self.mouse_select_mode
         state.work_mode = self.work_mode
@@ -246,6 +264,9 @@ class FabianBoard(Board):
             p1 = self.get_node_p(line.start_node)
             p2 = self.get_node_p(line.end_node)
             d, p = get_distance_from_line_and_nearest_point(Point(x, y), p1, p2)
+        elif self.selected_part.part_type == gv.part_type_inp_node and len(self.inp_nets) > 0 and self.show_inps:
+            inp_index, node_index, d = find_nearest_inp_node(mouse_point, self.inp_nets)
+            p = self.inp_nets[inp_index].node_list[node_index].p
         if self.mouse_select_mode == gv.mouse_select_mode_point and self.work_mode == gv.work_mode_inp:
             self.new_line_edge[0] = p
             self.keep_state()
@@ -259,14 +280,19 @@ class FabianBoard(Board):
             if d1 < d2:
                 p = p1
 
-        if self.mouse_select_mode == gv.mouse_select_mode_corner:# and self.work_mode == gv.work_mode_inp:
+        if self.mouse_select_mode == gv.mouse_select_mode_corner:
             corner = Corner()
-            node_hash_index = self.get_hash_index_of_node_with_point(p)
-            #debug
-            if node_hash_index is None:
-                print("can't find match node for corner")
-                return
-            corner.hash_node = node_hash_index
+            if self.select_parts_mode == gv.part_type_inp_node:
+                corner.hash_node = node_index
+                corner.inp_index = inp_index
+            # net_line or entity
+            else:
+                node_hash_index = self.get_hash_index_of_node_with_point(p)
+                #debug
+                if node_hash_index is None:
+                    print("can't find match node for corner")
+                    return
+                corner.hash_node = node_hash_index
             self.add_or_replace_corner(corner)
             return
 
@@ -458,6 +484,9 @@ class FabianBoard(Board):
             select_part_menu.add_command(label="Entities", command=lambda: self.change_select_parts_mode(gv.part_type_entity))
             select_part_menu.add_command(label="Net lines", command=lambda: self.change_select_parts_mode(gv.part_type_net_line))
             select_part_menu.add_command(label="both", command=lambda: self.change_select_parts_mode('all'))
+            if len(self.inp_nets) > 0 and self.show_inps:
+                select_part_menu.add_command(label="INP nodes",
+                                         command=lambda: self.change_select_parts_mode(gv.part_type_inp_node))
             select_part_menu.add_separator()
         select_part_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_edge))
         select_part_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_point))
@@ -513,7 +542,7 @@ class FabianBoard(Board):
                 menu.add_command(label="Merge", command=self.merge)
                 entity = self.entity_list[self.selected_part.index]
                 if entity.shape == 'ARC':
-                    menu.add_command(label="Extend arc", command=self.extend_arc)
+                    menu.add_command(label="Extend arc..", command=self.extend_arc)
             if self.work_mode == gv.work_mode_dxf or (self.work_mode == gv.work_mode_inp and self.selected_part.part_type == gv.part_type_net_line):
                 menu.add_command(label="Delete", command=self.remove_selected_part_from_list)
                 menu.add_command(label="Mark", command=self.mark_selected_part)
@@ -545,7 +574,7 @@ class FabianBoard(Board):
                                      command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
                     if len(self.corner_list) > 0:
                         menu.add_command(label="Clear corners",
-                                         command=lambda: self.handle_corners(gv.handle_corners_mode_clear))
+                                         command=lambda: self.handle_corners(gv.handle_corners_mode_clear_on_net_line))
                     menu.add_command(label="Match net", command=self.match_inp_net)
                     if len(self.inp_nets) > 1:
                         menu.add_command(label="Merge nets", command=self.merge_inp_nets)
@@ -571,9 +600,24 @@ class FabianBoard(Board):
                 set_corner_net_menu.add_command(label="1 -> 2", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_1_2))
                 menu.add_cascade(label="Set net between corners", menu=set_corner_net_menu)
             menu.add_command(label="Set Corners", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
+            add_separator = False
             if len(self.corner_list) > 0:
-                menu.add_command(label="Clear corners",
-                                         command=lambda: self.handle_corners(gv.handle_corners_mode_clear))
+                if len(self.inp_corner_list) == 0:
+                    label = "Clear corners"
+                else:
+                    label = "Clear net corners"
+                menu.add_command(label=label, command=lambda: self.handle_corners(gv.handle_corners_mode_clear_on_net_line))
+                add_separator = True
+            if len(self.inp_corner_list) > 0:
+                if len(self.corner_list) == 0:
+                    label = "Clear corners"
+                else:
+                    label = "Clear inp corners"
+                menu.add_command(label=label, command=lambda: self.handle_corners(gv.handle_corners_mode_clear_on_inp_net))
+                add_separator = True
+                if len(self.corner_list) == 4 and len(self.inp_corner_list) == 4:
+                    menu.add_command(label="Set border nodes by corners", command=self.set_border_nodes_by_corners)
+            if add_separator:
                 menu.add_separator()
             menu.add_command(label="Set net", command=self.set_net)
             menu.add_command(label="Set initial border nodes...", command=self.set_initial_border_nodes)
@@ -601,17 +645,24 @@ class FabianBoard(Board):
             if len(self.net_line_list) == 0:
                 return
             i_net_line, d_net_line = self.find_nearest_net_line(p, only_visible=True)
-        part_type = gv.part_type_entity
-        d = d_entity
-        i = i_entity
-        if i_net_line is not None and (d is None or d_net_line < d):
-            d = d_net_line
-            i = i_net_line
-            part_type = gv.part_type_net_line
-        if i is None:
-            return
+        if self.select_parts_mode == gv.part_type_inp_node:
+            if len(self.inp_nets) == 0:
+                return
+            inp_index, node_index, d = find_nearest_inp_node(p, self.inp_nets)
+            i = self.inp_nets[inp_index].node_list[node_index].p
+            part_type = gv.part_type_inp_node
+        else:
+            part_type = gv.part_type_entity
+            d = d_entity
+            i = i_entity
+            if i_net_line is not None and (d is None or d_net_line < d):
+                d = d_net_line
+                i = i_net_line
+                part_type = gv.part_type_net_line
+            if i is None:
+                return
         self.remove_selected_part_mark()
-        if d*self.scale < 5:
+        if d * self.scale < 5:
             self.mark_part(i, part_type)
 
     def choose_mark_option(self, option):
@@ -662,20 +713,23 @@ class FabianBoard(Board):
     def change_show_inp_mode(self, mode):
         self.keep_state()
         changed = False
+        clear_corners_mode = gv.handle_corners_mode_clear_on_both
+        if self.work_mode == gv.work_mode_inp:
+            clear_corners_mode = gv.handle_corners_mode_clear_on_inp_net
         if mode == gv.show_mode:
             if not self.show_inps:
                 self.show_inps = True
                 changed = True
         elif mode == gv.hide_mode:
             if self.show_inps:
-                self.clear_corner_list()
+                self.clear_corner_list(clear_corners_mode)
                 self.hide_all_inp_nets()
                 self.show_inps = False
                 self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
                 changed = True
         elif mode == gv.clear_mode:
             if len(self.inp_nets) > 0:
-                self.clear_corner_list()
+                self.clear_corner_list(clear_corners_mode)
                 self.hide_all_inp_nets()
                 self.inp_nets = []
                 self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
@@ -697,7 +751,7 @@ class FabianBoard(Board):
         self.keep_state()
         self.mouse_select_mode = gv.mouse_select_mode_edge
         self.choose_mark_option(gv.mark_option_mark)
-        self.clear_corner_list()
+        self.clear_corner_list(mode=gv.handle_corners_mode_clear_on_both)
         self.change_show_inp_mode(gv.clear_mode)
         if mode == gv.work_mode_dxf:
             self.reset_net()
@@ -748,8 +802,8 @@ class FabianBoard(Board):
             self.mouse_select_mode = gv.mouse_select_mode_edge
 
     def handle_corners(self, mode, arg=gv.corners_set_net_both):
-        if mode == gv.handle_corners_mode_clear:
-            self.clear_corner_list(True)
+        if mode == gv.handle_corners_mode_clear_on_net_line or mode == gv.handle_corners_mode_clear_on_inp_net or mode == gv.handle_corners_mode_clear_on_both:
+            self.clear_corner_list(True, mode=mode)
             if self.work_mode == gv.work_mode_dxf:
                 self.select_parts_mode = gv.part_type_entity
         elif mode == gv.handle_corners_mode_set_net:
@@ -1222,6 +1276,9 @@ class FabianBoard(Board):
         mutual_point.x += start_node_p.x
         mutual_point.y += start_node_p.y
         return mutual_point, None
+
+    def set_border_nodes_by_corners(self):
+        pass
 
     def set_initial_border_nodes(self):
         choice = SetInitialNetDialog(self.window_main).show()
@@ -2589,12 +2646,22 @@ class FabianBoard(Board):
                 return i
         return None
 
-    def clear_corner_list(self, keep_state=False):
-        if len(self.corner_list) > 0:
-            if keep_state:
-                self.keep_state()
-            self.hide_all_corners(keep_new_state=False)
-            self.corner_list = []
+    def clear_corner_list(self, keep_state=False, mode=gv.handle_corners_mode_clear_on_net_line):
+        if keep_state:
+            self.keep_state()
+        changed = False
+        if mode == gv.handle_corners_mode_clear_on_net_line or mode == gv.handle_corners_mode_clear_on_both:
+            if len(self.corner_list) > 0:
+                self.hide_all_corners(keep_new_state=False, mode=gv.corners_on_net_line)
+                self.corner_list = []
+                changed = True
+        if mode == gv.handle_corners_mode_clear_on_inp_net or mode == gv.handle_corners_mode_clear_on_both:
+            if len(self.inp_corner_list) > 0:
+                self.hide_all_corners(keep_new_state=False, mode=gv.corners_on_inp_net)
+                self.inp_corner_list = []
+                changed = True
+        if keep_state and not changed:
+            self.state.pop(-1)
 
     def add_or_replace_corner(self, corner):
         # in DXF mode - unlimited corners
@@ -2603,23 +2670,36 @@ class FabianBoard(Board):
             max_corners = 4
         self.keep_state()
         changed = False
-        i = len(self.corner_list)
+        if corner.inp_index is None:
+            i = len(self.corner_list)
+        else:
+            i = len(self.inp_corner_list)
         if self.remove_corner_from_list(corner):
             changed = True
             self.update_view()
         elif i < max_corners:
             changed = True
-            self.corner_list.append(corner)
-            self.show_corner(i)
+            if corner.inp_index is None:
+                self.corner_list.append(corner)
+                self.show_corner(i, mode=gv.corners_on_net_line)
+            else:
+                self.inp_corner_list.append(corner)
+                self.show_corner(i, mode=gv.corners_on_inp_net)
         if not changed:
             self.state.pop(-1)
 
     def remove_corner_from_list(self, corner):
-        for i in range(len(self.corner_list)):
-            c = self.corner_list[i]
+        if corner.inp_index is None:
+            corner_list = self.corner_list
+            mode = gv.corners_on_net_line
+        else:
+            corner_list = self.inp_corner_list
+            mode = gv.corners_on_inp_net
+        for i in range(len(corner_list)):
+            c = corner_list[i]
             if c.hash_node == corner.hash_node:
-                self.hide_corner(i)
-                self.corner_list.remove(c)
+                self.hide_corner(i, mode)
+                corner_list.remove(c)
                 return True
         return False
 
@@ -2823,37 +2903,53 @@ class FabianBoard(Board):
         self.window_main.update()
 
     # i = index in corner_list
-    def show_corner(self, i):
-        corner = self.corner_list[i]
-        p = self.get_node_p(corner.hash_node)
+    def show_corner(self, i, mode=gv.corners_on_net_line):
+        if mode == gv.corners_on_net_line:
+            corner = self.corner_list[i]
+            p = self.get_node_p(corner.hash_node)
+        else:
+            corner = self.inp_corner_list[i]
+            inp_index = corner.inp_index
+            node_index = corner.hash_node
+            p = self.inp_nets[inp_index].node_list[node_index].p
         if corner.board_part is None:
-            part = self.draw_square(p, 10/self.scale, gv.corner_color)
-            self.corner_list[i].board_part = part
+            corner.board_part = self.draw_square(p, 10/self.scale, gv.corner_color)
         if corner.board_text is None:
             x, y = self.convert_xy_to_screen(p.x, p.y)
             x += 9
             y -= 9
-            self.corner_list[i].board_text = self.board.create_text(x, y, text=i+1, fill=gv.corner_text_color, justify=tk.RIGHT)
+            corner.board_text = self.board.create_text(x, y, text=i+1, fill=gv.corner_text_color, justify=tk.RIGHT)
 
-    def hide_corner(self, i):
-        corner = self.corner_list[i]
+    def hide_corner(self, i, mode=gv.corners_on_net_line):
+        if mode == gv.corners_on_net_line:
+            corner = self.corner_list[i]
+        else:
+            corner = self.inp_corner_list[i]
         if corner.board_part is not None:
             self.board.delete(corner.board_part)
-            self.corner_list[i].board_part = None
+            corner.board_part = None
         if corner.board_text is not None:
             self.board.delete(corner.board_text)
-            self.corner_list[i].board_text = None
+            corner.board_text = None
 
-    def show_all_corners(self, keep_new_state=True):
-        for i in range(len(self.corner_list)):
-            self.show_corner(i)
+    def show_all_corners(self, keep_new_state=True, mode=gv.corners_on_both):
+        if mode == gv.corners_on_net_line or mode == gv.corners_on_both:
+            for i in range(len(self.corner_list)):
+                self.show_corner(i, gv.corners_on_net_line)
+        if mode == gv.corners_on_inp_net or mode == gv.corners_on_both:
+            for i in range(len(self.inp_corner_list)):
+                self.show_corner(i, gv.corners_on_inp_net)
         if keep_new_state:
             self.show_corners = True
         self.window_main.update()
 
-    def hide_all_corners(self, keep_new_state=True):
-        for i in range(len(self.corner_list)):
-            self.hide_corner(i)
+    def hide_all_corners(self, keep_new_state=True, mode=gv.corners_on_both):
+        if mode == gv.corners_on_net_line or mode == gv.corners_on_both:
+            for i in range(len(self.corner_list)):
+                self.hide_corner(i, mode=gv.corners_on_net_line)
+        if mode == gv.corners_on_inp_net or mode == gv.corners_on_both:
+            for i in range(len(self.inp_corner_list)):
+                self.hide_corner(i, mode=gv.corners_on_inp_net)
         if keep_new_state:
             self.show_corners = False
 
@@ -3063,12 +3159,15 @@ class FabianBoard(Board):
 
     def mark_part(self, i, part_type, color=gv.mark_rect_color):
         self.selected_part = SelectedPart(index=i, part_type=part_type)
-        if part_type == gv.part_type_entity:
+        if part_type == gv.part_type_inp_node:
+            self.selected_part.board_part = self.draw_circle(i, 8/self.scale, color)
+        elif part_type == gv.part_type_entity:
             b = self.board.bbox(self.entity_list[i].board_part)
+            self.selected_part.board_part = self.board.create_rectangle(b, outline=color)
         # part_type == gv.part_type_net_line
         else:
             b = self.board.bbox(self.net_line_list[i].board_part)
-        self.selected_part.board_part = self.board.create_rectangle(b, outline=color)
+            self.selected_part.board_part = self.board.create_rectangle(b, outline=color)
 
     def remove_selected_part_mark(self):
         if self.selected_part is None:

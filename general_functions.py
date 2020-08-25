@@ -474,3 +474,21 @@ def get_distance_from_entity_and_nearest_point(p, index, entity_list, only_visib
         d, nearest_point = get_distance_from_line_and_nearest_point(p, e.start, e.end)
     return round(d, gv.accuracy), nearest_point
 
+
+# return closest inp node - inp_net_index, node_index, distance
+def find_nearest_inp_node(p, inp_net_list):
+    if inp_net_list is None:
+        return None, None, None
+    min_d_inp_index = 0
+    min_d_node_index = 0
+    min_d = gv.infinite_size
+    for inp_index in range(len(inp_net_list)):
+        inp_net = inp_net_list[inp_index]
+        for node_index in range(len(inp_net.node_list)):
+            node = inp_net.node_list[node_index]
+            d = p.get_distance_to_point(node.p)
+            if d < min_d:
+                min_d_inp_index = inp_index
+                min_d_node_index = node_index
+                min_d = d
+    return min_d_inp_index, min_d_node_index, min_d

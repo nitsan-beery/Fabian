@@ -362,16 +362,24 @@ class Corner(Part):
         super().__init__(color)
         self.hash_node = hash_node
         self.board_text = None
+        self.inp_index = None
 
     def convert_into_tuple(self):
-        t = (self.hash_node, self.color)
+        t = (self.hash_node, self.inp_index, self.color)
         return t
 
     def get_data_from_tuple(self, t):
-        if len(t) < 2:
+        # fix me
+        '''
+        if len(t) < 3:
             print(f"tuple doesn't match Corner type: {t}")
+        '''
         self.hash_node = t[0]
-        self.color = t[1]
+        if len(t) < 3:
+            self.color = t[1]
+        else:
+            self.inp_index = t[1]
+            self.color = t[2]
 
 
 class FabianState:
@@ -383,6 +391,7 @@ class FabianState:
         self.net_line_list = None
         self.element_list = None
         self.corner_list = None
+        self.inp_corner_list = None
         self.inp_nets = None
         self.mouse_select_mode = None
         self.work_mode = None
