@@ -1,4 +1,5 @@
 from point import *
+import global_vars as gv
 import tkinter as tk
 from tkinter import ttk
 
@@ -19,6 +20,8 @@ class InpRotationPoint(Part):
         self.second_board_part = None
 
 
+# node_list start with node #0.
+# elements start with node #1 (element [1, 9, 3, 6] == nodes [0, 8, 2, 5])
 class InpNet:
     def __init__(self):
         self.node_list = []
@@ -36,6 +39,23 @@ class InpNet:
             counter += len(element.nodes)
         return counter
 
+    # return indexes of nodes attached to node_index
+    def get_attached_nodes(self, node_index):
+        attached_nodes = []
+        for e in self.elements:
+            num_nodes = len(e.nodes)
+            for i in range(num_nodes):
+                if e.nodes[i] == node_index + 1:
+                    attached_nodes.append(e.nodes[(i + 1) % num_nodes] - 1)
+                    attached_nodes.append(e.nodes[i - 1] - 1)
+                    break
+        attached_nodes = list(dict.fromkeys(attached_nodes))
+        return attached_nodes
+
+    def get_node_p(self, node_index):
+        node = self.node_list[node_index]
+        return node.p
+
     def get_shifted_net(self, diff_x, diff_y):
         new_inp_net = InpNet()
         for node in self.node_list:
@@ -46,7 +66,7 @@ class InpNet:
         new_inp_net.lines = self.lines.copy()
         return new_inp_net
 
-    def get_fliped_net(self, p1, p2):
+    def get_flipped_net(self, p1, p2):
         if p1 == p2:
             return self
         new_inp_net = InpNet()

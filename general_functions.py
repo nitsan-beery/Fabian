@@ -492,3 +492,197 @@ def find_nearest_inp_node(p, inp_net_list):
                 min_d_node_index = node_index
                 min_d = d
     return min_d_inp_index, min_d_node_index, min_d
+
+
+# return index of the most bottom - left node
+def get_bottom_left_node(node_list):
+    if len(node_list) < 2:
+        return 0
+    index = 0
+    p = node_list[index].p
+    for i in range(len(node_list)):
+        if node_list[i].p.is_smaller_x_smaller_y(p, by_x=False):
+            p = node_list[i].p
+            index = i
+    return index
+
+
+# return index of the most top - right node
+def get_top_right_node(node_list):
+    if len(node_list) < 2:
+        return 0
+    index = 0
+    p = node_list[index].p
+    for i in range(len(node_list)):
+        if p.is_smaller_x_smaller_y(node_list[i].p, by_x=False):
+            p = node_list[i].p
+            index = i
+    return index
+
+
+# return index of node in node_list which is the most external relative to p0 and prev_angle
+def get_most_external_node(p0, prev_angle, node_list, counter_clockwise=True):
+    if node_list is None:
+        return None
+    if len(node_list) == 0:
+        return None
+    most_external_index = 0
+    min_angle = gv.angle_diff_accuracy
+    max_angle = 360 - gv.angle_diff_accuracy
+    best_angle = max_angle
+    if counter_clockwise:
+        min_angle, max_angle = (360 - max_angle), (360 - min_angle)
+        best_angle = min_angle
+    for i in range(len(node_list)):
+        node = node_list[i]
+        angle = p0.get_alfa_to(node.p)
+        if angle < prev_angle:
+            angle += 360
+        angle -= prev_angle
+        if 0 <= angle <= 180:
+            diff_angle = 180 - angle
+        else:
+            diff_angle = 540 - angle
+        replace_best_angle = False
+        if counter_clockwise and best_angle <= diff_angle <= max_angle:
+            replace_best_angle = True
+        elif not counter_clockwise and min_angle <= diff_angle <= best_angle:
+            replace_best_angle = True
+        if replace_best_angle:
+            best_angle = diff_angle
+            most_external_index = i
+    return most_external_index
+
+
+def get_inp_percentage_middle_nodes(inp_net, corner_list):
+    middle_nodes = get_inp_corners_middle_nodes(inp_net, corner_list)
+    if middle_nodes is None:
+        return None
+    middle_nodes_1_2 = middle_nodes[0]
+    middle_nodes_2_3 = middle_nodes[1]
+    middle_nodes_3_4 = middle_nodes[2]
+    middle_nodes_4_1 = middle_nodes[3]
+    middle_nodes_1_2 = convert_partial_node_list_to_middle_nodes_percentage_list(middle_nodes_1_2, inp_net.node_list)
+    middle_nodes_2_3 = convert_partial_node_list_to_middle_nodes_percentage_list(middle_nodes_2_3, inp_net.node_list)
+    middle_nodes_3_4 = convert_partial_node_list_to_middle_nodes_percentage_list(middle_nodes_3_4, inp_net.node_list)
+    middle_nodes_4_1 = convert_partial_node_list_to_middle_nodes_percentage_list(middle_nodes_4_1, inp_net.node_list)
+    return middle_nodes_1_2, middle_nodes_2_3, middle_nodes_3_4, middle_nodes_4_1
+
+
+# return distance of middle nodes in partial_node_list from partial_node_list[0] as percentage (0-1) of
+# distance between partial_node_list[0] and partial_node_list[-1]
+def convert_partial_node_list_to_middle_nodes_percentage_list(partial_node_list, node_list):
+    if partial_node_list is None or node_list is None:
+        return None
+    if len(partial_node_list) < 3:
+        return []
+    middle_nodes_p_list = []
+    p1 = node_list[partial_node_list[0]].p
+    d = 0
+    for i in range(len(partial_node_list) - 1):
+        p2 = node_list[partial_node_list[i + 1]].p
+        d += p1.get_distance_to_point(p2)
+        middle_nodes_p_list.append(d)
+        p1 = p2
+    middle_nodes_p_list.pop(-1)
+    for i in range(len(middle_nodes_p_list)):
+        node_d = middle_nodes_p_list[i]
+        middle_nodes_p_list[i] = float(node_d / d)
+    return middle_nodes_p_list
+
+
+def get_inp_border_nodes(inp_net):
+    start_node = get_inp_bottom_left_node(inp_net)
+    border_nodes = [start_node]
+    current_node = start_node
+    prev_angle = 0
+    next_node = -1
+    while next_node != start_node and len(border_nodes) <= len(inp_net.node_list):
+        node_list = []
+        node_list_indexes = inp_net.get_attached_nodes(current_node)
+        for index in node_list_indexes:
+            node_list.append(inp_net.node_list[index])
+        p = inp_net.node_list[current_node].p
+        next_node = get_most_external_node(p, prev_angle, node_list)
+        next_node = node_list_indexes[next_node]
+        border_nodes.append(next_node)
+        prev_angle = p.get_alfa_to(inp_net.node_list[next_node].p)
+        current_node = next_node
+    if border_nodes[-1] == start_node:
+        border_nodes.pop(-1)
+        return border_nodes
+    else:
+        print("can't set border for inp")
+        return []
+
+
+# return 4 node list include the corners
+def get_inp_corners_middle_nodes(inp_net, corner_list):
+    if len(corner_list) != 4:
+        return None
+    borde_nodes = get_inp_border_nodes(inp_net)
+    if len(borde_nodes) == 0:
+        return None
+    # check that all corners on border line
+    for corner in corner_list:
+        if corner.hash_node not in borde_nodes:
+            print("inp corners not on inp border")
+            return None
+    # check that corners are set by order on border line
+    corner_1_index = borde_nodes.index(corner_list[0].hash_node)
+    corner_set = '1'
+    for i in range(1, len(borde_nodes)):
+        n = borde_nodes[(i + corner_1_index) % len(borde_nodes)]
+        if n == corner_list[1].hash_node:
+            corner_set += '2'
+        elif n == corner_list[2].hash_node:
+            corner_set += '3'
+        elif n == corner_list[3].hash_node:
+            corner_set += '4'
+    if corner_set == '1234':
+        order_value = 1
+    elif corner_set == '1432':
+        order_value = -1
+    else:
+        print("inp corners not set by order (" + corner_set + ")")
+        return None
+    middle_nodes_1_2 = [corner_list[0].hash_node]
+    middle_nodes_2_3 = [corner_list[1].hash_node]
+    middle_nodes_3_4 = [corner_list[2].hash_node]
+    middle_nodes_4_1 = [corner_list[3].hash_node]
+    index = corner_1_index
+    middle_node = -1
+    while middle_node != corner_list[1].hash_node:
+        index = (index + order_value) % len(borde_nodes)
+        middle_node = borde_nodes[index]
+        middle_nodes_1_2.append(middle_node)
+    while middle_node != corner_list[2].hash_node:
+        index = (index + order_value) % len(borde_nodes)
+        middle_node = borde_nodes[index]
+        middle_nodes_2_3.append(middle_node)
+    while middle_node != corner_list[3].hash_node:
+        index = (index + order_value) % len(borde_nodes)
+        middle_node = borde_nodes[index]
+        middle_nodes_3_4.append(middle_node)
+    while middle_node != corner_list[0].hash_node:
+        index = (index + order_value) % len(borde_nodes)
+        middle_node = borde_nodes[index]
+        middle_nodes_4_1.append(middle_node)
+    return middle_nodes_1_2, middle_nodes_2_3, middle_nodes_3_4, middle_nodes_4_1
+
+
+def get_inp_bottom_left_node(inp_net):
+    node_list = inp_net.node_list.copy()
+    top_right_index = get_top_right_node(node_list)
+    top_right_p = node_list[top_right_index].p
+    attached_nodes = []
+    while len(attached_nodes) < 2:
+        bottom_left_index = get_bottom_left_node(node_list)
+        if bottom_left_index == top_right_index:
+            return None
+        attached_nodes = inp_net.get_attached_nodes(bottom_left_index)
+        if len(attached_nodes) > 1:
+            return bottom_left_index
+        else:
+            node_list[bottom_left_index].p = top_right_p
+    return None

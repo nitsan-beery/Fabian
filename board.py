@@ -1,5 +1,5 @@
 from file_handling import *
-
+from point import Point
 
 class Board:
     def __init__(self, with_frame_2=False):

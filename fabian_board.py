@@ -357,7 +357,7 @@ class FabianBoard(Board):
                     new_inp_net.node_list = self.inp_nets[-1].node_list.copy()
                     new_inp_net.elements = self.inp_nets[-1].elements.copy()
                     if self.mouse_select_mode == gv.mouse_select_mode_flip_net:
-                        new_inp_net = new_inp_net.get_fliped_net(self.new_line_edge[0], p)
+                        new_inp_net = new_inp_net.get_flipped_net(self.new_line_edge[0], p)
                     elif self.mouse_select_mode == gv.mouse_select_mode_rotate_net:
                         new_inp_net.rotation_point = self.inp_nets[-1].rotation_point
                         angle1 = self.inp_nets[-1].rotation_point.reference_point.get_alfa_to(self.new_line_edge[0])
@@ -594,6 +594,8 @@ class FabianBoard(Board):
             menu.add_cascade(label='Entities', menu=show_entities_menu)
             menu.add_separator()
             if len(self.corner_list) == 4:
+                if len(self.inp_corner_list) == 4:
+                    menu.add_command(label="Set border according to inp net", command=self.set_border_nodes_by_corners)
                 set_corner_net_menu = tk.Menu(menu, tearoff=0)
                 set_corner_net_menu.add_command(label="Both sides (1 -> 4 first)", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_both))
                 set_corner_net_menu.add_command(label="1 -> 4", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_1_4))
@@ -615,8 +617,6 @@ class FabianBoard(Board):
                     label = "Clear inp corners"
                 menu.add_command(label=label, command=lambda: self.handle_corners(gv.handle_corners_mode_clear_on_inp_net))
                 add_separator = True
-                if len(self.corner_list) == 4 and len(self.inp_corner_list) == 4:
-                    menu.add_command(label="Set border nodes by corners", command=self.set_border_nodes_by_corners)
             if add_separator:
                 menu.add_separator()
             menu.add_command(label="Set net", command=self.set_net)
@@ -722,14 +722,14 @@ class FabianBoard(Board):
                 changed = True
         elif mode == gv.hide_mode:
             if self.show_inps:
-                self.clear_corner_list(clear_corners_mode)
+                self.clear_corner_list(False, clear_corners_mode)
                 self.hide_all_inp_nets()
                 self.show_inps = False
                 self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
                 changed = True
         elif mode == gv.clear_mode:
             if len(self.inp_nets) > 0:
-                self.clear_corner_list(clear_corners_mode)
+                self.clear_corner_list(False, clear_corners_mode)
                 self.hide_all_inp_nets()
                 self.inp_nets = []
                 self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
@@ -1278,7 +1278,16 @@ class FabianBoard(Board):
         return mutual_point, None
 
     def set_border_nodes_by_corners(self):
-        pass
+        inp_index = self.inp_corner_list[0].inp_index
+        # validity check
+        for i in range(len(self.inp_corner_list)):
+            if self.inp_corner_list[i].inp_index != inp_index:
+                print("set corner on single inp net")
+                return
+        inp_net = self.inp_nets[inp_index]
+        middle_inp_nodes = get_inp_percentage_middle_nodes(inp_net, self.inp_corner_list)
+        if middle_inp_nodes is None:
+            return
 
     def set_initial_border_nodes(self):
         choice = SetInitialNetDialog(self.window_main).show()
@@ -1722,7 +1731,7 @@ class FabianBoard(Board):
         # make sure that corner will not remain on invalid node
         for corner in self.corner_list:
             if corner.hash_node == hash_index:
-                self.clear_corner_list()
+                self.clear_corner_list(mode=gv.handle_corners_mode_clear_on_net_line)
                 break
         # update hash
         for i in range(node_list_index+1, len(self.node_list)):
@@ -2197,7 +2206,7 @@ class FabianBoard(Board):
             self.hide_text_on_screen()
             self.hide_progress_bar()
             self.frame_1.update_idletasks()
-        self.clear_corner_list()
+        self.clear_corner_list(mode=gv.handle_corners_mode_clear_on_net_line)
         if is_empty_board:
             self.center_view(by_nodes=True, set_scale=True)
         if self.work_mode == gv.work_mode_dxf:
@@ -2314,26 +2323,12 @@ class FabianBoard(Board):
 
     # return the hash index of the node
     def get_bottom_left_node(self):
-        if len(self.node_list) < 2:
-            return 0
-        index = 1
-        p = self.node_list[index].p
-        for i in range(1, len(self.node_list)):
-            if self.node_list[i].p.is_smaller_x_smaller_y(p, by_x=False):
-                p = self.node_list[i].p
-                index = i
+        index = get_bottom_left_node(self.node_list[1:]) + 1
         return self.node_list[index].hash_index
 
     # return the hash index of the node
     def get_top_right_node(self):
-        if len(self.node_list) < 2:
-            return 0
-        index = 1
-        p = self.node_list[index].p
-        for i in range(1, len(self.node_list)):
-            if p.is_smaller_x_smaller_y(self.node_list[i].p, by_x=False):
-                p = self.node_list[i].p
-                index = i
+        index = get_top_right_node(self.node_list[1:]) + 1
         return self.node_list[index].hash_index
 
     def mark_selected_part(self, key=None):
@@ -2541,7 +2536,9 @@ class FabianBoard(Board):
         return new_points
 
     # return list of nodes_hash_index between the 2 nodes in the shortest path
-    def get_middle_nodes_between_node1_and_node_2(self, node1_hash_index, node2_hash_index, wrong_nodes=[]):
+    def get_middle_nodes_between_node1_and_node_2(self, node1_hash_index, node2_hash_index, wrong_nodes=None):
+        if wrong_nodes is None:
+            wrong_nodes = []
         # try to set middle nodes direction oriented
         middle_nodes, found_track = self.get_middle_nodes_direction_oriented(node1_hash_index, node2_hash_index, wrong_nodes)
         if found_track:
@@ -2591,7 +2588,7 @@ class FabianBoard(Board):
             return middle_nodes, True
         return [], False
 
-    def get_middle_nodes_on_one_direction(self, node, prev_node, target_node, wrong_nodes=[]):
+    def get_middle_nodes_on_one_direction(self, node, prev_node, target_node, wrong_nodes):
         middle_nodes = [node]
         c = len(self.node_list)
         while c > 0:
@@ -2617,7 +2614,7 @@ class FabianBoard(Board):
         return middle_nodes, True
 
     # return list of nodes_hash_index between the 2 nodes in the shortest path
-    def get_middle_nodes_on_border_lines(self, node1_hash_index, node2_hash_index, wrong_nodes=[]):
+    def get_middle_nodes_on_border_lines(self, node1_hash_index, node2_hash_index, wrong_nodes):
         node_index = get_index_from_hash(self.nodes_hash, node1_hash_index)
         attached_lines = self.node_list[node_index].attached_lines
         side_border_node = []
@@ -2907,18 +2904,20 @@ class FabianBoard(Board):
         if mode == gv.corners_on_net_line:
             corner = self.corner_list[i]
             p = self.get_node_p(corner.hash_node)
+            color = gv.corner_color
         else:
             corner = self.inp_corner_list[i]
             inp_index = corner.inp_index
             node_index = corner.hash_node
             p = self.inp_nets[inp_index].node_list[node_index].p
+            color = gv.inp_corner_color
         if corner.board_part is None:
-            corner.board_part = self.draw_square(p, 10/self.scale, gv.corner_color)
+            corner.board_part = self.draw_square(p, 10/self.scale, color)
         if corner.board_text is None:
             x, y = self.convert_xy_to_screen(p.x, p.y)
             x += 9
             y -= 9
-            corner.board_text = self.board.create_text(x, y, text=i+1, fill=gv.corner_text_color, justify=tk.RIGHT)
+            corner.board_text = self.board.create_text(x, y, text=i+1, fill=color, justify=tk.RIGHT)
 
     def hide_corner(self, i, mode=gv.corners_on_net_line):
         if mode == gv.corners_on_net_line:

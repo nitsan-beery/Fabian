@@ -104,8 +104,8 @@ marked_net_line_color = '#777777'
 text_color = 'green'
 element_color = 'white'
 mark_rect_color = 'black'
-corner_color = '#0000FF'
-corner_text_color = corner_color
+corner_color = 'red'
+inp_corner_color = 'blue'
 
 # node exceptions
 unattached = 'unattached'
