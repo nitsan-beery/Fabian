@@ -1288,6 +1288,10 @@ class FabianBoard(Board):
         middle_inp_nodes = get_inp_percentage_middle_nodes(inp_net, self.inp_corner_list)
         if middle_inp_nodes is None:
             return
+        middle_inp_1_2 = middle_inp_nodes[0]
+        middle_inp_2_3 = middle_inp_nodes[1]
+        middle_inp_3_4 = middle_inp_nodes[2]
+        middle_inp_4_1 = middle_inp_nodes[3]
 
     def set_initial_border_nodes(self):
         choice = SetInitialNetDialog(self.window_main).show()
@@ -1297,7 +1301,6 @@ class FabianBoard(Board):
             circle_parts = choice.get('circle_parts')
         else:
             return
-        self.reset_net()
         self.set_initial_net()
         for i in range(len(self.entity_list)):
             e = self.entity_list[i]
