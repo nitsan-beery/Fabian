@@ -199,6 +199,17 @@ class Entity(Part):
         else:
             self.nodes_list.insert(1, node_hash)
 
+    def get_length(self):
+        length = None
+        if self.shape == 'LINE':
+            length = self.start.get_distance_to_point(self.end)
+        elif self.shape == 'ARC':
+            arc_angle = self.arc_end_angle - self.arc_start_angle
+            length = 2 * math.pi * self.radius * arc_angle / 360
+        elif self.shape == 'CIRCLE':
+            length = 2 * math.pi * self.radius
+        return length
+
     def convert_into_tuple(self):
         center = self.center
         if center is not None:

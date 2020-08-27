@@ -1285,13 +1285,33 @@ class FabianBoard(Board):
                 print("set corner on single inp net")
                 return
         inp_net = self.inp_nets[inp_index]
-        middle_inp_nodes = get_inp_percentage_middle_nodes(inp_net, self.inp_corner_list)
-        if middle_inp_nodes is None:
+        middle_inp_p_nodes = get_inp_percentage_middle_nodes(inp_net, self.inp_corner_list)
+        if middle_inp_p_nodes is None:
             return
-        middle_inp_1_2 = middle_inp_nodes[0]
-        middle_inp_2_3 = middle_inp_nodes[1]
-        middle_inp_3_4 = middle_inp_nodes[2]
-        middle_inp_4_1 = middle_inp_nodes[3]
+        # corners index: 0 = 1... 3 = 4
+        # line index between corners: 0 = 1->2,  1 = 2->3,  2 = 3->4,  3 = 4->1
+        corner_p = []
+        for i in range(4):
+            corner_p.append(self.get_node_p(self.corner_list[i].hash_node))
+        e_list = []
+        e_p_list = []
+        for i in range(4):
+            e_list.append(get_entities_between_points(self.entity_list, corner_p[i], corner_p[(i + 1) % 4], corner_p[(i - 1) % 4]))
+            r_list = get_entities_relative_length(self.entity_list, e_list[i])
+            e_p_list.append(get_entities_p_list(r_list, middle_inp_p_nodes[i]))
+        self.reset_net(keep_state=True)
+        for i in range(4):
+            p_list = get_connected_entities_split_points(corner_p[i], corner_p[(i + 1) % 4], self.entity_list, e_list[i], e_p_list[i])
+            new_node = Node(p_list[0])
+            start_node = self.add_node_to_node_list(new_node)
+            for j in range(1, len(p_list)):
+                new_node = Node(p_list[j])
+                end_node = self.add_node_to_node_list(new_node)
+                self.add_line_to_net_list_by_nodes(start_node, end_node)
+                start_node = end_node
+        self.clear_corner_list(keep_state=False, mode=gv.handle_corners_mode_clear_on_both)
+        self.change_select_parts_mode(gv.part_type_net_line)
+        self.update_view()
 
     def set_initial_border_nodes(self):
         choice = SetInitialNetDialog(self.window_main).show()
@@ -2908,14 +2928,16 @@ class FabianBoard(Board):
             corner = self.corner_list[i]
             p = self.get_node_p(corner.hash_node)
             color = gv.corner_color
+            size = 10
         else:
             corner = self.inp_corner_list[i]
             inp_index = corner.inp_index
             node_index = corner.hash_node
             p = self.inp_nets[inp_index].node_list[node_index].p
             color = gv.inp_corner_color
+            size = 12
         if corner.board_part is None:
-            corner.board_part = self.draw_square(p, 10/self.scale, color)
+            corner.board_part = self.draw_square(p, size/self.scale, color)
         if corner.board_text is None:
             x, y = self.convert_xy_to_screen(p.x, p.y)
             x += 9

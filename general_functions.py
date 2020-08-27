@@ -73,7 +73,10 @@ def get_split_line_points(p1, p2, split_mode=gv.split_mode_evenly_n_parts, split
                     percentage_left = 100 - percentage_left
         p_list = [percentage_left]
     else:
-        p_list = get_middle_split_points_percentage_list(split_mode, split_arg)
+        if split_mode == gv.split_mode_by_percentage_list:
+            p_list = split_arg
+        else:
+            p_list = get_middle_split_points_percentage_list(split_mode, split_arg)
         if p2.is_smaller_x_smaller_y(p1):
             for i in range(len(p_list)):
                 p_list[i] = 100 - p_list[i]
@@ -99,7 +102,10 @@ def get_split_arc_points(arc, split_mode=gv.split_mode_evenly_n_parts, split_arg
         point_list.append(new_arc.end)
         point_list.append(arc.end)
         return point_list
-    p_list = get_middle_split_points_percentage_list(split_mode, split_arg)
+    if split_mode == gv.split_mode_by_percentage_list:
+        p_list = split_arg
+    else:
+        p_list = get_middle_split_points_percentage_list(split_mode, split_arg)
     if arc.end.is_smaller_x_smaller_y(arc.start):
         for i in range(len(p_list)):
             p_list[i] = 100 - p_list[i]
@@ -686,3 +692,165 @@ def get_inp_bottom_left_node(inp_net):
         else:
             node_list[bottom_left_index].p = top_right_p
     return None
+
+
+# return list of entities connected between p1-p2, None if can't find
+# invalid_p is necessary to define correct direction
+def get_entities_between_points(entity_list, p1, p2, invalid_p):
+    p1_entities = get_entities_with_edge_point(entity_list, p1)
+    if len(p1_entities) < 2:
+        return []
+    # validity check
+    p2_entities = get_entities_with_edge_point(entity_list, p2)
+    if len(p2_entities) < 2:
+        return []
+    # try one direction
+    e_list = get_entities_towards_point(entity_list, p1_entities[0], p1, p2, invalid_p)
+    if e_list is not None:
+        return e_list
+    e_list = get_entities_towards_point(entity_list, p1_entities[1], p1, p2, invalid_p)
+    if e_list is None:
+        return []
+    return e_list
+
+
+def get_entities_towards_point(entity_list, start_entity, p1, p2, invalid_p):
+    e_list = []
+    entity_index = start_entity
+    next_point = p1
+    while not next_point.is_equal(p2):
+        entity = entity_list[entity_index]
+        if entity.start.is_equal(next_point):
+            next_point = entity.end
+        else:
+            next_point = entity.start
+        if next_point.is_equal(invalid_p):
+            return None
+        e_list.append(entity_index)
+        next_entities = get_entities_with_edge_point(entity_list, next_point)
+        next_entities.remove(entity_index)
+        if len(next_entities) < 1:
+            return None
+        entity_index = next_entities[0]
+    return e_list
+
+
+def get_entities_with_edge_point(entity_list, p):
+    e_list = []
+    for i in range(len(entity_list)):
+        entity = entity_list[i]
+        if entity.shape == 'CIRCLE':
+            continue
+        if entity.start.is_equal(p) or entity.end.is_equal(p):
+            e_list.append(i)
+    return e_list
+
+
+def get_entities_relative_length(entity_list, connected_entities):
+    len_list = []
+    len_p_list = []
+    length = 0
+    for e in connected_entities:
+        start_length = length
+        entity = entity_list[e]
+        length += entity.get_length()
+        end_length = length
+        len_list.append((start_length, end_length))
+    for i in range(len(len_list)):
+        entity_edges = len_list[i]
+        start_p_length = entity_edges[0] / length
+        end_p_length = entity_edges[1] / length
+        len_p_list.append((start_p_length, end_p_length))
+    return len_p_list
+
+
+def get_entity_relative_p_list(entity_start_p, entity_end_p, total_p_list):
+    accuracy = 6
+    e_relative_length = entity_end_p - entity_start_p
+    if round(entity_start_p, accuracy) > round(total_p_list[-1], accuracy) or round(entity_end_p, accuracy) < round(total_p_list[0], accuracy):
+        return []
+    p_list = []
+    i = 0
+    while round(total_p_list[i], accuracy) < round(entity_start_p, accuracy):
+        i += 1
+    while i < len(total_p_list):
+        p = total_p_list[i]
+        if round(p, accuracy) > round(entity_end_p, accuracy):
+            break
+        p_list.append(100 * round((p - entity_start_p) / e_relative_length, accuracy))
+        i += 1
+    return p_list
+
+
+def get_entities_p_list(entities_relative_len, total_p_list):
+    p_list = []
+    for i in range(len(entities_relative_len)):
+        entity_start_p = entities_relative_len[i][0]
+        entity_end_p = entities_relative_len[i][1]
+        p_list.append(get_entity_relative_p_list(entity_start_p, entity_end_p, total_p_list))
+    return p_list
+
+
+def get_connected_entities_split_points(p1, p2, entity_list, connected_entities, entities_p_list):
+    first_entity = entity_list[connected_entities[0]]
+    if len(connected_entities) == 1:
+        p_list = entities_p_list[0]
+        if p2.is_smaller_x_smaller_y(p1):
+            p_list.reverse()
+            for i in range(len(p_list)):
+                p_list[i] = 100 - p_list[i]
+        if first_entity.shape == 'LINE':
+            return get_split_line_points(p1, p2, gv.split_mode_by_percentage_list, p_list)
+        else:
+            return get_split_arc_points(first_entity, gv.split_mode_by_percentage_list, p_list)
+    p_list = [p1]
+    next_p = p1
+    for i in range(len(connected_entities)):
+        tmp_p_list = entities_p_list[i]
+        e_index = connected_entities[i]
+        entity = entity_list[e_index]
+        is_left_to_right = entity.start.is_smaller_x_smaller_y(entity.end)
+        change_order = False
+        if entity.start.is_equal(next_p):
+            next_p = entity.end
+            p1_equal_start = True
+            if not is_left_to_right:
+                change_order = True
+        else:
+            next_p = entity.start
+            p1_equal_start = False
+            if is_left_to_right:
+                change_order = True
+        keep_last = False
+        if p1_equal_start:
+            if 100 in tmp_p_list:
+                keep_last = True
+                tmp_p_list.remove(100)
+            if 0 in tmp_p_list:
+                tmp_p_list.remove(0)
+        else:
+            if 0 in tmp_p_list:
+                keep_last = True
+                tmp_p_list.remove(0)
+            if 100 in tmp_p_list:
+                tmp_p_list.remove(100)
+        if change_order:
+            tmp_p_list.reverse()
+            for j in range(len(tmp_p_list)):
+                tmp_p_list[j] = 100 - tmp_p_list[j]
+        if entity.shape == 'LINE':
+            tmp_p_list = get_split_line_points(entity.start, entity.end, gv.split_mode_by_percentage_list, tmp_p_list)
+        else:
+            tmp_p_list = get_split_arc_points(entity, gv.split_mode_by_percentage_list, tmp_p_list)
+        if p1_equal_start:
+            tmp_p_list.pop(0)
+            if not keep_last:
+                tmp_p_list.pop(-1)
+        else:
+            tmp_p_list.pop(-1)
+            if not keep_last:
+                tmp_p_list.pop(0)
+        p_list += tmp_p_list
+    p_list.append(p2)
+    return p_list
+
