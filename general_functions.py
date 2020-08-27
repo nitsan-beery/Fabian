@@ -842,14 +842,11 @@ def get_connected_entities_split_points(p1, p2, entity_list, connected_entities,
             tmp_p_list = get_split_line_points(entity.start, entity.end, gv.split_mode_by_percentage_list, tmp_p_list)
         else:
             tmp_p_list = get_split_arc_points(entity, gv.split_mode_by_percentage_list, tmp_p_list)
-        if p1_equal_start:
-            tmp_p_list.pop(0)
-            if not keep_last:
-                tmp_p_list.pop(-1)
-        else:
+        if not p1_equal_start:
+            tmp_p_list.reverse()
+        tmp_p_list.pop(0)
+        if not keep_last:
             tmp_p_list.pop(-1)
-            if not keep_last:
-                tmp_p_list.pop(0)
         p_list += tmp_p_list
     p_list.append(p2)
     return p_list
