@@ -247,7 +247,8 @@ class FabianBoard(Board):
         self.mouse_click_point = mouse_point
         p = p1 = p2 = mouse_point
         if self.selected_part is None:
-            self.temp_rect_start_point = mouse_point
+            if self.new_line_edge[0] is None:
+                self.temp_rect_start_point = mouse_point
             return
         # selected part is not None
         if self.selected_part.part_type == gv.part_type_entity:
@@ -425,6 +426,9 @@ class FabianBoard(Board):
         # mark parts inside the "choose" rect
         if self.temp_rect_start_point is None:
             return
+        if self.selected_part is not None or self.new_line_edge[0] is not None:
+            self.board.delete(self.temp_rect_mark)
+            return
         p1 = self.temp_rect_start_point
         p1.x, p1.y = self.convert_xy_to_screen(p1.x, p1.y)
         p2 = Point()
@@ -470,6 +474,10 @@ class FabianBoard(Board):
                     else:
                         self.set_part_color(list_name, i, non_marked_color)
                 i += 1
+            # debug
+            if gv.debug_mode:
+                m = "mark performed"
+                messagebox.showinfo(m)
         self.board.delete(self.temp_rect_mark)
 
     def mouse_3_pressed(self, key):

@@ -49,7 +49,7 @@ def get_index_of_node_with_point_in_list(p, node_list):
     return None
 
 
-def get_split_line_points(p1, p2, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):
+def get_split_line_points(p1, p2, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts, check_validity=True):
     point_list = [p1]
     alfa = p1.get_alfa_to(p2) * math.pi / 180
     d = p1.get_distance_to_point(p2)
@@ -86,11 +86,12 @@ def get_split_line_points(p1, p2, split_mode=gv.split_mode_evenly_n_parts, split
         middle_point = Point(start.x + current_d * math.cos(alfa), start.y + current_d * math.sin(alfa))
         point_list.append(middle_point)
     point_list.append(p2)
-    point_list = check_point_list_validity(point_list)
+    if check_validity:
+        point_list = check_point_list_validity(point_list)
     return point_list
 
 
-def get_split_arc_points(arc, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts):
+def get_split_arc_points(arc, split_mode=gv.split_mode_evenly_n_parts, split_arg=gv.default_split_parts, check_validity=True):
     point_list = [arc.start]
     start_angle = arc.arc_start_angle
     diff_angle = arc.arc_end_angle - arc.arc_start_angle
@@ -117,7 +118,8 @@ def get_split_arc_points(arc, split_mode=gv.split_mode_evenly_n_parts, split_arg
         point_list.append(new_arc.end)
         start_angle = end_angle
     point_list.append(arc.end)
-    point_list = check_point_list_validity(point_list)
+    if check_validity:
+        point_list = check_point_list_validity(point_list)
     return point_list
 
 
@@ -800,9 +802,9 @@ def get_connected_entities_split_points(p1, p2, entity_list, connected_entities,
             for i in range(len(p_list)):
                 p_list[i] = 100 - p_list[i]
         if first_entity.shape == 'LINE':
-            return get_split_line_points(p1, p2, gv.split_mode_by_percentage_list, p_list)
+            return get_split_line_points(p1, p2, gv.split_mode_by_percentage_list, p_list, check_validity=False)
         else:
-            return get_split_arc_points(first_entity, gv.split_mode_by_percentage_list, p_list)
+            return get_split_arc_points(first_entity, gv.split_mode_by_percentage_list, p_list, check_validity=False)
     p_list = [p1]
     next_p = p1
     for i in range(len(connected_entities)):
@@ -839,9 +841,9 @@ def get_connected_entities_split_points(p1, p2, entity_list, connected_entities,
             for j in range(len(tmp_p_list)):
                 tmp_p_list[j] = 100 - tmp_p_list[j]
         if entity.shape == 'LINE':
-            tmp_p_list = get_split_line_points(entity.start, entity.end, gv.split_mode_by_percentage_list, tmp_p_list)
+            tmp_p_list = get_split_line_points(entity.start, entity.end, gv.split_mode_by_percentage_list, tmp_p_list, check_validity=False)
         else:
-            tmp_p_list = get_split_arc_points(entity, gv.split_mode_by_percentage_list, tmp_p_list)
+            tmp_p_list = get_split_arc_points(entity, gv.split_mode_by_percentage_list, tmp_p_list, check_validity=False)
         if not p1_equal_start:
             tmp_p_list.reverse()
         tmp_p_list.pop(0)

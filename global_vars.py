@@ -7,6 +7,8 @@ BOARD_WIDTH = int(BOARD_HEIGHT*4/3)
 
 files_dir = "./data files"#/IM 0113-08"
 
+debug_mode = True
+
 max_nodes_to_create_element = 4
 
 default_split_parts = 2
