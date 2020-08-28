@@ -593,32 +593,31 @@ class FabianBoard(Board):
             menu.add_cascade(label='Elements', menu=show_elements_menu)
             menu.add_cascade(label='Entities', menu=show_entities_menu)
             menu.add_separator()
-            if len(self.corner_list) == 4:
-                if len(self.inp_corner_list) == 4:
-                    menu.add_command(label="Set net by inp", command=self.set_net_by_inp)
-                set_corner_net_menu = tk.Menu(menu, tearoff=0)
-                set_corner_net_menu.add_command(label="Both sides (1 -> 4 first)", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_both))
-                set_corner_net_menu.add_command(label="1 -> 4", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_1_4))
-                set_corner_net_menu.add_command(label="1 -> 2", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_1_2))
-                menu.add_cascade(label="Set net between corners", menu=set_corner_net_menu)
             menu.add_command(label="Set Corners", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_corner))
-            add_separator = False
             if len(self.corner_list) > 0:
                 if len(self.inp_corner_list) == 0:
                     label = "Clear corners"
                 else:
                     label = "Clear net corners"
                 menu.add_command(label=label, command=lambda: self.handle_corners(gv.handle_corners_mode_clear_on_net_line))
-                add_separator = True
             if len(self.inp_corner_list) > 0:
                 if len(self.corner_list) == 0:
                     label = "Clear corners"
                 else:
                     label = "Clear inp corners"
                 menu.add_command(label=label, command=lambda: self.handle_corners(gv.handle_corners_mode_clear_on_inp_net))
-                add_separator = True
-            if add_separator:
-                menu.add_separator()
+            if len(self.corner_list) == 4:
+                if len(self.inp_corner_list) == 4:
+                    set_net_by_inp_menu = tk.Menu(menu, tearoff=0)
+                    set_net_by_inp_menu.add_command(label="Whole net", command=lambda: self.set_net_by_inp(set_net=True))
+                    set_net_by_inp_menu.add_command(label="Border nodes only", command=lambda: self.set_net_by_inp(set_net=False))
+                    menu.add_cascade(label="Set net by inp", menu=set_net_by_inp_menu)
+                set_corner_net_menu = tk.Menu(menu, tearoff=0)
+                set_corner_net_menu.add_command(label="Both sides (1 -> 4 first)", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_both))
+                set_corner_net_menu.add_command(label="1 -> 4", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_1_4))
+                set_corner_net_menu.add_command(label="1 -> 2", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_1_2))
+                menu.add_cascade(label="Set net between corners", menu=set_corner_net_menu)
+            menu.add_separator()
             menu.add_command(label="Set net", command=self.set_net)
             menu.add_command(label="Set initial border nodes...", command=self.set_initial_border_nodes)
             menu.add_command(label="Clear inner net", command=self.clear_net)
@@ -752,7 +751,7 @@ class FabianBoard(Board):
         self.mouse_select_mode = gv.mouse_select_mode_edge
         self.choose_mark_option(gv.mark_option_mark)
         self.clear_corner_list(mode=gv.handle_corners_mode_clear_on_both)
-        self.change_show_inp_mode(gv.clear_mode)
+        self.hide_all_inp_nets()
         if mode == gv.work_mode_dxf:
             self.reset_net()
             self.show_nodes = False
@@ -1277,7 +1276,7 @@ class FabianBoard(Board):
         mutual_point.y += start_node_p.y
         return mutual_point, None
 
-    def set_net_by_inp(self):
+    def set_net_by_inp(self, set_net=True):
         inp_index = self.inp_corner_list[0].inp_index
         # validity check
         for i in range(len(self.inp_corner_list)):
@@ -1314,10 +1313,11 @@ class FabianBoard(Board):
         self.change_select_parts_mode(gv.part_type_net_line)
         for i in range(4):
             corner = Corner(self.get_hash_index_of_node_with_point(corner_p[i]))
-            self.add_or_replace_corner(corner)
-        changed = self.set_net_between_corners(gv.corners_set_net_both)
-        if changed:
-            self.clear_corner_list()
+            self.add_or_replace_corner(corner, keep_state=False)
+        if set_net:
+            changed = self.set_net_between_corners(gv.corners_set_net_both)
+            if changed:
+                self.clear_corner_list()
         self.update_view()
 
     def set_initial_border_nodes(self):
@@ -2690,12 +2690,13 @@ class FabianBoard(Board):
         if keep_state and not changed:
             self.state.pop(-1)
 
-    def add_or_replace_corner(self, corner):
+    def add_or_replace_corner(self, corner, keep_state=True):
         # in DXF mode - unlimited corners
         max_corners = len(self.node_list) - 1
         if self.work_mode == gv.work_mode_inp:
             max_corners = 4
-        self.keep_state()
+        if keep_state:
+            self.keep_state()
         changed = False
         if corner.inp_index is None:
             i = len(self.corner_list)
@@ -2712,7 +2713,7 @@ class FabianBoard(Board):
             else:
                 self.inp_corner_list.append(corner)
                 self.show_corner(i, mode=gv.corners_on_inp_net)
-        if not changed:
+        if keep_state and not changed:
             self.state.pop(-1)
 
     def remove_corner_from_list(self, corner):
