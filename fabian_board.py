@@ -475,9 +475,11 @@ class FabianBoard(Board):
                         self.set_part_color(list_name, i, non_marked_color)
                 i += 1
             # debug
+            '''
             if gv.debug_mode:
                 m = "mark performed"
                 messagebox.showinfo(m)
+            '''
         self.board.delete(self.temp_rect_mark)
 
     def mouse_3_pressed(self, key):
