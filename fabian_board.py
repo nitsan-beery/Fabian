@@ -628,7 +628,7 @@ class FabianBoard(Board):
                 set_corner_net_menu.add_command(label="1 -> 2", command=lambda: self.handle_corners(gv.handle_corners_mode_set_net, gv.corners_set_net_1_2))
                 menu.add_cascade(label="Set net between corners", menu=set_corner_net_menu)
             menu.add_separator()
-            menu.add_command(label="Set net", command=self.set_net)
+            menu.add_command(label="Set inp net", command=self.set_net)
             menu.add_command(label="Set initial border nodes...", command=self.set_initial_border_nodes)
             menu.add_command(label="Clear inner net", command=self.clear_net)
             menu.add_separator()
@@ -2071,7 +2071,7 @@ class FabianBoard(Board):
         self.update_view()
 
     def control_mouse_wheel(self, key):
-        if key.delta < 0:
+        if key.delta > 0:
             factor = 5/4
         else:
             factor = 4/5
