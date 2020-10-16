@@ -17,9 +17,11 @@ class FabianBoard(Board):
         self.button_zoom_out.config(command=lambda: self.zoom_modified(3 / 4))
         self.button_center = tk.Button(self.frame_2, text='Center view', command=lambda: self.center_view())
         self.button_clear = tk.Button(self.frame_2, text='Clear all', command=lambda: self.reset_board(reset_state=False))
+        self.button_p_select_mode = tk.Button(self.frame_2, text='Point select mode', command=self.toggle_point_edge_selection_mode)
         # debug
         self.button_print = tk.Button(self.frame_2, text='Print lines', command=self.print_line_list)
         self.button_center.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
+        self.button_p_select_mode.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
         self.button_clear.pack(side=tk.RIGHT, fill=tk.BOTH, padx=5)
         # debug
         #self.button_print.pack(side=tk.LEFT, fill=tk.BOTH, padx=5)
@@ -69,8 +71,8 @@ class FabianBoard(Board):
         self.board.bind('<Button-3>', self.mouse_3_pressed)
         self.board.bind('<Control-MouseWheel>', self.control_mouse_wheel)
 
-        self.window_main.bind('<Delete>', self.remove_selected_part_from_list)
-        self.window_main.bind('d', self.remove_selected_part_from_list)
+        self.window_main.bind('<Delete>', self.delete_pressed)
+        self.window_main.bind('d', self.delete_pressed)
         self.window_main.bind('m', self.mark_selected_part)
         self.window_main.bind('u', self.unmark_selected_part)
         self.window_main.bind('r', self.remove_temp_line)
@@ -272,7 +274,7 @@ class FabianBoard(Board):
             self.new_line_edge[0] = p
             self.keep_state()
             self.split_selected_part(gv.split_mode_2_parts_by_point)
-            self.mouse_select_mode = gv.mouse_select_mode_edge
+            self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
             return
         if self.mouse_select_mode != gv.mouse_select_mode_point:
             d1 = p1.get_distance_to_point(mouse_point)
@@ -373,7 +375,7 @@ class FabianBoard(Board):
                         self.hide_inp(-1)
                         self.inp_nets.pop(-1)
                     self.add_inp_net(new_inp_net.node_list, new_inp_net.elements)
-                    self.mouse_select_mode = gv.mouse_select_mode_edge
+                    self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
                     self.select_parts_mode = gv.part_type_entity
                 else:
                     print('choose reference point on INP net (white parts)')
@@ -408,10 +410,12 @@ class FabianBoard(Board):
         self.temp_rect_mark = self.board.create_rectangle(p1.x, p1.y, p2.x, p2.y)
 
     def control_mouse_1_released(self, key):
+        if self.mouse_select_mode == gv.mouse_select_mode_point:
+            return
         x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
         mouse_point = Point(x, y)
         if self.work_mode == gv.work_mode_inp or (self.work_mode == gv.work_mode_dxf and self.select_parts_mode == gv.part_type_net_line):
-            if self.mouse_select_mode != gv.mouse_select_mode_point and self.new_line_edge[0] is not None and not self.mouse_click_point.is_equal(mouse_point):
+            if self.new_line_edge[0] is not None and not self.mouse_click_point.is_equal(mouse_point):
                 node_index = get_index_of_node_with_point_in_list(self.new_line_edge[0], self.node_list)
                 self.keep_state()
                 self.node_list[node_index].p = mouse_point
@@ -498,9 +502,6 @@ class FabianBoard(Board):
                 select_part_menu.add_command(label="INP nodes",
                                          command=lambda: self.change_select_parts_mode(gv.part_type_inp_node))
             select_part_menu.add_separator()
-        select_part_menu.add_command(label="Edges", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_edge))
-        select_part_menu.add_command(label="Points", command=lambda: self.change_mouse_selection_mode(gv.mouse_select_mode_point))
-        select_part_menu.add_separator()
         select_part_menu.add_command(label="Quit")
         mark_option_menu = tk.Menu(self.board, tearoff=0)
         mark_option_menu.add_command(label="Mark", command=lambda: self.choose_mark_option(gv.mark_option_mark))
@@ -758,7 +759,7 @@ class FabianBoard(Board):
         self.remove_selected_part_mark()
         self.remove_temp_line()
         self.keep_state()
-        self.mouse_select_mode = gv.mouse_select_mode_edge
+        self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
         self.choose_mark_option(gv.mark_option_mark)
         self.clear_corner_list(mode=gv.handle_corners_mode_clear_on_both)
         self.hide_all_inp_nets()
@@ -787,10 +788,19 @@ class FabianBoard(Board):
         self.work_mode = mode
         self.update_view()
 
+    def toggle_point_edge_selection_mode(self):
+        if toggle(self.button_p_select_mode) == 'on':
+            self.mouse_select_mode = gv.mouse_select_mode_point
+        else:
+            self.mouse_select_mode = gv.mouse_select_mode_edge
+
     def change_mouse_selection_mode(self, mode):
         self.remove_temp_line()
         if self.mouse_select_mode != mode:
             self.mouse_select_mode = mode
+            if mode == gv.mouse_select_mode_point or mode == gv.mouse_select_mode_edge:
+                self.toggle_point_edge_selection_mode()
+                return
         if mode != gv.mouse_select_mode_rotate_net:
             self.clear_inp_rotation_point()
         if mode == gv.mouse_select_mode_copy_net or mode == gv.mouse_select_mode_move_net or \
@@ -808,7 +818,7 @@ class FabianBoard(Board):
         if mode != self.select_parts_mode:
             self.select_parts_mode = mode
         if self.mouse_select_mode == gv.mouse_select_mode_corner:
-            self.mouse_select_mode = gv.mouse_select_mode_edge
+            self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
 
     def handle_corners(self, mode, arg=gv.corners_set_net_both):
         if mode == gv.handle_corners_mode_clear_on_net_line or mode == gv.handle_corners_mode_clear_on_inp_net or mode == gv.handle_corners_mode_clear_on_both:
@@ -819,8 +829,8 @@ class FabianBoard(Board):
             self.keep_state()
             changed = self.set_net_between_corners(arg)
             if changed:
-                self.clear_corner_list()
-                self.mouse_select_mode = gv.mouse_select_mode_edge
+                # self.clear_corner_list()
+                self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
                 self.update_view()
             else:
                 self.state.pop(-1)
@@ -1103,7 +1113,7 @@ class FabianBoard(Board):
             self.show_entity(-1)
         self.remove_parts_from_list([part], gv.part_list_entities)
         if split_mode == gv.split_mode_2_parts_by_point:
-            self.mouse_select_mode = gv.mouse_select_mode_edge
+            self.change_mouse_selection_mode(gv.mouse_select_mode_edge)
         return True
 
     def split_all_circles(self, n=gv.default_split_circle_parts):
@@ -2474,6 +2484,12 @@ class FabianBoard(Board):
         self.remove_selected_part_mark()
         self.board.delete('all')
         self.show_all_entities()
+
+    def delete_pressed(self, key=None):
+        if self.selected_part is not None:
+            self.remove_selected_part_from_list()
+        else:
+            self.remove_marked_net_lines_from_list()
 
     def remove_selected_part_from_list(self, key=None):
         if self.selected_part is None:

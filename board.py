@@ -1,6 +1,16 @@
 from file_handling import *
 from point import Point
 
+
+def toggle(b):
+    if b.config('relief')[-1] == 'sunken':
+        b.config(relief="raised")
+        return 'off'
+    else:
+        b.config(relief="sunken")
+        return 'on'
+
+
 class Board:
     def __init__(self, with_frame_2=False):
         self.window_main = tk.Tk()
