@@ -4,10 +4,10 @@ from point import Point
 
 def toggle(b):
     if b.config('relief')[-1] == 'sunken':
-        b.config(relief="raised")
+        b.config(relief="raised", bg="SystemButtonFace")
         return 'off'
     else:
-        b.config(relief="sunken")
+        b.config(relief="sunken", bg=gv.sunken_button_color)
         return 'on'
 
 

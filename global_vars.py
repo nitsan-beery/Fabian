@@ -109,6 +109,7 @@ element_color = 'white'
 mark_rect_color = 'black'
 corner_color = 'red'
 inp_corner_color = 'blue'
+sunken_button_color = '#FF9933'
 
 # node exceptions
 unattached = 'unattached'

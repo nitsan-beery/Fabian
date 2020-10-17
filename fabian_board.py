@@ -65,6 +65,7 @@ class FabianBoard(Board):
 
         self.board.bind('<Motion>', self.motion)
         self.board.bind('<Button-1>', self.mouse_1_pressed)
+        self.board.bind('<Control-Button-1>', self.control_mouse_1_pressed)
         self.board.bind('<B1-Motion>', self.mouse_1_motion)
         self.board.bind('<ButtonRelease-1>', self.mouse_1_released)
         self.board.bind('<Control-ButtonRelease-1>', self.control_mouse_1_released)
@@ -173,7 +174,7 @@ class FabianBoard(Board):
                 inp_net = InpNet()
                 inp_net.get_data_from_tuple(t)
                 self.inp_nets.append(inp_net)
-        self.mouse_select_mode = state.mouse_select_mode
+        self.change_mouse_selection_mode(state.mouse_select_mode)
         self.work_mode = state.work_mode
         self.select_parts_mode = state.select_parts_mode
         self.show_entities = state.show_entities
@@ -240,6 +241,11 @@ class FabianBoard(Board):
         state.show_inps = self.show_inps
         state.scale = self.scale
         self.state.append(state)
+
+    def control_mouse_1_pressed(self, key):
+        if self.mouse_select_mode == gv.mouse_select_mode_point and self.selected_part is not None:
+            return
+        self.mouse_1_pressed(key)
 
     def mouse_1_pressed(self, key):
         if self.temp_rect_mark is not None:
@@ -410,17 +416,17 @@ class FabianBoard(Board):
         self.temp_rect_mark = self.board.create_rectangle(p1.x, p1.y, p2.x, p2.y)
 
     def control_mouse_1_released(self, key):
-        if self.mouse_select_mode == gv.mouse_select_mode_point:
-            return
         x, y = self.convert_keyx_keyy_to_xy(key.x, key.y)
         mouse_point = Point(x, y)
         if self.work_mode == gv.work_mode_inp or (self.work_mode == gv.work_mode_dxf and self.select_parts_mode == gv.part_type_net_line):
-            if self.new_line_edge[0] is not None and not self.mouse_click_point.is_equal(mouse_point):
+            if self.new_line_edge[0] is not None and not self.mouse_click_point.is_equal(mouse_point) and self.mouse_select_mode != gv.mouse_select_mode_point:
                 node_index = get_index_of_node_with_point_in_list(self.new_line_edge[0], self.node_list)
                 self.keep_state()
                 self.node_list[node_index].p = mouse_point
                 self.remove_temp_line()
                 self.update_view()
+            else:
+                self.mouse_1_released(key)
         if self.temp_rect_mark is not None:
             self.board.delete(self.temp_rect_mark)
             self.temp_rect_mark = None
@@ -790,8 +796,10 @@ class FabianBoard(Board):
 
     def toggle_point_edge_selection_mode(self):
         if toggle(self.button_p_select_mode) == 'on':
+            self.button_p_select_mode.config(bg=gv.sunken_button_color)
             self.mouse_select_mode = gv.mouse_select_mode_point
         else:
+            self.button_p_select_mode.config(bg="SystemButtonFace")
             self.mouse_select_mode = gv.mouse_select_mode_edge
 
     def change_mouse_selection_mode(self, mode):
@@ -2486,7 +2494,7 @@ class FabianBoard(Board):
         self.show_all_entities()
 
     def delete_pressed(self, key=None):
-        if self.selected_part is not None:
+        if self.selected_part is not None or self.new_line_edge[0] is not None:
             self.remove_selected_part_from_list()
         else:
             self.remove_marked_net_lines_from_list()
